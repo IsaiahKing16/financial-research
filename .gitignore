@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+venv/
+.venv/
+
+# Data (large files — don't commit)
+data/*.csv
+data/*.npz
+data/*.pkl
+
+# Models (large files)
+models/*.keras
+models/*.h5
+models/*.pkl
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# TensorFlow
+*.tfevents.*
+logs/

@@ -1,0 +1,26 @@
+# Financial Research Workflow - Phase 1 Dependencies
+# Install: pip install -r requirements.txt
+
+# Data
+yfinance>=0.2.36          # US stock data (no API key needed)
+pandas>=2.0.0
+numpy>=1.24.0
+
+# Technical indicators
+ta>=0.11.0                # Technical analysis library (RSI, MACD, Bollinger, etc.)
+
+# Machine learning
+scikit-learn>=1.3.0       # Preprocessing, metrics
+tensorflow>=2.15.0        # Conv1D + LSTM model (or use tensorflow-cpu for no GPU)
+# Alternatively, uncomment below for PyTorch:
+# torch>=2.1.0
+# torchvision>=0.16.0
+
+# Visualization
+matplotlib>=3.7.0
+
+# Utilities
+requests>=2.31.0          # API calls
+python-dateutil>=2.8.0
+tqdm>=4.65.0              # Progress bars
+joblib>=1.3.0             # Model saving

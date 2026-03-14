@@ -1,0 +1,18 @@
+{
+  "architecture": "TRANSFORMER",
+  "conv_filters": 64,
+  "conv_kernel": 3,
+  "dense_units": 32,
+  "dropout_rate": 0.3,
+  "learning_rate": 0.001,
+  "batch_size": 256,
+  "epochs": 150,
+  "confidence_threshold": 0.55,
+  "mc_samples": 100,
+  "use_focal_loss": true,
+  "focal_gamma": 2.0,
+  "focal_alpha": 0.25,
+  "window_size": 60,
+  "n_features": 32,
+  "num_heads": 4
+}

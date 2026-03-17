@@ -1,52 +1,47 @@
 """
-strategy.py — System A: Historical Analogue Matching, Calibration & Live Signals
+strategy_overnight.py — System A: 5-Hour Overnight Autoresearch Run
+DO NOT MODIFY DURING A RUN. Results append live to results_analogue.tsv.
 
-VISION:
-  Take end-of-day updated financial data across 52 US tickers.
-  For each ticker, compute its current return fingerprint and find the
-  historical moments across all 52 stocks and 25 years that looked
-  most like today. Project forward: what did those historical twins do
-  over the next 7 days? Rank the universe by match quality and signal
-  strength to identify the highest-confidence opportunities.
+THIS FILE IS A DUPLICATE OF strategy.py WITH THE MAIN BLOCK REPLACED.
+All matching logic, evaluation, and sweep infrastructure is identical.
 
-THE 5-STEP PIPELINE:
-  1. Profiling:      Compute 8-feature return vector for target stock/date
-  2. Analogue Search: K-NN search (Euclidean, ball_tree) for nearest twins
-  3. Regime Filter:  Restrict to same macro regime (bull/bear via SPY ret_90d)
-  4. Calibration:    Platt or isotonic regression maps raw P(up) → calibrated P
-  5. Signal:         Three-filter rule (MIN_MATCHES + AGREEMENT + THRESHOLD)
+OVERNIGHT SCHEDULE (5 phases, ~60 min each):
 
-PRODUCTION MODE:
-  run_live_signals() — fetches today's end-of-day data, scores all 52 tickers,
-  returns ranked BUY/SELL signals with match count, calibrated probability,
-  and top-5 historical analogues per ticker.
+  Phase 1 — Platt scaling calibration (~60 min)
+    Tests whether logistic regression post-calibration fixes the BSS gap.
+    Fits on the first 50% of val set, evaluates on second 50%.
+    If any config achieves BSS > 0 after calibration → Phase 5 activates.
 
-RESEARCH MODES:
-  run_analogue_sweep()     — parameter search, results → results_analogue.tsv
-  run_platt_sweep()        — calibration fraction optimisation
-  run_platt_walkforward()  — walk-forward with train-set Platt calibration
-  run_regime_walkforward() — walk-forward with regime filter + Platt/isotonic
+  Phase 2 — Horizon sweep (~60 min)
+    Tests fwd_1d, fwd_3d, fwd_14d, fwd_30d on the sweep 3 winner config.
+    Current work only evaluated fwd_7d_up. Different horizons may have better
+    calibration characteristics — the directional accuracy pattern may vary.
 
-LOCKED SETTINGS (evidence in PROJECT_GUIDE.md):
-  Distance metric:   Euclidean (cosine collapsed — 93.3% within dist 0.20)
-  MAX_DISTANCE:      1.1019 (quantile-calibrated, AvgK ~42)
-  DISTANCE_WEIGHTING: "uniform" (beats inverse — sweep 1)
-  Feature set:       return-only 8 cols (supplements 3.5x worse — sweeps 2/3)
-  CONFIDENCE_THRESHOLD: 0.65 (best binary accuracy — sweep 1)
-  SAME_SECTOR_ONLY:  False (sector-only worst BSS — sweep 1)
-  Calibration:       Platt cal_frac=0.76 on training set (generalises across regimes)
-  Regime filter:     SPY ret_90d > 0 = bull, <= 0 = bear (fixes 2022 Bear fold)
+  Phase 3 — Feature weight ablation (~60 min)
+    Tests: all-weights=1.0 baseline, return-windows-only weights,
+    and aggressive medium-term weighting (ret_7d/14d at 2.5x).
+    Establishes whether the current hand-tuned weights help or hurt.
 
-CURRENT STATUS (2026-03-16):
-  Positive BSS:    +0.00103 Platt / +0.00074 Isotonic (fold 2024, v4 walk-forward)
-  Walk-forward v4: Regime labels CONFIRMED CORRECT across all 6 folds.
-                   Zero trades at threshold=0.65 — regime filter compresses P(up).
-                   Overnight testing threshold=0.60/0.55 to restore trade coverage.
-  Regime labels verified:
-    2019: 11024 bull / 2080 bear  |  2020: 8788 bull / 4368 bear (COVID mixed)
-    2021: 13104 bull / 0 bear     |  2022: 2756 bull / 10296 bear (correctly bear)
-    2023: 11596 bull / 1404 bear  |  2024: 13052 bull / 52 bear
-  Test suite: 52 tests passing.
+  Phase 4 — Fine Euclidean grid scan (~60 min)
+    Denser grid around the sweep 3 winner (euc_r_d1.2457, BSS=-0.038).
+    Tests 12 configs between dist=1.15 and dist=1.40 to find any BSS peak.
+    Also tests inverse weighting (locked off in sweep 1 — re-test with retonly).
+
+  Phase 5 — Walk-forward on best overnight config (~60 min, conditional)
+    Only runs if Phase 1 or Phase 2 produces BSS > 0.
+    If no positive BSS found, runs walk-forward on overall best config
+    to establish regime stability baseline before Platt scaling is merged.
+
+RESULTS:
+  All phases write to results/results_analogue.tsv continuously.
+  Each phase prints a leaderboard when it finishes.
+  A final overnight summary is printed at the end.
+  Progress checkpoint written to results/overnight_progress.json.
+
+USAGE:
+  python strategy_overnight.py
+
+ESTIMATED RUNTIME: 5 hours on Ryzen 9 5900X.
 """
 
 import numpy as np
@@ -58,8 +53,85 @@ from sklearn.preprocessing import StandardScaler
 import joblib
 import json
 import warnings
+import threading
+import collections
 
+# ── Warning watchdog ──────────────────────────────────────────────────────────
+# Intercepts warning floods (e.g. sklearn/joblib parallel bug that caused
+# the previous overnight hang) and aborts cleanly before the process locks up.
+#
+#   WARN_WINDOW_SEC    = rolling window in seconds
+#   WARN_MAX_IN_WINDOW = max total warnings before abort
+#   WARN_IDENTICAL_MAX = max *identical* warnings before abort (tighter guard)
+
+WARN_WINDOW_SEC     = 10
+WARN_MAX_IN_WINDOW  = 20
+WARN_IDENTICAL_MAX  = 15
+
+_warn_lock       = threading.Lock()
+_warn_times      = collections.deque()
+_warn_messages   = collections.deque()
+_warn_abort_flag = threading.Event()
+
+
+class _WatchdogFilter:
+    def __init__(self, checkpoint_path=None):
+        self.checkpoint_path    = checkpoint_path
+        self._orig_showwarning  = warnings.showwarning
+
+    def install(self):
+        warnings.showwarning = self._handle
+        warnings.resetwarnings()
+        warnings.simplefilter("always")
+
+    def _handle(self, message, category, filename, lineno, file=None, line=None):
+        if _warn_abort_flag.is_set():
+            return
+        import time as _t
+        now     = _t.time()
+        msg_str = str(message)
+        with _warn_lock:
+            while _warn_times     and now - _warn_times[0]      > WARN_WINDOW_SEC: _warn_times.popleft()
+            while _warn_messages  and now - _warn_messages[0][0] > WARN_WINDOW_SEC: _warn_messages.popleft()
+            _warn_times.append(now)
+            _warn_messages.append((now, msg_str))
+            total     = len(_warn_times)
+            identical = sum(1 for _, m in _warn_messages if m == msg_str)
+            if identical <= 2:
+                self._orig_showwarning(message, category, filename, lineno, file, line)
+            triggered, reason = False, ""
+            if total >= WARN_MAX_IN_WINDOW:
+                triggered, reason = True, f"{total} warnings in {WARN_WINDOW_SEC}s (max={WARN_MAX_IN_WINDOW})"
+            elif identical >= WARN_IDENTICAL_MAX:
+                triggered, reason = True, f"{identical} identical warnings in {WARN_WINDOW_SEC}s: {msg_str[:80]!r}"
+            if triggered:
+                _warn_abort_flag.set()
+        if _warn_abort_flag.is_set() and triggered:
+            import json as _j, time as _t2
+            print(f"\n{'!'*65}")
+            print(f"  WATCHDOG ABORT: {reason}")
+            print(f"  Saving checkpoint and exiting cleanly.")
+            print(f"{'!'*65}\n")
+            if self.checkpoint_path:
+                try:
+                    cp = {}
+                    if self.checkpoint_path.exists():
+                        with open(self.checkpoint_path) as _f: cp = _j.load(_f)
+                    cp.update({"status": "ABORTED_WATCHDOG", "abort_reason": reason,
+                               "abort_time": _t2.strftime("%Y-%m-%d %H:%M:%S")})
+                    with open(self.checkpoint_path, "w") as _f: _j.dump(cp, _f, indent=2)
+                except Exception: pass
+            raise SystemExit(f"Aborted by warning watchdog: {reason}")
+
+    def restore(self):
+        warnings.showwarning = self._orig_showwarning
+        warnings.resetwarnings()
+        warnings.filterwarnings("ignore")
+
+
+# Bare filter for non-overnight usage (watchdog installed inside run_overnight)
 warnings.filterwarnings("ignore")
+
 
 # Graceful import for scoringrules — install with: pip install scoringrules
 try:
@@ -76,11 +148,10 @@ except ImportError:
 # ============================================================
 
 # --- Matching Algorithm ---
-TOP_K = 50                       # Neighbours retrieved per query
-MAX_DISTANCE = 1.1019            # Euclidean distance ceiling — quantile-calibrated (AvgK ~42)
-                                 # Locked from Platt sweep 2. Do not change without re-running sweep.
-DISTANCE_WEIGHTING = "uniform"   # "uniform" beats "inverse" — locked from sweep 1
-MIN_MATCHES = 10                 # Minimum valid matches required to generate a signal
+TOP_K = 50                     # Number of nearest neighbours (try: 20, 50, 100, 200)
+MAX_DISTANCE = 0.5             # Reject matches with cosine distance above this (try: 0.3-0.7)
+DISTANCE_WEIGHTING = "inverse" # "uniform" = all matches equal, "inverse" = closer matches count more
+MIN_MATCHES = 10               # Minimum valid matches required to generate a signal
 
 # --- Cohort Filtering ---
 SAME_SECTOR_ONLY = False       # If True, only match within same sector (try: True/False)
@@ -90,9 +161,9 @@ EXCLUDE_SAME_TICKER = True     # Don't match a stock against its own history (pr
 PROJECTION_HORIZON = "fwd_7d_up"  # Which forward window to predict (try: fwd_1d_up, fwd_3d_up, fwd_7d_up, fwd_14d_up, fwd_30d_up)
 
 # --- Signal Generation ---
-CONFIDENCE_THRESHOLD = 0.65    # Locked from sweep 1 — best binary accuracy trade-off
-                               # 0.65 = at least 65% of historical twins went UP for BUY signal
-AGREEMENT_SPREAD = 0.10        # Inert at AvgK ~42 but kept for signal quality filtering
+CONFIDENCE_THRESHOLD = 0.55    # Minimum agreement among analogues to trade (try: 0.50-0.65)
+                               # 0.55 = at least 55% of historical twins went UP
+AGREEMENT_SPREAD = 0.10        # Also require the UP% to be this far from 50% (try: 0.05-0.15)
 
 # --- Feature Weights (which parts of the return vector matter most) ---
 # These multiply each feature before distance calculation.
@@ -1434,319 +1505,32 @@ def run_analogue_sweep(budget_minutes=60, verbose=1):
     return ranked
 
 
-def run_live_signals(tickers=None, top_n=10, verbose=1):
-    """
-    PRODUCTION MODE — End-of-day signal generation across the full universe.
-
-    This is the entry point for live operation. It:
-      1. Fetches the last 120 days of OHLCV data for all 52 tickers via yfinance
-      2. Computes the 8-feature return fingerprint for today's close
-      3. Runs Euclidean analogue search against the full training database
-      4. Applies regime conditioning (bull/bear via SPY ret_90d)
-      5. Applies the fitted Platt calibrator to raw probabilities
-      6. Ranks all tickers by calibrated P(up) and signal strength
-      7. Returns the top_n BUY and SELL candidates with full analogue detail
-
-    No validation or historical evaluation is done here — this is purely
-    forward-looking: "given today's fingerprint, what does history suggest?"
-
-    Args:
-        tickers:  list of tickers to scan (default: all 52 from SECTOR_MAP)
-        top_n:    number of top BUY and SELL candidates to return (default: 10)
-        verbose:  1 = progress, 0 = silent
-
-    Returns:
-        dict with keys:
-          "date":     today's date string
-          "signals":  list of dicts ranked by calibrated_prob, each containing:
-                        ticker, signal, calibrated_prob, raw_prob,
-                        n_matches, avg_distance, top_analogues (list of 5),
-                        sector, regime
-          "summary":  printable leaderboard string
-          "regime":   current SPY macro regime ("bull" / "bear" / "unknown")
-
-    Usage:
-        results = run_live_signals()
-        for s in results["signals"]:
-            print(s["ticker"], s["signal"], f"{s['calibrated_prob']:.1%}")
-    """
-    import yfinance as yf
-    import time
-
-    if tickers is None:
-        tickers = list(SECTOR_MAP.keys())
-
-    print(f"\n{'='*65}")
-    print(f"  SYSTEM A — LIVE SIGNAL SCAN")
-    print(f"  Universe: {len(tickers)} tickers | Horizon: {PROJECTION_HORIZON}")
-    print(f"  Distance: Euclidean | Max dist: {MAX_DISTANCE} | Top K: {TOP_K}")
-    print(f"{'='*65}\n")
-
-    # ── Step 1: Load training database and fitted calibrator ──────────────
-    if verbose:
-        print("  [1/5] Loading analogue database and calibrator...")
-
-    train_db = pd.read_parquet(DATA_DIR / "train_db.parquet")
-
-    from prepare import FEATURE_COLS
-    RETURN_ONLY = [c for c in FEATURE_COLS if c.startswith("ret_")]
-
-    # Refit scaler on training data (return-only features)
-    scaler = StandardScaler()
-    scaler.fit(train_db[RETURN_ONLY].values)
-
-    # Fit Platt calibrator on training set probabilities
-    # This mirrors run_platt_walkforward v2 — calibrator sees all 14 years
-    if verbose:
-        print("  [2/5] Fitting Platt calibrator on training set...")
-    train_probs, _, _, _, _, _ = _run_matching_loop(
-        train_db, train_db, scaler, FEATURE_COLS, verbose=0,
-        max_distance=MAX_DISTANCE,
-        metric_override="euclidean",
-        feature_cols_override=RETURN_ONLY,
-        top_k=TOP_K, distance_weighting=DISTANCE_WEIGHTING,
-        confidence_threshold=CONFIDENCE_THRESHOLD,
-        agreement_spread=AGREEMENT_SPREAD,
-        exclude_same_ticker=True,
-        regime_filter=True,
-    )
-    train_y_bin = train_db[PROJECTION_HORIZON].values
-    calibrator = fit_platt_scaling(train_probs, train_y_bin)
-    if verbose:
-        print(f"     Calibrator fitted on {len(train_probs):,} training samples")
-
-    # ── Step 2: Fetch today's end-of-day data for all tickers ─────────────
-    if verbose:
-        print(f"  [3/5] Fetching end-of-day data for {len(tickers)} tickers...")
-
-    today_str = datetime.now().strftime("%Y-%m-%d")
-    lookback_days = 130  # need 90 days for ret_90d + buffer for weekends/holidays
-
-    all_today_data = {}
-    failed_tickers = []
-    for i, ticker in enumerate(tickers):
-        if verbose and i % 10 == 0:
-            print(f"     Downloading {i+1}/{len(tickers)}...", end="\r")
-        try:
-            df = yf.download(ticker, period=f"{lookback_days}d",
-                             progress=False, auto_adjust=True)
-            if len(df) >= 95:  # need at least 95 trading days for ret_90d
-                df = df.reset_index()
-                df.columns = [c[0] if isinstance(c, tuple) else c for c in df.columns]
-                df["Ticker"] = ticker
-                all_today_data[ticker] = df
-        except Exception as e:
-            failed_tickers.append((ticker, str(e)))
-
-    if verbose:
-        print(f"     Downloaded {len(all_today_data)}/{len(tickers)} tickers "
-              f"({len(failed_tickers)} failed)    ")
-
-    # ── Step 3: Compute today's return fingerprint for each ticker ─────────
-    if verbose:
-        print(f"  [4/5] Computing return fingerprints...")
-
-    from prepare import compute_return_vector
-
-    query_rows = []
-    for ticker, df in all_today_data.items():
-        df = compute_return_vector(df, ticker)
-        df = df.dropna(subset=RETURN_ONLY)
-        if len(df) == 0:
-            continue
-        latest = df.iloc[-1]  # most recent trading day = today's fingerprint
-        row = {"Ticker": ticker, "Date": latest["Date"]}
-        row.update({c: latest[c] for c in RETURN_ONLY})
-        query_rows.append(row)
-
-    if not query_rows:
-        print("  ERROR: No valid fingerprints computed. Check yfinance connection.")
-        return {"date": today_str, "signals": [], "summary": "No data", "regime": "unknown"}
-
-    query_db = pd.DataFrame(query_rows).reset_index(drop=True)
-
-    # Determine current market regime from SPY
-    spy_row = query_db[query_db["Ticker"] == "SPY"]
-    if len(spy_row) > 0:
-        spy_ret90 = float(spy_row.iloc[-1]["ret_90d"])
-        current_regime = "bull" if spy_ret90 > 0 else "bear"
-    else:
-        current_regime = "unknown"
-    if verbose:
-        print(f"     Current regime: {current_regime.upper()} "
-              f"(SPY ret_90d = {spy_ret90:+.1%})" if current_regime != "unknown"
-              else "     Current regime: unknown (SPY data unavailable)")
-
-    # ── Step 4: Run analogue matching on today's fingerprints ─────────────
-    if verbose:
-        print(f"  [5/5] Matching {len(query_db)} tickers against {len(train_db):,} historical rows...")
-
-    raw_probs, signals, reasons, n_matches, mean_rets, ensembles = _run_matching_loop(
-        train_db, query_db, scaler, FEATURE_COLS, verbose=0,
-        max_distance=MAX_DISTANCE,
-        metric_override="euclidean",
-        feature_cols_override=RETURN_ONLY,
-        top_k=TOP_K, distance_weighting=DISTANCE_WEIGHTING,
-        confidence_threshold=CONFIDENCE_THRESHOLD,
-        agreement_spread=AGREEMENT_SPREAD,
-        regime_filter=True,
-    )
-
-    # ── Step 5: Apply calibration and build signal records ─────────────────
-    cal_probs = calibrate_probabilities(calibrator, raw_probs)
-
-    # Re-generate signals with calibrated probabilities
-    final_signals = []
-    for i in range(len(query_db)):
-        ticker  = query_db.iloc[i]["Ticker"]
-        raw_p   = float(raw_probs[i])
-        cal_p   = float(cal_probs[i])
-        nm      = int(n_matches[i])
-        mr      = float(mean_rets[i])
-        sector  = SECTOR_MAP.get(ticker, "Unknown")
-
-        # Generate signal from calibrated probability
-        proj_mock = {
-            "probability_up": cal_p,
-            "agreement": abs(cal_p - 0.5) * 2,
-            "n_matches": nm,
-            "mean_return": mr,
-            "median_return": mr,
-            "ensemble_returns": ensembles[i],
-        }
-        signal, reason = generate_signal(
-            proj_mock,
-            threshold=CONFIDENCE_THRESHOLD,
-            min_agreement=AGREEMENT_SPREAD,
-            min_matches=MIN_MATCHES,
-        )
-
-        # Find top-5 nearest analogues for this ticker
-        top_analogues = []
-        if nm > 0:
-            # Re-run a single query to get actual neighbour rows with dates
-            X_q = scaler.transform(
-                query_db.iloc[[i]][RETURN_ONLY].values
-            )
-            nn_idx = NearestNeighbors(
-                n_neighbors=min(5, len(train_db)),
-                metric="euclidean", algorithm="ball_tree", n_jobs=1
-            )
-            nn_idx.fit(scaler.transform(train_db[RETURN_ONLY].values))
-            dists, idxs = nn_idx.kneighbors(X_q)
-            for dist, idx in zip(dists[0], idxs[0]):
-                if dist <= MAX_DISTANCE:
-                    analogue_row = train_db.iloc[idx]
-                    top_analogues.append({
-                        "date":    str(analogue_row["Date"])[:10],
-                        "ticker":  analogue_row["Ticker"],
-                        "distance": round(float(dist), 4),
-                        "fwd_7d":  round(float(analogue_row.get("fwd_7d", 0)) * 100, 2),
-                        "went_up": bool(analogue_row.get("fwd_7d_up", 0)),
-                    })
-
-        final_signals.append({
-            "ticker":          ticker,
-            "signal":          signal,
-            "calibrated_prob": round(cal_p, 4),
-            "raw_prob":        round(raw_p, 4),
-            "n_matches":       nm,
-            "mean_7d_return":  round(mr * 100, 2),
-            "sector":          sector,
-            "regime":          current_regime,
-            "reason":          reason,
-            "top_analogues":   top_analogues,
-        })
-
-    # Rank: BUY by highest calibrated_prob, SELL by lowest, HOLD filtered out
-    buys  = sorted([s for s in final_signals if s["signal"] == "BUY"],
-                   key=lambda x: x["calibrated_prob"], reverse=True)
-    sells = sorted([s for s in final_signals if s["signal"] == "SELL"],
-                   key=lambda x: x["calibrated_prob"])
-    holds = [s for s in final_signals if s["signal"] == "HOLD"]
-
-    top_buys  = buys[:top_n]
-    top_sells = sells[:top_n]
-
-    # ── Print leaderboard ──────────────────────────────────────────────────
-    lines = []
-    lines.append(f"\n{'='*65}")
-    lines.append(f"  LIVE SIGNAL LEADERBOARD — {today_str}")
-    lines.append(f"  Regime: {current_regime.upper()} | "
-                 f"Universe: {len(final_signals)} tickers | "
-                 f"BUY: {len(buys)} | SELL: {len(sells)} | HOLD: {len(holds)}")
-    lines.append(f"{'='*65}")
-
-    if top_buys:
-        lines.append(f"\n  TOP BUY SIGNALS")
-        lines.append(f"  {'Ticker':<8} {'P(up)':>7} {'Raw P':>7} "
-                     f"{'Matches':>8} {'AvgRet':>8} {'Sector':<12} Top Analogues")
-        lines.append(f"  {'─'*75}")
-        for s in top_buys:
-            analogue_str = ", ".join(
-                f"{a['ticker']}@{a['date'][:7]}" for a in s["top_analogues"][:3]
-            )
-            lines.append(f"  {s['ticker']:<8} {s['calibrated_prob']:>7.1%} "
-                         f"{s['raw_prob']:>7.1%} {s['n_matches']:>8} "
-                         f"{s['mean_7d_return']:>+7.1f}% {s['sector']:<12} {analogue_str}")
-
-    if top_sells:
-        lines.append(f"\n  TOP SELL SIGNALS")
-        lines.append(f"  {'Ticker':<8} {'P(up)':>7} {'Raw P':>7} "
-                     f"{'Matches':>8} {'AvgRet':>8} {'Sector':<12} Top Analogues")
-        lines.append(f"  {'─'*75}")
-        for s in top_sells:
-            analogue_str = ", ".join(
-                f"{a['ticker']}@{a['date'][:7]}" for a in s["top_analogues"][:3]
-            )
-            lines.append(f"  {s['ticker']:<8} {s['calibrated_prob']:>7.1%} "
-                         f"{s['raw_prob']:>7.1%} {s['n_matches']:>8} "
-                         f"{s['mean_7d_return']:>+7.1f}% {s['sector']:<12} {analogue_str}")
-
-    lines.append(f"\n  Regime: {current_regime.upper()} — "
-                 + ("Bear-market analogues only. " if current_regime == "bear" else
-                    "Bull-market analogues only. ")
-                 + f"HOLD: {len(holds)} tickers filtered.")
-    lines.append(f"{'='*65}\n")
-
-    summary = "\n".join(lines)
-    print(summary)
-
-    return {
-        "date":    today_str,
-        "signals": top_buys + top_sells,
-        "all_signals": final_signals,
-        "summary": summary,
-        "regime":  current_regime,
-        "n_buys":  len(buys),
-        "n_sells": len(sells),
-        "n_holds": len(holds),
-    }
-
-
 # ============================================================
 # PLATT SCALING CALIBRATION
 # ============================================================
 
 def fit_platt_scaling(probabilities, y_true):
     """
-    Fit a logistic regression to map raw P(up) outputs to calibrated
-    probabilities. This is the standard post-hoc calibration fix when
-    a model has directional skill but miscalibrated probability outputs.
+    Fit a logistic regression to map raw P(up) outputs to calibrated probabilities.
 
-    The raw P(up) from analogue matching is the single input feature.
-    The fitted model learns a monotonic mapping to calibrated probabilities.
+    This is the standard post-hoc calibration fix when a model has directional
+    skill but miscalibrated probability outputs (which is exactly the case here:
+    58.6% binary accuracy but BSS = -0.038 across all sweep 3 configs).
+
+    The raw P(up) from analogue matching is fed as a single feature.
+    The fitted model learns a monotonic mapping to better-calibrated probabilities.
 
     Args:
         probabilities: array of raw P(up) from _run_matching_loop
-        y_true:        array of 0/1 ground truth outcomes
+        y_true:        array of 0/1 ground truth
 
     Returns:
-        fitted LogisticRegression calibrator
+        fitted LogisticRegression calibrator (call .predict_proba for calibrated probs)
     """
     from sklearn.linear_model import LogisticRegression
+    X = probabilities.reshape(-1, 1)
     cal = LogisticRegression(C=1.0, solver="lbfgs", max_iter=1000)
-    cal.fit(probabilities.reshape(-1, 1), y_true)
+    cal.fit(X, y_true)
     return cal
 
 
@@ -1777,6 +1561,7 @@ def fit_isotonic_scaling(probabilities, y_true):
     return cal
 
 
+
 def calibrate_probabilities(calibrator, probabilities):
     """
     Apply a fitted calibrator to raw probabilities. Abstracts Platt vs isotonic
@@ -1793,55 +1578,49 @@ def calibrate_probabilities(calibrator, probabilities):
         return calibrator.predict(probabilities)
 
 
+
+
 def evaluate_with_calibration(probabilities, y_true_binary, y_true_returns,
                                all_signals, all_ensembles, horizon_label,
                                cal_frac=0.5, experiment_name=""):
     """
     Fit Platt scaling on the first cal_frac of validation, evaluate on the rest.
 
-    Temporal split: first half = earlier 2024 (calibration), second = later 2024
-    (evaluation). This avoids using the same data to fit and evaluate the calibrator.
+    This avoids using the same data to both fit and evaluate the calibrator.
+    The split is temporal (first half = earlier 2024, second half = later 2024).
 
-    OVERNIGHT RESULTS (cal_frac=0.50):
-      platt_euc_r_d1.0115: pre=-0.03807 → post=-0.00192  delta=+0.036  ← best ever
-      platt_euc_r_d1.1019: pre=-0.03429 → post=-0.00228  delta=+0.032
-      platt_euc_r_d1.2457: pre=-0.03351 → post=-0.00277  delta=+0.031
-      platt_cos_uniform:   pre=-0.04008 → post=-0.00491  delta=+0.035
-    Gap to BSS=0: 0.002. Hypothesis: higher cal_frac closes the gap.
-
-    Args:
-        cal_frac: fraction of val set used for calibration (try 0.50–0.80)
-
-    Returns:
-        dict with pre_bss, post_bss, bss_delta, pre_acc, post_acc, etc.
+    Returns dict with both pre- and post-calibration metrics.
     """
     from prepare import save_results
 
-    n     = len(probabilities)
+    n = len(probabilities)
     split = int(n * cal_frac)
 
-    # Fit calibrator on first cal_frac of validation (temporal order)
-    cal_probs = probabilities[:split]
-    cal_y     = y_true_binary[:split]
-    calibrator = fit_platt_scaling(cal_probs, cal_y)
+    # Calibration set (first half)
+    cal_probs   = probabilities[:split]
+    cal_y       = y_true_binary[:split]
 
-    # Evaluate on second half only
+    # Evaluation set (second half)
     eval_probs  = probabilities[split:]
     eval_y_bin  = y_true_binary[split:]
     eval_y_ret  = y_true_returns[split:]
     eval_sigs   = all_signals[split:]
     eval_ens    = all_ensembles[split:]
 
-    # Apply calibrated probabilities to eval set (Platt or isotonic)
-    cal_probs_eval = calibrate_probabilities(calibrator, eval_probs)
+    # Fit calibrator on first half
+    calibrator = fit_platt_scaling(cal_probs, cal_y)
 
-    # Re-generate signals with calibrated probabilities
+    # Apply to second half
+    cal_probs_eval = calibrator.predict_proba(eval_probs.reshape(-1, 1))[:, 1]
+
+    # Re-generate signals using calibrated probabilities
+    from prepare import FEATURE_COLS
     recal_signals = []
     for p in cal_probs_eval:
         proj_mock = {
             "probability_up": float(p),
             "agreement": abs(p - 0.5) * 2,
-            "n_matches": MIN_MATCHES + 1,
+            "n_matches": 20,  # Assume enough matches passed — signals already filtered
             "mean_return": 0.0,
             "median_return": 0.0,
             "ensemble_returns": np.array([]),
@@ -1853,21 +1632,17 @@ def evaluate_with_calibration(probabilities, y_true_binary, y_true_returns,
         recal_signals.append(sig)
     recal_signals = np.array(recal_signals)
 
-    # Score uncalibrated on eval set
+    # Evaluate uncalibrated on eval set
     pre_metrics = evaluate_probabilistic(
         eval_y_bin, eval_y_ret, eval_probs,
         eval_ens, signals=eval_sigs, horizon_label=horizon_label
     )
 
-    # Score calibrated on eval set
+    # Evaluate calibrated on eval set
     post_metrics = evaluate_probabilistic(
         eval_y_bin, eval_y_ret, cal_probs_eval,
         eval_ens, signals=recal_signals, horizon_label=horizon_label
     )
-
-    pre_bss  = pre_metrics.get("brier_skill_score")
-    post_bss = post_metrics.get("brier_skill_score")
-    bss_delta = (post_bss or 0) - (pre_bss or 0)
 
     result = {
         "experiment_name": experiment_name,
@@ -1875,384 +1650,56 @@ def evaluate_with_calibration(probabilities, y_true_binary, y_true_returns,
         "cal_frac": cal_frac,
         "cal_samples": split,
         "eval_samples": n - split,
-        "pre_bss":    pre_bss,
-        "pre_acc":    pre_metrics.get("accuracy_confident"),
+        # Pre-calibration
+        "pre_bss": pre_metrics.get("brier_skill_score"),
+        "pre_acc": pre_metrics.get("accuracy_confident"),
         "pre_trades": pre_metrics.get("confident_trades"),
-        "pre_crps":   pre_metrics.get("crps"),
-        "post_bss":    post_bss,
-        "post_acc":    post_metrics.get("accuracy_confident"),
+        "pre_crps": pre_metrics.get("crps"),
+        # Post-calibration
+        "post_bss": post_metrics.get("brier_skill_score"),
+        "post_acc": post_metrics.get("accuracy_confident"),
         "post_trades": post_metrics.get("confident_trades"),
-        "post_crps":   post_metrics.get("crps"),
-        "bss_delta":   bss_delta,
+        "post_crps": post_metrics.get("crps"),
+        "bss_delta": (post_metrics.get("brier_skill_score") or 0) -
+                     (pre_metrics.get("brier_skill_score") or 0),
     }
 
+    # Save to TSV
     save_results(result, experiment_name,
                  filepath=RESULTS_DIR / ANALOGUE_RESULTS_FILE)
     return result
 
 
-def run_platt_sweep(cal_fracs=None, verbose=1):
-    """
-    Targeted Platt calibration fraction sweep.
-
-    Tests multiple cal_frac values (0.50–0.80) on the best-performing
-    analogue configs. The gap to BSS=0 is 0.002 as of 2026-03-16 —
-    this sweep is designed to close it.
-
-    EVIDENCE:
-      - Best raw BSS:   -0.038 (euc_r_d1.2457, sweep 3)
-      - Best Platt BSS: -0.00192 (platt_euc_r_d1.0115, cal_frac=0.50)
-      - Platt lifts BSS by +0.031 to +0.036 across all configs tested
-      - More calibration data (higher cal_frac) should narrow the gap further
-
-    Results → results_analogue.tsv. Prints leaderboard ranked by post_bss.
-
-    Args:
-        cal_fracs: list of fractions to test. Default: [0.50, 0.65, 0.70, 0.75, 0.80]
-    """
-    import time
-
-    if cal_fracs is None:
-        cal_fracs = [0.50, 0.65, 0.70, 0.75, 0.80]
-
-    # Load data once
-    print(f"\n{'='*65}")
-    print(f"  PLATT CALIBRATION FRACTION SWEEP")
-    print(f"  cal_frac values: {cal_fracs}")
-    print(f"  Goal: post_bss > 0  (gap = 0.002 as of 2026-03-16)")
-    print(f"{'='*65}\n")
-
-    train_db = pd.read_parquet(DATA_DIR / "train_db.parquet")
-    val_db   = pd.read_parquet(DATA_DIR / "val_db.parquet")
-    scaler   = joblib.load(MODEL_DIR / "analogue_scaler.pkl")
-    from prepare import FEATURE_COLS, save_results
-
-    RETURN_ONLY = [c for c in FEATURE_COLS if c.startswith("ret_")]
-
-    # Configs — top 2 from Platt sweep 1 (both peaked at cf=0.75)
-    # d1.1019: best post_bss=-0.00048 at cf=0.75
-    # d1.2457: best post_bss=-0.00078 at cf=0.75
-    configs = [
-        {"name_base": "platt_euc_r_d1.1019", "MAX_DISTANCE": 1.1019,
-         "metric": "euclidean", "feat": RETURN_ONLY},
-        {"name_base": "platt_euc_r_d1.2457", "MAX_DISTANCE": 1.2457,
-         "metric": "euclidean", "feat": RETURN_ONLY},
-        {"name_base": "platt_euc_r_d1.0115", "MAX_DISTANCE": 1.0115,
-         "metric": "euclidean", "feat": RETURN_ONLY},
-    ]
-
-    all_results = []
-    session_start = time.time()
-
-    # Pre-compute probabilities for each config once (reused across all cal_fracs)
-    config_probs = {}
-    for cfg in configs:
-        print(f"  Computing analogues: {cfg['name_base']}...")
-        probs, sigs, _, n_matches, mean_rets, ensembles = _run_matching_loop(
-            train_db, val_db, scaler, FEATURE_COLS, verbose=0,
-            max_distance=cfg["MAX_DISTANCE"],
-            metric_override=cfg["metric"],
-            feature_cols_override=cfg["feat"],
-            top_k=50, distance_weighting="uniform",
-            confidence_threshold=CONFIDENCE_THRESHOLD,
-            agreement_spread=AGREEMENT_SPREAD,
-        )
-        config_probs[cfg["name_base"]] = (probs, sigs, ensembles,
-                                           float(np.mean(n_matches)))
-        print(f"    AvgK={np.mean(n_matches):.1f} | raw P(up) range: "
-              f"{probs.min():.3f}–{probs.max():.3f}")
-
-    y_bin = val_db[PROJECTION_HORIZON].values
-    y_ret = val_db[PROJECTION_HORIZON.replace("_up", "")].values
-
-    print(f"\n  Running Platt sweep across {len(cal_fracs)} cal_frac values...\n")
-
-    # Now test all cal_fracs for each config
-    for cfg in configs:
-        name_base = cfg["name_base"]
-        probs, sigs, ensembles, avgk = config_probs[name_base]
-
-        for cal_frac in cal_fracs:
-            exp_name = f"{name_base}_cf{int(cal_frac*100)}"
-
-            r = evaluate_with_calibration(
-                probs, y_bin, y_ret, sigs, ensembles,
-                horizon_label=PROJECTION_HORIZON,
-                experiment_name=exp_name,
-                cal_frac=cal_frac,
-            )
-            all_results.append(r)
-
-            pre  = r.get("pre_bss") or 0
-            post = r.get("post_bss") or 0
-            delta = r.get("bss_delta") or 0
-            flag  = "✓ POSITIVE BSS" if post > 0 else ("↑ close" if post > -0.01 else "✗")
-            if verbose:
-                print(f"  {flag} {exp_name:<40} "
-                      f"pre={pre:+.5f} → post={post:+.5f}  Δ={delta:+.5f}  "
-                      f"AvgK={avgk:.1f}")
-
-    # Leaderboard
-    total_time = time.time() - session_start
-    ranked = sorted(all_results,
-                    key=lambda r: r.get("post_bss") or -99, reverse=True)
-
-    print(f"\n{'='*65}")
-    print(f"  PLATT SWEEP LEADERBOARD — {len(all_results)} configs in {total_time/60:.1f} min")
-    print(f"  Ranked by post-calibration BSS")
-    print(f"{'='*65}\n")
-    print(f"  {'Experiment':<42} {'cal_frac':>8} {'pre_BSS':>9} {'post_BSS':>9} {'delta':>8}")
-    print(f"  {'─'*75}")
-
-    for i, r in enumerate(ranked):
-        post = r.get("post_bss") or 0
-        pre  = r.get("pre_bss") or 0
-        flag = "✓" if post > 0 else " "
-        marker = " ← BEST" if i == 0 else ""
-        print(f"  {flag}{r['experiment_name']:<41} "
-              f"{r.get('cal_frac', 0):>8.2f} "
-              f"{pre:>+9.5f} "
-              f"{post:>+9.5f} "
-              f"{r.get('bss_delta', 0):>+8.5f}"
-              f"{marker}")
-
-    if ranked and (ranked[0].get("post_bss") or 0) > 0:
-        best = ranked[0]
-        print(f"\n  ✓ POSITIVE BSS ACHIEVED: {best['experiment_name']}")
-        print(f"  post_bss={best['post_bss']:+.5f} at cal_frac={best['cal_frac']}")
-        print(f"\n  NEXT STEP: Run walk-forward with this config to confirm regime stability.")
-    else:
-        best = ranked[0] if ranked else {}
-        post = best.get("post_bss") or 0
-        print(f"\n  Best post_bss: {post:+.5f} ({best.get('experiment_name','?')})")
-        print(f"  Still negative. Gap to 0: {abs(post):.5f}")
-        if abs(post) < 0.01:
-            print(f"  Very close — try a wider cal_frac range or isotonic regression.")
-
-    print(f"{'='*65}\n")
-    return ranked
-
-
-def run_platt_walkforward(experiment_name="platt_walkforward",
-                          max_distance=1.1019):
-    """
-    Walk-forward validation using Platt calibration fitted on TRAINING data.
-
-    Previous version (v1) fitted Platt on the first 76% of each fold's val set.
-    That caused two failures:
-      1. 2022 Bear: calibrator fitted on Jan-Sep 2022 (all-bear) mapped all
-         probabilities toward 0.47 → zero trades generated
-      2. 1/6 positive BSS — calibration overfit to each fold's own regime
-
-    This version (v2) fits Platt on the training set probabilities:
-      - Training set spans all regimes (2010–fold train_end)
-      - Calibrator learns a stable, regime-agnostic P(raw) → P(calibrated) mapping
-      - Full validation set is evaluated (no holdout split needed)
-      - Strictly no leakage: calibrator uses only train_db rows
-
-    Config: Euclidean distance | return-only (8 features) | dist={max_distance}
-    """
-    print(f"\n{'='*65}")
-    print(f"  PLATT WALK-FORWARD v2: {experiment_name}")
-    print(f"  Config: Euclidean + return-only | dist={max_distance}")
-    print(f"  Calibration: fitted on TRAINING SET (regime-agnostic)")
-    print(f"  {len(WALKFORWARD_FOLDS)} folds × (match train + calibrate on train + eval full val)")
-    print(f"{'='*65}")
-
-    full_db_path = DATA_DIR / "full_analogue_db.parquet"
-    if not full_db_path.exists():
-        raise FileNotFoundError("full_analogue_db.parquet not found. Run prepare.py first.")
-
-    full_db = pd.read_parquet(full_db_path)
-    full_db["Date"] = pd.to_datetime(full_db["Date"])
-
-    from prepare import FEATURE_COLS, save_results
-    RETURN_ONLY = [c for c in FEATURE_COLS if c.startswith("ret_")]
-
-    horizon_return_col = PROJECTION_HORIZON.replace("_up", "")
-    fold_results = []
-
-    for fold_idx, fold in enumerate(WALKFORWARD_FOLDS):
-        label     = fold["label"]
-        train_end = fold["train_end"]
-        val_start = fold["val_start"]
-        val_end   = fold["val_end"]
-
-        print(f"\n  ── Fold {fold_idx+1}/{len(WALKFORWARD_FOLDS)}: {label} ──")
-        print(f"     Train: start → {train_end} | Val: {val_start} → {val_end}")
-
-        train_db = full_db[full_db["Date"] <= train_end].copy().reset_index(drop=True)
-        val_db   = full_db[(full_db["Date"] >= val_start) &
-                           (full_db["Date"] <= val_end)].copy().reset_index(drop=True)
-
-        if len(train_db) < 1000 or len(val_db) < 100:
-            print(f"     SKIP — insufficient data")
-            continue
-
-        print(f"     Train: {len(train_db):,} rows | Val: {len(val_db):,} rows")
-
-        # Refit scaler on this fold's training data only (no leakage)
-        scaler = StandardScaler()
-        scaler.fit(train_db[RETURN_ONLY].values)
-
-        # Step 1: Run matching on TRAINING set to get train probabilities
-        # These are used to fit the Platt calibrator — all 14 years of regimes
-        print(f"     Fitting Platt calibrator on training set...")
-        train_probs, _, _, _, _, _ = _run_matching_loop(
-            train_db, train_db, scaler, FEATURE_COLS, verbose=0,
-            max_distance=max_distance,
-            metric_override="euclidean",
-            feature_cols_override=RETURN_ONLY,
-            top_k=50, distance_weighting="uniform",
-            confidence_threshold=CONFIDENCE_THRESHOLD,
-            agreement_spread=AGREEMENT_SPREAD,
-            exclude_same_ticker=True,  # must exclude self-matches on train set
-        )
-        train_y_bin = train_db[PROJECTION_HORIZON].values
-
-        # Fit Platt calibrator on full training set probabilities
-        calibrator = fit_platt_scaling(train_probs, train_y_bin)
-        print(f"     Calibrator fitted on {len(train_probs):,} training samples")
-
-        # Step 2: Run matching on VALIDATION set
-        val_probs, all_signals, _, all_n_matches, all_mean_returns, all_ensembles = \
-            _run_matching_loop(
-                train_db, val_db, scaler, FEATURE_COLS, verbose=0,
-                max_distance=max_distance,
-                metric_override="euclidean",
-                feature_cols_override=RETURN_ONLY,
-                top_k=50, distance_weighting="uniform",
-                confidence_threshold=CONFIDENCE_THRESHOLD,
-                agreement_spread=AGREEMENT_SPREAD,
-            )
-
-        y_bin = val_db[PROJECTION_HORIZON].values
-        y_ret = val_db[horizon_return_col].values
-
-        # Step 3: Apply training-fitted calibrator to validation probabilities
-        cal_probs = calibrator.predict_proba(val_probs.reshape(-1, 1))[:, 1]
-
-        # Re-generate signals with calibrated probabilities (full val set)
-        recal_signals = []
-        for p in cal_probs:
-            proj_mock = {"probability_up": float(p), "agreement": abs(p - 0.5) * 2,
-                         "n_matches": MIN_MATCHES + 1, "mean_return": 0.0,
-                         "median_return": 0.0, "ensemble_returns": np.array([])}
-            sig, _ = generate_signal(proj_mock, threshold=CONFIDENCE_THRESHOLD,
-                                      min_agreement=AGREEMENT_SPREAD, min_matches=1)
-            recal_signals.append(sig)
-        recal_signals = np.array(recal_signals)
-
-        # Evaluate on FULL validation set
-        metrics = evaluate_probabilistic(
-            y_bin, y_ret, cal_probs,
-            all_ensembles, signals=recal_signals,
-            horizon_label=PROJECTION_HORIZON
-        )
-
-        bss  = metrics.get("brier_skill_score") or 0
-        crps = metrics.get("crps")
-        crps_str = f"{crps:.5f}" if crps is not None else "N/A"
-        bss_flag = "✓" if bss > 0 else "✗"
-        print(f"     {bss_flag} Trades={metrics['confident_trades']:,} | "
-              f"Acc={metrics['accuracy_confident']:.1%} | "
-              f"BSS={bss:+.5f} | CRPS={crps_str} | AvgK={np.mean(all_n_matches):.1f}")
-
-        # Log to TSV
-        fold_name = f"{experiment_name}_fold_{label.replace(' ', '_').replace('(','').replace(')','')}"
-        row = {k: v for k, v in metrics.items() if k != "calibration_buckets"}
-        row.update({
-            "experiment_name": fold_name,
-            "method": "platt_walkforward_v2",
-            "fold_label": label,
-            "train_end": train_end,
-            "val_year": val_start[:4],
-            "top_k": 50,
-            "max_distance": max_distance,
-            "distance_weighting": "uniform",
-            "projection_horizon": PROJECTION_HORIZON,
-            "confidence_threshold": CONFIDENCE_THRESHOLD,
-            "agreement_spread": AGREEMENT_SPREAD,
-            "min_matches": MIN_MATCHES,
-            "same_sector_only": False,
-            "exclude_same_ticker": True,
-            "cal_source": "training_set",
-            "distance_metric": "euclidean",
-            "feature_set_name": "returns_only",
-            "n_features": len(RETURN_ONLY),
-            "avg_matches": float(np.mean(all_n_matches)),
-            "avg_projected_return": float(np.mean(all_mean_returns)),
-            "buy_signals": int((all_signals == "BUY").sum()),
-            "sell_signals": int((all_signals == "SELL").sum()),
-            "hold_signals": int((all_signals == "HOLD").sum()),
-        })
-        save_results(row, fold_name, filepath=RESULTS_DIR / ANALOGUE_RESULTS_FILE)
-        fold_results.append({"label": label, **metrics,
-                              "avg_matches": float(np.mean(all_n_matches))})
-
-    # ── Summary ──────────────────────────────────────────────
-    acc_list, bss_list, crps_list = [], [], []
-    print(f"\n{'='*65}")
-    print(f"  PLATT WALK-FORWARD SUMMARY — {experiment_name}")
-    print(f"{'='*65}")
-    print(f"  {'Fold':<22} {'Trades':>7} {'Acc(c)':>7} {'BSS':>9} {'CRPS':>10} {'AvgK':>6}")
-    print(f"  {'~'*57}")
-
-    for r in fold_results:
-        bss_val = r.get("brier_skill_score")
-        bss_str = f"{bss_val:>+9.5f}" if bss_val is not None else "      N/A"
-        crps_str = f"{r['crps']:.5f}" if r.get("crps") is not None else "       N/A"
-        bss_flag = "✓" if (bss_val or 0) > 0 else " "
-        print(f"  {bss_flag}{r['label']:<21} {r['confident_trades']:>7} "
-              f"{r['accuracy_confident']:>7.1%} {bss_str} {crps_str:>10} "
-              f"{r['avg_matches']:>6.1f}")
-
-        if r["confident_trades"] > 0:
-            acc_list.append(r["accuracy_confident"])
-        bss_v = r.get("brier_skill_score")
-        if bss_v is not None and not np.isnan(bss_v):
-            bss_list.append(bss_v)
-        crps_v = r.get("crps")
-        if crps_v is not None and not np.isnan(crps_v):
-            crps_list.append(crps_v)
-
-    if acc_list:
-        n_pos = sum(1 for b in bss_list if b > 0)
-        bss_mean = np.mean(bss_list) if bss_list else float("nan")
-        print(f"  {'~'*57}")
-        print(f"  {'MEAN':<22} {'':>7} {np.mean(acc_list):>7.1%} "
-              f"{bss_mean:>+9.5f} "
-              f"{np.mean(crps_list):>10.5f}" if crps_list else "")
-        print(f"  {'STD':<22} {'':>7} {np.std(acc_list):>7.1%} "
-              f"{np.std(bss_list):>9.5f}")
-        print(f"\n  Positive BSS folds: {n_pos}/{len(bss_list)}")
-        std_acc = np.std(acc_list)
-        if std_acc < 0.02:
-            print(f"  ✓ STABLE — std={std_acc:.3f}. Signal consistent across regimes.")
-        elif std_acc < 0.05:
-            print(f"  ~ MODERATE — std={std_acc:.3f}. Some regime sensitivity.")
-        else:
-            print(f"  ✗ UNSTABLE — std={std_acc:.3f}. Results vary too much.")
-
-    print(f"{'='*65}\n")
-    return fold_results
-
+# ============================================================
+# OVERNIGHT RUNNER
+# ============================================================
 
 def run_regime_walkforward(experiment_name="regime_walkforward",
                             max_distance=1.1019,
                             calibration_method="both",
                             confidence_threshold=None):
     """
-    Walk-forward validation with macro-regime conditioning (v4).
+    Walk-forward validation with macro-regime conditioning.
+    confidence_threshold: if None uses CONFIDENCE_THRESHOLD global (0.65).
+    Pass 0.60 or 0.55 to increase trade coverage under regime conditioning.
+    Gemini (2026-03-16): regime filter compresses P(up) toward 0.5 — trades
+    disappear at 0.65. Lower threshold restores signal coverage.
 
-    v4 confirms regime labels correct: 2022 Bear = 2756 bull / 10296 bear ✓
-    Positive BSS: +0.00103 Platt / +0.00074 Isotonic on fold 2024 (v4 run).
-    Zero trades at threshold=0.65 — regime filter compresses P(up) toward 0.5.
-    Use confidence_threshold=0.60 or 0.55 to restore coverage. Overnight testing.
+    Addresses the 2022 Bear fold failure in platt_wf_v2:
+      v2 result: 2022 BSS=-0.031, Acc=48.7%, Mean BSS=-0.00797 (1/6 positive)
+      Root cause: analogues from 2010-2021 bull market signal UP in a -20% year
+
+    This version (v3) adds regime_filter=True to _run_matching_loop:
+      - Classifies each date as bull (SPY ret_90d > 0) or bear (<= 0)
+      - Restricts analogue search to same-regime historical periods
+      - In 2022 bear queries, only 2011/2015-16/2018Q4/2020 crash analogues used
+      - Those periods correctly signal DOWN or low confidence → fewer false BUYs
+
+    Also tests both Platt and isotonic calibration to find which generalises better.
+    Source: Gemini deep research — macro-regime filtration + isotonic calibration.
 
     Args:
-        calibration_method:   "platt", "isotonic", or "both"
-        confidence_threshold: override threshold (default CONFIDENCE_THRESHOLD=0.65)
+        calibration_method: "platt", "isotonic", or "both"
     """
     print(f"\n{'='*65}")
     print(f"  REGIME WALK-FORWARD v3: {experiment_name}")
@@ -2370,8 +1817,7 @@ def run_regime_walkforward(experiment_name="regime_walkforward",
             row = {k: v for k, v in metrics.items() if k != "calibration_buckets"}
             row.update({
                 "experiment_name": fold_name,
-                "method": f"regime_walkforward_v4_{method_name}",
-                "confidence_threshold_used": _conf_thresh,
+                "method": f"regime_walkforward_v3_{method_name}",
                 "fold_label": label,
                 "train_end": train_end,
                 "val_year": val_start[:4],
@@ -2379,7 +1825,8 @@ def run_regime_walkforward(experiment_name="regime_walkforward",
                 "max_distance": max_distance,
                 "distance_weighting": "uniform",
                 "projection_horizon": PROJECTION_HORIZON,
-                "confidence_threshold": CONFIDENCE_THRESHOLD,
+                "confidence_threshold": _conf_thresh,
+                "confidence_threshold_used": _conf_thresh,
                 "agreement_spread": AGREEMENT_SPREAD,
                 "min_matches": MIN_MATCHES,
                 "same_sector_only": False,
@@ -2477,22 +1924,678 @@ if __name__ == "__main__":
     # 2022 Bear: Acc=48.7%, BSS=-0.031 — still fails without regime filter.
     # run_platt_walkforward(experiment_name="platt_wf_v2_d1.1019_train_cal", max_distance=1.1019)
 
-    # ── MODE 6: Regime walk-forward ──
-    # v4 result: regime labels confirmed correct. BSS=+0.00103 Platt on 2024.
-    # BUT 0 trades at thresh=0.65 — regime filter compresses P(up) toward 0.5.
-    # Overnight is testing thresh=0.60/0.55 across distance configs.
-    # run_regime_walkforward(
-    #     experiment_name="regime_wf_v4_d1.1019",
-    #     max_distance=1.1019,
-    #     calibration_method="both",
-    # )
-
-    # ── MODE 6b: Regime walk-forward with relaxed threshold ── ACTIVE ──
-    # Gemini (2026-03-16): regime filter compresses P(up) → 0 trades at 0.65.
-    # 0.60 is the first test — if trades appear with positive BSS → lock it.
+    # ── MODE 6: Regime-conditioned walk-forward ── ACTIVE ──
+    # Addresses 2022 Bear failure. Regime filter restricts analogues to same
+    # bull/bear macro environment as query (SPY ret_90d > 0 = bull, <= 0 = bear).
+    # Tests both Platt and isotonic calibration fitted on training set.
+    # Source: Gemini deep research — macro-regime filtration + isotonic calibration.
+    # v3 result: 0 trades all folds except 2024 — regime labeling bug.
+    # val queries were labeled using last train_db SPY row, not val_db SPY.
+    # 2023 fold: all 13,000 labeled bear (wrong — 2023 was +24% bull).
+    # v4 fix: val_db SPY rows used for val query regime labels. No leakage.
     run_regime_walkforward(
-        experiment_name="regime_wf_v4_d1.1019_t60",
+        experiment_name="regime_wf_v4_d1.1019",
         max_distance=1.1019,
         calibration_method="both",
-        confidence_threshold=0.60,
     )
+
+
+
+def run_overnight(total_hours=5.0, cycle_prefix="", wall_deadline=None, cal_frac=0.5):
+    """
+    One full pass of all 5 phases.
+    Called repeatedly by the __main__ continuous loop until wall_deadline.
+
+    cycle_prefix:  string prepended to every experiment name so each cycle
+                   writes distinct rows to results_analogue.tsv.
+                   e.g. "c02_" for cycle 2. Empty string for cycle 1.
+    wall_deadline: absolute time.time() value — phases skip if past this.
+                   Passed in from the outer loop so the phase budget is
+                   computed relative to the overall session, not this cycle.
+    cal_frac:      fraction of validation set used to fit the Platt calibrator.
+                   Varied across cycles (0.50 → 0.65 → 0.70 → 0.75 → 0.80)
+                   to find the fraction that achieves BSS > 0.
+    """
+    import time, json as _json
+
+    session_start = time.time()
+    # Respect the tighter of per-cycle budget vs overall session deadline
+    cycle_deadline = session_start + total_hours * 3600
+    deadline = min(cycle_deadline, wall_deadline) if wall_deadline is not None else cycle_deadline
+    phase_budget  = (total_hours * 3600) / 5
+
+    checkpoint_path = RESULTS_DIR / "overnight_progress.json"
+    RESULTS_DIR.mkdir(exist_ok=True)
+
+    # Install warning watchdog — aborts if sklearn/joblib produces a warning flood
+    _watchdog = _WatchdogFilter(checkpoint_path=checkpoint_path)
+    _watchdog.install()
+    print(f"  Warning watchdog active — abort if >{WARN_MAX_IN_WINDOW} warnings "
+          f"in {WARN_WINDOW_SEC}s or >{WARN_IDENTICAL_MAX} identical")
+
+    def pfx(name):
+        """Prefix experiment name with cycle label so repeated cycles write distinct rows."""
+        return f"{cycle_prefix}{name}" if cycle_prefix else name
+
+    all_phase_results = {}
+    best_bss_overall  = -99.0
+    best_config_name  = "none"
+    positive_bss_found = False
+
+
+    def checkpoint(phase, status, best_bss, best_name):
+        RESULTS_DIR.mkdir(exist_ok=True)
+        cp = {
+            "session_start": time.strftime("%Y-%m-%d %H:%M:%S",
+                                           time.localtime(session_start)),
+            "last_updated":  time.strftime("%Y-%m-%d %H:%M:%S"),
+            "elapsed_min":   round((time.time() - session_start) / 60, 1),
+            "cycle_prefix":  cycle_prefix,
+            "phase":         phase,
+            "status":        status,
+            "best_bss":      best_bss,
+            "best_config":   best_name,
+            "positive_bss":  best_bss > 0,
+        }
+        with open(checkpoint_path, "w") as f:
+            _json.dump(cp, f, indent=2)
+
+    def time_left():
+        return deadline - time.time()
+
+    def phase_start(n, name):
+        print(f"\n{'='*65}")
+        print(f"  PHASE {n}/5: {name}")
+        print(f"  Elapsed: {(time.time()-session_start)/60:.1f} min | "
+              f"Remaining: {time_left()/3600:.2f} h")
+        print(f"{'='*65}")
+
+    # Load data once
+    print(f"\n{'='*65}")
+    print(f"  OVERNIGHT RUN — {total_hours}h budget")
+    print(f"  Results → results/{ANALOGUE_RESULTS_FILE}")
+    print(f"  Checkpoint → {checkpoint_path}")
+    print(f"{'='*65}")
+    print("\n  Loading data (once for all phases)...")
+
+    train_db = pd.read_parquet(DATA_DIR / "train_db.parquet")
+    val_db   = pd.read_parquet(DATA_DIR / "val_db.parquet")
+    scaler   = joblib.load(MODEL_DIR / "analogue_scaler.pkl")
+    from prepare import FEATURE_COLS
+
+    RETURN_ONLY = [c for c in FEATURE_COLS if c.startswith("ret_")]
+    print(f"  Train: {len(train_db):,} | Val: {len(val_db):,} | "
+          f"Return cols: {len(RETURN_ONLY)}")
+
+    checkpoint(0, "loaded", best_bss_overall, best_config_name)
+
+    # ──────────────────────────────────────────────────────────
+    # PHASE 1: Platt Calibration Fraction Sweep
+    # ──────────────────────────────────────────────────────────
+    # The overnight run confirmed Platt scaling lifts BSS by +0.036
+    # consistently. Best post-BSS so far: -0.00192 at cal_frac=0.50.
+    # Gap to BSS=0 is only 0.002. Hypothesis: more calibration data
+    # (higher cal_frac) tightens the logistic regression fit and
+    # closes the gap. Each cycle of the outer loop tests a different
+    # cal_frac so the session explores 0.50 → 0.65 → 0.70 → 0.75 → 0.80.
+    phase_start(1, f"Platt Calibration Fraction Sweep  (cal_frac={cal_frac:.2f})")
+
+    platt_configs = [
+        # All four best configs tested at this cycle's cal_frac.
+        # Naming encodes both the distance config AND the cal_frac used,
+        # so rows are unique across cycles and leaderboard is unambiguous.
+        {
+            "name": pfx(f"platt_euc_r_d1.0115_cf{int(cal_frac*100)}"),
+            "MAX_DISTANCE": 1.0115, "metric": "euclidean", "feat": RETURN_ONLY,
+        },
+        {
+            "name": pfx(f"platt_euc_r_d1.2457_cf{int(cal_frac*100)}"),
+            "MAX_DISTANCE": 1.2457, "metric": "euclidean", "feat": RETURN_ONLY,
+        },
+        {
+            "name": pfx(f"platt_euc_r_d1.1019_cf{int(cal_frac*100)}"),
+            "MAX_DISTANCE": 1.1019, "metric": "euclidean", "feat": RETURN_ONLY,
+        },
+        {
+            "name": pfx(f"platt_cos_uniform_cf{int(cal_frac*100)}"),
+            "MAX_DISTANCE": 0.3, "metric": "cosine", "feat": None,
+        },
+    ]
+
+    platt_results = []
+    for cfg in platt_configs:
+        if time_left() < 300: break
+        print(f"\n  Calibrating {cfg['name']}...")
+        probs, sigs, _, n_matches, mean_rets, ensembles = _run_matching_loop(
+            train_db, val_db, scaler, FEATURE_COLS, verbose=0,
+            max_distance=cfg["MAX_DISTANCE"],
+            metric_override=cfg["metric"],
+            feature_cols_override=cfg["feat"],
+            top_k=50, distance_weighting="uniform",
+            confidence_threshold=CONFIDENCE_THRESHOLD,
+            agreement_spread=AGREEMENT_SPREAD,
+        )
+        y_bin = val_db[PROJECTION_HORIZON].values
+        y_ret = val_db[PROJECTION_HORIZON.replace("_up", "")].values
+
+        r = evaluate_with_calibration(
+            probs, y_bin, y_ret, sigs, ensembles,
+            horizon_label=PROJECTION_HORIZON,
+            experiment_name=cfg["name"],
+            cal_frac=cal_frac,
+        )
+        platt_results.append(r)
+
+        pre  = r.get("pre_bss") or 0
+        post = r.get("post_bss") or 0
+        delta = r.get("bss_delta") or 0
+        flag  = "✓ POSITIVE BSS" if post > 0 else ("↑ improving" if delta > 0 else "✗")
+        print(f"    {flag} | pre={pre:+.5f} → post={post:+.5f} | delta={delta:+.5f}")
+
+        if post > best_bss_overall:
+            best_bss_overall = post
+            best_config_name = cfg["name"]
+        if post > 0:
+            positive_bss_found = True
+
+    all_phase_results["phase1_platt"] = platt_results
+    checkpoint(1, "complete", best_bss_overall, best_config_name)
+
+    print(f"\n  Phase 1 summary: best post-calibration BSS = {best_bss_overall:+.5f}")
+    print(f"  Positive BSS achieved: {'YES ✓' if positive_bss_found else 'No — continuing'}")
+
+    # ──────────────────────────────────────────────────────────
+    # PHASE 2: Horizon Sweep
+    # ──────────────────────────────────────────────────────────
+    phase_start(2, "Horizon Sweep — fwd_1d / fwd_3d / fwd_14d / fwd_30d")
+
+    horizon_results = []
+    for horizon in ["fwd_1d_up", "fwd_3d_up", "fwd_14d_up", "fwd_30d_up"]:
+        if time_left() < 300: break
+        name = pfx(f"horizon_{horizon}_euc_retonly")
+        print(f"\n  Testing {horizon}...")
+        probs, sigs, _, n_matches, mean_rets, ensembles = _run_matching_loop(
+            train_db, val_db, scaler, FEATURE_COLS, verbose=0,
+            max_distance=1.2457,
+            metric_override="euclidean",
+            feature_cols_override=RETURN_ONLY,
+            top_k=50, distance_weighting="uniform",
+            confidence_threshold=CONFIDENCE_THRESHOLD,
+            agreement_spread=AGREEMENT_SPREAD,
+            projection_horizon=horizon,
+        )
+        y_bin = val_db[horizon].values
+        y_ret = val_db[horizon.replace("_up", "")].values
+
+        metrics = evaluate_probabilistic(
+            y_bin, y_ret, probs, ensembles,
+            signals=sigs, horizon_label=horizon
+        )
+        from prepare import save_results
+        metrics.update({
+            "experiment_name": name, "method": "horizon_sweep",
+            "projection_horizon": horizon,
+            "top_k": 50, "max_distance": 1.2457,
+            "distance_weighting": "uniform", "confidence_threshold": CONFIDENCE_THRESHOLD,
+            "agreement_spread": AGREEMENT_SPREAD, "min_matches": MIN_MATCHES,
+            "same_sector_only": False, "exclude_same_ticker": True,
+            "avg_matches": float(np.mean(n_matches)),
+            "avg_projected_return": float(np.mean(mean_rets)),
+            "buy_signals": int((sigs == "BUY").sum()),
+            "sell_signals": int((sigs == "SELL").sum()),
+            "hold_signals": int((sigs == "HOLD").sum()),
+            "distance_metric": "euclidean", "feature_set_name": "returns_only",
+            "n_features": len(RETURN_ONLY),
+        })
+        row = {k: v for k, v in metrics.items() if k != "calibration_buckets"}
+        save_results(row, name, filepath=RESULTS_DIR / ANALOGUE_RESULTS_FILE)
+        horizon_results.append(metrics)
+
+        bss = metrics.get("brier_skill_score") or 0
+        flag = "✓" if bss > 0 else "✗"
+        print(f"    {flag} BSS={bss:+.5f} | Acc={metrics['accuracy_confident']:.1%} | "
+              f"Trades={metrics['confident_trades']:,}")
+        if bss > best_bss_overall:
+            best_bss_overall = bss
+            best_config_name = name
+        if bss > 0:
+            positive_bss_found = True
+
+    all_phase_results["phase2_horizons"] = horizon_results
+    checkpoint(2, "complete", best_bss_overall, best_config_name)
+
+    # ──────────────────────────────────────────────────────────
+    # PHASE 3: Feature Weight Ablation
+    # ──────────────────────────────────────────────────────────
+    phase_start(3, "Feature Weight Ablation")
+
+    weight_configs = [
+        {
+            "name": pfx("weights_allones"),
+            "desc": "All weights = 1.0 (unweighted baseline)",
+            "weights": {c: 1.0 for c in FEATURE_COLS},
+        },
+        {
+            "name": pfx("weights_retonly_allones"),
+            "desc": "Return-only, all weights = 1.0",
+            "weights": {c: 1.0 for c in RETURN_ONLY},
+            "feat_override": RETURN_ONLY,
+        },
+        {
+            "name": pfx("weights_aggressive_midterm"),
+            "desc": "ret_7d and ret_14d at 2.5x (aggressive medium-term)",
+            "weights": {**{c: 1.0 for c in FEATURE_COLS},
+                        "ret_7d": 2.5, "ret_14d": 2.5},
+        },
+        {
+            "name": pfx("weights_shortterm_emphasis"),
+            "desc": "ret_1d and ret_3d at 2.0x",
+            "weights": {**{c: 1.0 for c in RETURN_ONLY},
+                        "ret_1d": 2.0, "ret_3d": 2.0},
+            "feat_override": RETURN_ONLY,
+        },
+    ]
+
+    import strategy_overnight as _self
+    weight_results = []
+    orig_weights = dict(FEATURE_WEIGHTS)
+
+    for cfg in weight_configs:
+        if time_left() < 300: break
+        print(f"\n  Testing {cfg['name']}: {cfg['desc']}")
+
+        # Temporarily apply weights
+        _self.FEATURE_WEIGHTS.clear()
+        _self.FEATURE_WEIGHTS.update(cfg["weights"])
+
+        feat_override = cfg.get("feat_override")
+        probs, sigs, _, n_matches, mean_rets, ensembles = _run_matching_loop(
+            train_db, val_db, scaler, FEATURE_COLS, verbose=0,
+            max_distance=1.2457,
+            metric_override="euclidean",
+            feature_cols_override=feat_override,
+            top_k=50, distance_weighting="uniform",
+            confidence_threshold=CONFIDENCE_THRESHOLD,
+            agreement_spread=AGREEMENT_SPREAD,
+        )
+        _self.FEATURE_WEIGHTS.clear()
+        _self.FEATURE_WEIGHTS.update(orig_weights)
+
+        y_bin = val_db[PROJECTION_HORIZON].values
+        y_ret = val_db[PROJECTION_HORIZON.replace("_up", "")].values
+
+        metrics = evaluate_probabilistic(
+            y_bin, y_ret, probs, ensembles, signals=sigs,
+            horizon_label=PROJECTION_HORIZON
+        )
+        from prepare import save_results
+        metrics.update({
+            "experiment_name": cfg["name"], "method": "weight_ablation",
+            "top_k": 50, "max_distance": 1.2457,
+            "distance_weighting": "uniform",
+            "projection_horizon": PROJECTION_HORIZON,
+            "confidence_threshold": CONFIDENCE_THRESHOLD,
+            "agreement_spread": AGREEMENT_SPREAD, "min_matches": MIN_MATCHES,
+            "same_sector_only": False, "exclude_same_ticker": True,
+            "avg_matches": float(np.mean(n_matches)),
+            "avg_projected_return": float(np.mean(mean_rets)),
+            "buy_signals": int((sigs == "BUY").sum()),
+            "sell_signals": int((sigs == "SELL").sum()),
+            "hold_signals": int((sigs == "HOLD").sum()),
+            "distance_metric": "euclidean",
+            "feature_set_name": "returns_only" if feat_override else "full",
+            "n_features": len(feat_override or FEATURE_COLS),
+        })
+        row = {k: v for k, v in metrics.items() if k != "calibration_buckets"}
+        save_results(row, cfg["name"], filepath=RESULTS_DIR / ANALOGUE_RESULTS_FILE)
+        weight_results.append(metrics)
+
+        bss = metrics.get("brier_skill_score") or 0
+        flag = "✓" if bss > 0 else "✗"
+        print(f"    {flag} BSS={bss:+.5f} | Acc={metrics['accuracy_confident']:.1%} | "
+              f"AvgK={np.mean(n_matches):.1f}")
+        if bss > best_bss_overall:
+            best_bss_overall = bss
+            best_config_name = cfg["name"]
+        if bss > 0:
+            positive_bss_found = True
+
+    all_phase_results["phase3_weights"] = weight_results
+    checkpoint(3, "complete", best_bss_overall, best_config_name)
+
+    # ──────────────────────────────────────────────────────────
+    # PHASE 4: Fine Euclidean Grid Scan
+    # ──────────────────────────────────────────────────────────
+    phase_start(4, "Fine Euclidean Grid Scan (around sweep 3 winner)")
+
+    fine_dists = np.arange(1.15, 1.50, 0.05)  # 7 configs
+    fine_results = []
+    from prepare import save_results
+
+    for dist in fine_dists:
+        if time_left() < 300: break
+        name = pfx(f"fine_euc_r_d{dist:.4f}")
+        print(f"\n  Testing dist={dist:.4f}...", end=" ", flush=True)
+        probs, sigs, _, n_matches, mean_rets, ensembles = _run_matching_loop(
+            train_db, val_db, scaler, FEATURE_COLS, verbose=0,
+            max_distance=float(dist),
+            metric_override="euclidean",
+            feature_cols_override=RETURN_ONLY,
+            top_k=50, distance_weighting="uniform",
+            confidence_threshold=CONFIDENCE_THRESHOLD,
+            agreement_spread=AGREEMENT_SPREAD,
+        )
+        y_bin = val_db[PROJECTION_HORIZON].values
+        y_ret = val_db[PROJECTION_HORIZON.replace("_up", "")].values
+
+        metrics = evaluate_probabilistic(
+            y_bin, y_ret, probs, ensembles, signals=sigs,
+            horizon_label=PROJECTION_HORIZON
+        )
+        metrics.update({
+            "experiment_name": name, "method": "fine_grid",
+            "top_k": 50, "max_distance": float(dist),
+            "distance_weighting": "uniform",
+            "projection_horizon": PROJECTION_HORIZON,
+            "confidence_threshold": CONFIDENCE_THRESHOLD,
+            "agreement_spread": AGREEMENT_SPREAD, "min_matches": MIN_MATCHES,
+            "same_sector_only": False, "exclude_same_ticker": True,
+            "avg_matches": float(np.mean(n_matches)),
+            "avg_projected_return": float(np.mean(mean_rets)),
+            "buy_signals": int((sigs == "BUY").sum()),
+            "sell_signals": int((sigs == "SELL").sum()),
+            "hold_signals": int((sigs == "HOLD").sum()),
+            "distance_metric": "euclidean",
+            "feature_set_name": "returns_only",
+            "n_features": len(RETURN_ONLY),
+        })
+        row = {k: v for k, v in metrics.items() if k != "calibration_buckets"}
+        save_results(row, name, filepath=RESULTS_DIR / ANALOGUE_RESULTS_FILE)
+        fine_results.append(metrics)
+
+        bss = metrics.get("brier_skill_score") or 0
+        avgk = float(np.mean(n_matches))
+        flag = "✓" if bss > 0 else "✗"
+        print(f"{flag} BSS={bss:+.5f} AvgK={avgk:.1f}")
+        if bss > best_bss_overall:
+            best_bss_overall = bss
+            best_config_name = name
+        if bss > 0:
+            positive_bss_found = True
+
+    # Also test inverse weighting with best dist
+    if time_left() > 600:
+        print(f"\n  Testing inverse weighting at dist=1.2457...")
+        name = pfx("fine_euc_r_inverse_d1.2457")
+        probs, sigs, _, n_matches, mean_rets, ensembles = _run_matching_loop(
+            train_db, val_db, scaler, FEATURE_COLS, verbose=0,
+            max_distance=1.2457,
+            metric_override="euclidean",
+            feature_cols_override=RETURN_ONLY,
+            top_k=50, distance_weighting="inverse",
+            confidence_threshold=CONFIDENCE_THRESHOLD,
+            agreement_spread=AGREEMENT_SPREAD,
+        )
+        y_bin = val_db[PROJECTION_HORIZON].values
+        y_ret = val_db[PROJECTION_HORIZON.replace("_up", "")].values
+        metrics = evaluate_probabilistic(y_bin, y_ret, probs, ensembles,
+                                         signals=sigs, horizon_label=PROJECTION_HORIZON)
+        metrics.update({
+            "experiment_name": name, "method": "fine_grid",
+            "top_k": 50, "max_distance": 1.2457, "distance_weighting": "inverse",
+            "projection_horizon": PROJECTION_HORIZON,
+            "confidence_threshold": CONFIDENCE_THRESHOLD,
+            "agreement_spread": AGREEMENT_SPREAD, "min_matches": MIN_MATCHES,
+            "same_sector_only": False, "exclude_same_ticker": True,
+            "avg_matches": float(np.mean(n_matches)),
+            "avg_projected_return": float(np.mean(mean_rets)),
+            "buy_signals": int((sigs == "BUY").sum()),
+            "sell_signals": int((sigs == "SELL").sum()),
+            "hold_signals": int((sigs == "HOLD").sum()),
+            "distance_metric": "euclidean", "feature_set_name": "returns_only",
+            "n_features": len(RETURN_ONLY),
+        })
+        save_results({k: v for k, v in metrics.items() if k != "calibration_buckets"},
+                     name, filepath=RESULTS_DIR / ANALOGUE_RESULTS_FILE)
+        fine_results.append(metrics)
+        bss = metrics.get("brier_skill_score") or 0
+        print(f"  {'✓' if bss > 0 else '✗'} inverse BSS={bss:+.5f} AvgK={np.mean(n_matches):.1f}")
+        if bss > best_bss_overall:
+            best_bss_overall = bss
+            best_config_name = name
+        if bss > 0:
+            positive_bss_found = True
+
+    all_phase_results["phase4_fine_grid"] = fine_results
+    checkpoint(4, "complete", best_bss_overall, best_config_name)
+
+    # ──────────────────────────────────────────────────────────
+    # PHASE 5: Walk-Forward (conditional or best-effort)
+    # ──────────────────────────────────────────────────────────
+    phase_start(5, "Walk-Forward Validation" +
+                (" — POSITIVE BSS FOUND" if positive_bss_found else " — best-effort baseline"))
+
+    if time_left() > 600:
+        wf_label = pfx("overnight_walkforward_platt") if positive_bss_found else pfx("overnight_walkforward_baseline")
+        print(f"\n  Running walk-forward: {wf_label}")
+        print(f"  Config: Euclidean + retonly + dist=1.2457 (sweep 3 winner)")
+        if positive_bss_found:
+            print(f"  NOTE: Positive BSS was found in an earlier phase — this walk-forward")
+            print(f"  validates that config's regime stability.")
+        else:
+            print(f"  NOTE: No positive BSS found yet. This walk-forward establishes")
+            print(f"  the regime stability baseline before Platt scaling is integrated.")
+
+        wf_results = run_walkforward(
+            experiment_name=wf_label,
+            verbose=1,
+        )
+        all_phase_results["phase5_walkforward"] = wf_results
+    else:
+        print(f"  Skipped — less than 10 min remaining.")
+
+    checkpoint(5, "complete", best_bss_overall, best_config_name)
+
+    # ──────────────────────────────────────────────────────────
+    # OVERNIGHT SUMMARY
+    # ──────────────────────────────────────────────────────────
+    elapsed = (time.time() - session_start) / 3600
+    print(f"\n{'='*65}")
+    print(f"  OVERNIGHT RUN COMPLETE")
+    print(f"  Total time: {elapsed:.2f} hours")
+    print(f"{'='*65}")
+    print(f"\n  Best BSS across all phases: {best_bss_overall:+.5f}")
+    print(f"  Best config: {best_config_name}")
+    print(f"  Positive BSS achieved: {'YES ✓' if positive_bss_found else 'No'}")
+    print()
+
+    # Final leaderboard from all overnight results
+    all_overnight = []
+    for phase_key, phase_list in all_phase_results.items():
+        if isinstance(phase_list, list):
+            for r in phase_list:
+                if isinstance(r, dict) and "brier_skill_score" in r:
+                    all_overnight.append(r)
+
+    if all_overnight:
+        all_overnight.sort(key=lambda r: (
+            r.get("brier_skill_score") if r.get("brier_skill_score") is not None else -99
+        ), reverse=True)
+        print(f"  {'Name':<35} {'BSS':>9} {'Acc':>7} {'Trades':>7}")
+        print(f"  {'─'*60}")
+        for r in all_overnight[:15]:
+            bss = r.get("brier_skill_score")
+            bss_str = f"{bss:+.5f}" if bss is not None else "    N/A"
+            flag = "✓" if (bss or 0) > 0 else " "
+            print(f"  {flag}{r.get('experiment_name','?'):<34} {bss_str} "
+                  f"{r.get('accuracy_confident', 0):>7.1%} "
+                  f"{r.get('confident_trades', 0):>7,}")
+
+    print(f"\n  Results saved to: results/{ANALOGUE_RESULTS_FILE}")
+    print(f"  Checkpoint:       {checkpoint_path}")
+    print(f"{'='*65}\n")
+
+    return all_phase_results
+
+
+# ============================================================
+# MAIN — continuous overnight loop
+# ============================================================
+
+if __name__ == "__main__":
+    import sys as _sys, time as _time
+
+    # ── Overnight configuration ──────────────────────────────────────
+    TOTAL_HOURS = 6.0          # 6-hour wall clock (user going to bed)
+    STOP_BUFFER = 600          # stop if < 10 min left
+
+    wall_start    = _time.time()
+    wall_deadline = wall_start + TOTAL_HOURS * 3600
+    cycle         = 1
+    session_best_bss    = -99.0
+    session_best_config = "none"
+    session_positive    = False
+    session_results     = []
+
+    # ── Experiment schedule: distance × threshold grid ──────────────────
+    # Gemini (2026-03-16) identified that regime conditioning compresses
+    # calibrated P(up) toward 0.5 — so CONFIDENCE_THRESHOLD=0.65 produces
+    # 0 trades even with positive BSS. We test 3 thresholds × 2 distances
+    # = 6 unique configs. Each ~90 min. In 6 hours: 3-4 full cycles.
+    # Experiment names encode both distance and threshold for TSV uniqueness.
+    EXPERIMENT_SCHEDULE = [
+        # (max_distance, confidence_threshold)
+        (1.1019, 0.60),  # cycle 1: medium dist, relaxed threshold  ← most likely fix
+        (1.2457, 0.60),  # cycle 2: wider dist, relaxed threshold
+        (1.1019, 0.55),  # cycle 3: medium dist, more relaxed
+        (1.5000, 0.60),  # cycle 4: loose dist, relaxed threshold
+        (1.2457, 0.55),  # cycle 5: wider dist, more relaxed
+        (1.1019, 0.65),  # cycle 6: medium dist, original threshold (baseline)
+    ]
+
+    print(f"\n{'='*65}")
+    print(f"  OVERNIGHT SESSION — {TOTAL_HOURS}h wall clock")
+    print(f"  Experiment: Regime Walk-Forward v4 — Distance × Threshold Grid")
+    print(f"  Gemini finding: regime filter compresses P(up) → 0 trades at thresh=0.65")
+    print(f"  Testing thresholds 0.55/0.60 across 3 distances to find coverage sweet spot")
+    print(f"  Calibration: Platt + Isotonic (both per cycle)")
+    print(f"  Each cycle ~90 min | Expected cycles: ~{int(TOTAL_HOURS*60/90)}-{int(TOTAL_HOURS*60/75)}")
+    print(f"  Results → results/results_analogue.tsv after every fold.")
+    print(f"  Stop any time with Ctrl+C — completed results are safe.")
+    print(f"{'='*65}\n")
+
+    while _time.time() < wall_deadline - STOP_BUFFER:
+        elapsed_h   = (_time.time() - wall_start) / 3600
+        remaining_h = (wall_deadline - _time.time()) / 3600
+
+        if remaining_h < 0.75:
+            print(f"  Less than 45 min remaining — stopping cleanly.")
+            break
+
+        dist, thresh = EXPERIMENT_SCHEDULE[(cycle - 1) % len(EXPERIMENT_SCHEDULE)]
+        exp_name = f"on_c{cycle:02d}_v4_d{dist}_t{int(thresh*100)}"
+
+        print(f"\n{'─'*65}")
+        print(f"  CYCLE {cycle} — dist={dist} | threshold={thresh} | exp={exp_name}")
+        print(f"  Elapsed: {elapsed_h:.2f}h | Remaining: {remaining_h:.2f}h")
+        print(f"{'─'*65}")
+
+        try:
+            fold_results = run_regime_walkforward(
+                experiment_name=exp_name,
+                max_distance=dist,
+                calibration_method="both",
+                confidence_threshold=thresh,
+            )
+
+            # Harvest best BSS from this cycle
+            for method, folds in (fold_results or {}).items():
+                for r in (folds or []):
+                    if not isinstance(r, dict): continue
+                    b = r.get("brier_skill_score")
+                    if b is None: continue
+                    try:
+                        b = float(b)
+                        session_results.append({
+                            "cycle": cycle, "dist": dist, "thresh": thresh,
+                            "method": method,
+                            "fold": r.get("label","?"), "bss": b,
+                            "acc": r.get("accuracy_confident", 0),
+                            "trades": r.get("confident_trades", 0),
+                        })
+                        if b > session_best_bss:
+                            session_best_bss = b
+                            session_best_config = f"{exp_name}_{method}_{r.get('label','')}"
+                        if b > 0:
+                            session_positive = True
+                    except (TypeError, ValueError):
+                        pass
+
+            # Print cycle summary
+            cycle_bss = [r["bss"] for r in session_results if r["cycle"] == cycle]
+            n_pos = sum(1 for b in cycle_bss if b > 0)
+            print(f"\n  Cycle {cycle} complete.")
+            print(f"  BSS range this cycle: {min(cycle_bss):+.5f} → {max(cycle_bss):+.5f}")
+            print(f"  Positive folds this cycle: {n_pos}/{len(cycle_bss)}")
+            print(f"  Session best BSS: {session_best_bss:+.5f} ({session_best_config})")
+
+        except KeyboardInterrupt:
+            print(f"\n  Manual interrupt after cycle {cycle}.")
+            break
+
+        except SystemExit:
+            print("\n  Watchdog abort — not restarting.")
+            _sys.exit(1)
+
+        except Exception as e:
+            import traceback
+            print(f"\n  Cycle {cycle} crashed: {type(e).__name__}: {e}")
+            traceback.print_exc()
+            print("  Continuing to next cycle in 15 seconds...")
+            _time.sleep(15)
+
+        finally:
+            try:
+                _watchdog.restore()
+            except Exception:
+                pass
+            _warn_times.clear()
+            _warn_messages.clear()
+            _warn_abort_flag.clear()
+
+        cycle += 1
+
+    # ── Session complete — final summary ─────────────────────────────
+    elapsed_total = (_time.time() - wall_start) / 3600
+    print(f"\n{'='*65}")
+    print(f"  OVERNIGHT SESSION COMPLETE — {elapsed_total:.2f}h / {TOTAL_HOURS}h")
+    print(f"  Cycles completed: {cycle - 1}")
+    print(f"  Session best BSS: {session_best_bss:+.5f} ({session_best_config})")
+    print(f"  Positive BSS achieved: {'YES ✓' if session_positive else 'No'}")
+    print(f"  Results in: results/{ANALOGUE_RESULTS_FILE}")
+    print(f"{'='*65}")
+
+    if session_results:
+        print(f"\n  DISTANCE × THRESHOLD SUMMARY")
+        print(f"  {'Dist':<8} {'Thresh':>7} {'Method':<10} {'Trades':>7} {'Pos/6':>6} {'MeanBSS':>10}")
+        print(f"  {'─'*58}")
+        from collections import defaultdict
+        import numpy as np
+        by_config = defaultdict(list)
+        by_config_trades = defaultdict(list)
+        for r in session_results:
+            key = (r["dist"], r.get("thresh", 0.65), r["method"])
+            by_config[key].append(r["bss"])
+            by_config_trades[key].append(r.get("trades", 0))
+        for (dist, thresh, method), bss_list in sorted(by_config.items()):
+            n_pos   = sum(1 for b in bss_list if b > 0)
+            mean    = np.mean(bss_list)
+            trades  = int(np.mean(by_config_trades[(dist, thresh, method)]))
+            flag    = "✓" if n_pos > 0 else " "
+            print(f"  {flag}{dist:<7.4f} {thresh:>7.2f} {method:<10} {trades:>7,} "
+                  f"{n_pos:>3}/{len(bss_list):<3} {mean:>+10.5f}")
+        print(f"\n  KEY: Look for rows with Trades>0 AND positive BSS folds.")
+        print(f"  That combination is the threshold sweet spot under regime conditioning.")
+
+    print(f"\n  Bring these results + results_analogue.tsv to the next session.")
+    print(f"{'='*65}\n")

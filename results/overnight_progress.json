@@ -1,0 +1,11 @@
+{
+  "session_start": "2026-03-16 11:13:35",
+  "last_updated": "2026-03-16 11:15:24",
+  "elapsed_min": 1.8,
+  "cycle_prefix": "c18_",
+  "phase": 5,
+  "status": "complete",
+  "best_bss": -0.00192,
+  "best_config": "c18_platt_euc_r_d1.0115",
+  "positive_bss": false
+}

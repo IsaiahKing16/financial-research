@@ -5,16 +5,32 @@ Clean break from results/results_analogue.tsv. New column schema
 includes all EngineConfig fields. Preserves the PROJECT_GUIDE
 provenance requirement: every metric must trace to a TSV row.
 
-New columns are always appended at the end — never insert in the middle.
+Reliability features:
+  - fsync after each append (data hits disk before returning)
+  - Deduplication: skip if (experiment_name, fold_label, config_hash) exists
+  - New columns always appended at the end — never insert in the middle
 """
 
+import hashlib
 import json
+import os
+import tempfile
 from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
 
 from pattern_engine.config import EngineConfig
+
+
+def _config_hash(config: EngineConfig) -> str:
+    """Deterministic hash of config for deduplication."""
+    key_fields = (
+        config.top_k, config.max_distance, config.distance_metric,
+        config.feature_set, config.calibration_method, config.cal_frac,
+        config.regime_mode, config.regime_filter,
+    )
+    return hashlib.md5(str(key_fields).encode()).hexdigest()[:12]
 
 
 class ExperimentLogger:
@@ -25,7 +41,8 @@ class ExperimentLogger:
         self.results_file = self.results_dir / "experiments.tsv"
 
     def log(self, metrics: dict, config: EngineConfig,
-            experiment_name: str = "", fold_label: str = "") -> None:
+            experiment_name: str = "", fold_label: str = "",
+            skip_duplicates: bool = True) -> bool:
         """Append one experiment result row to the TSV file.
 
         Args:
@@ -33,14 +50,25 @@ class ExperimentLogger:
             config: EngineConfig used for this experiment
             experiment_name: name/tag for this experiment
             fold_label: walk-forward fold label (e.g. "2024")
+            skip_duplicates: if True, skip row if already logged
+
+        Returns:
+            True if row was written, False if skipped (duplicate)
         """
         self.results_dir.mkdir(parents=True, exist_ok=True)
+
+        cfg_hash = _config_hash(config)
+
+        # Dedup check
+        if skip_duplicates and self._is_duplicate(experiment_name, fold_label, cfg_hash):
+            return False
 
         row = {
             # Metadata
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "experiment_name": experiment_name,
             "fold_label": fold_label,
+            "config_hash": cfg_hash,
 
             # Metrics
             "total_samples": metrics.get("total_samples", 0),
@@ -85,11 +113,51 @@ class ExperimentLogger:
 
         df_row = pd.DataFrame([row])
 
-        if self.results_file.exists():
-            df_row.to_csv(self.results_file, mode="a", header=False,
-                          index=False, sep="\t")
+        if not self.results_file.exists():
+            # First write — include header, use atomic write
+            fd, tmp = tempfile.mkstemp(
+                dir=str(self.results_dir), suffix=".tsv.tmp"
+            )
+            try:
+                with os.fdopen(fd, "w") as f:
+                    f.write(df_row.to_csv(index=False, sep="\t"))
+                    f.flush()
+                    os.fsync(f.fileno())
+                os.replace(tmp, str(self.results_file))
+            except Exception:
+                try:
+                    os.unlink(tmp)
+                except OSError:
+                    pass
+                raise
         else:
-            df_row.to_csv(self.results_file, index=False, sep="\t")
+            # Append with fsync — ensures row hits disk
+            row_tsv = df_row.to_csv(index=False, sep="\t", header=False)
+            with open(self.results_file, "a") as f:
+                f.write(row_tsv)
+                f.flush()
+                os.fsync(f.fileno())
+
+        return True
+
+    def _is_duplicate(self, experiment_name: str, fold_label: str,
+                      cfg_hash: str) -> bool:
+        """Check if this experiment+fold+config already has a row."""
+        if not self.results_file.exists():
+            return False
+        try:
+            df = pd.read_csv(self.results_file, sep="\t", usecols=[
+                "experiment_name", "fold_label", "config_hash"
+            ], dtype=str)
+            mask = (
+                (df["experiment_name"] == str(experiment_name)) &
+                (df["fold_label"] == str(fold_label)) &
+                (df["config_hash"] == str(cfg_hash))
+            )
+            return bool(mask.any())
+        except (KeyError, pd.errors.EmptyDataError):
+            # config_hash column might not exist in old TSVs
+            return False
 
     def read_results(self) -> pd.DataFrame:
         """Read all experiment results from the TSV file."""

@@ -52,6 +52,7 @@ class TestFeatureRegistry:
         assert "returns_vol" in names
         assert "returns_sector" in names
         assert "full" in names
+        assert "returns_hybrid" in names
 
     def test_returns_only_columns(self):
         fs = FeatureRegistry.get("returns_only")

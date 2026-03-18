@@ -20,12 +20,17 @@ class LiveSignalRunner:
     Args:
         config: EngineConfig (or None for defaults)
         engine: pre-fitted PatternEngine (or None to fit from data)
+        consensus_configs: optional list of additional EngineConfigs for
+            cross-model consensus filtering. When provided, only emits
+            signals where the majority of models agree.
     """
 
     def __init__(self, config: EngineConfig = None,
-                 engine: PatternEngine = None):
+                 engine: PatternEngine = None,
+                 consensus_configs: list[EngineConfig] = None):
         self.config = config or EngineConfig()
         self.engine = engine
+        self.consensus_configs = consensus_configs
 
     def run(self, train_db: pd.DataFrame = None,
             query_db: pd.DataFrame = None,
@@ -70,6 +75,19 @@ class LiveSignalRunner:
             })
 
         signals_df = pd.DataFrame(rows)
+
+        # Cross-model consensus filtering (optional)
+        if self.consensus_configs and train_db is not None:
+            from pattern_engine.cross_validation import CrossValidator
+            all_configs = [self.config] + self.consensus_configs
+            xval = CrossValidator(all_configs)
+            xval_result = xval.run(train_db, query_db, verbose=0)
+            consensus = xval.consensus_signals()
+
+            # Override signals with consensus (aligned by position, not ticker dict)
+            # consensus has same row order as query_db, so use positional alignment
+            signals_df["Signal"] = consensus["ConsensusSignal"].values
+            signals_df["ConsensusAgreement"] = consensus["AgreementRatio"].values
 
         # Sort: BUY/SELL first (by probability strength), HOLD last
         signals_df["_sort_key"] = signals_df["Signal"].map(

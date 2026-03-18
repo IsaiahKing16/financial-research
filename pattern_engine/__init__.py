@@ -19,6 +19,7 @@ Usage:
 
 from pattern_engine.config import EngineConfig
 from pattern_engine.engine import PatternEngine
+from pattern_engine.cross_validation import CrossValidator
 
-__version__ = "2.0.0"
-__all__ = ["PatternEngine", "EngineConfig"]
+__version__ = "2.1.0"
+__all__ = ["PatternEngine", "EngineConfig", "CrossValidator"]

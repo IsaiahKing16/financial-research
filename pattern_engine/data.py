@@ -171,7 +171,7 @@ class DataLoader:
         for name, split in [("train", train_db), ("val", val_db), ("test", test_db)]:
             print(f"  {name:5s}: {len(split):>8,} rows | "
                   f"{split['Ticker'].nunique()} tickers | "
-                  f"{split['Date'].min().strftime('%Y-%m-%d')} → "
+                  f"{split['Date'].min().strftime('%Y-%m-%d')} -> "
                   f"{split['Date'].max().strftime('%Y-%m-%d')}")
 
         return train_db, val_db, test_db

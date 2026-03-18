@@ -46,6 +46,13 @@ class EngineConfig:
         "atr_14": 0.8,
         "price_vs_sma20": 1.2,  # Mean reversion signal
         "price_vs_sma50": 1.0,
+        # Overnight/session features (neutral weights, pending sweep)
+        "ret_overnight": 1.0,
+        "ret_intraday": 1.0,
+        "gap_magnitude": 1.0,
+        "gap_direction_streak": 0.8,
+        "weekend_gap": 1.0,
+        "weekend_gap_magnitude": 0.8,
     })
 
     # --- Forward Projection ---

@@ -66,6 +66,17 @@ def _make_ticker_data(ticker: str, n_days: int, start_date: str,
     df["spy_correlation_30d"] = rng.rand(n_days) * 0.4 + 0.5
     df["sector_rank_30d"] = rng.rand(n_days)
 
+    # Overnight/session features
+    df["ret_overnight"] = rng.randn(n_days) * 0.005
+    df["ret_intraday"] = rng.randn(n_days) * 0.015
+    df["gap_magnitude"] = np.abs(df["ret_overnight"])
+    df["gap_direction_streak"] = rng.choice([-3, -2, -1, 0, 1, 2, 3], n_days)
+    df["weekend_gap"] = np.where(
+        pd.to_datetime(df["Date"]).dt.dayofweek == 0,
+        rng.randn(n_days) * 0.01, 0.0
+    )
+    df["weekend_gap_magnitude"] = np.abs(df["weekend_gap"])
+
     # ADX for regime testing
     df["adx_14"] = rng.rand(n_days) * 40 + 10
 

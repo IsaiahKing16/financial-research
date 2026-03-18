@@ -5,7 +5,7 @@ Financial Pattern Prediction Engine (FPPE) v2.1 — K-NN analogue matching for p
 See PROJECT_GUIDE.md for full architecture, API, and roadmap.
 
 ## Commands
-- `python -m pytest tests/ -v` — Run all 218 tests (always run before committing)
+- `python -m pytest tests/ -v` — Run all 242 tests (always run before committing)
 - `python -m pattern_engine.live` — Production EOD signals
 - `python -m pattern_engine.overnight` — 6-hour overnight runner
 - `venv\Scripts\activate` — Windows venv activation
@@ -31,6 +31,8 @@ See PROJECT_GUIDE.md for full architecture, API, and roadmap.
 - `pattern_engine/engine.py` — Core fit/predict/evaluate API
 - `pattern_engine/sweep.py` — Grid + Bayesian (Optuna) sweep runners
 - `pattern_engine/schema.py` — DataFrame validation at engine boundaries
+- `pattern_engine/features.py` — Feature sets including new `returns_overnight` and `returns_session`
+- `tests/test_overnight_features.py` — 24 tests for overnight/session features
 - `prepare.py` — Data pipeline (HUMAN-ONLY, do not modify)
 
 ## Dependencies

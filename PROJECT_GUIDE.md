@@ -13,7 +13,7 @@ analogue matching on return fingerprints to generate probabilistic BUY/SELL/HOLD
 signals across a 52-ticker universe.
 
 The project has two codebases:
-1. **`pattern_engine/`** — Python package (21 modules, 218 tests, all passing)
+1. **`pattern_engine/`** — Python package (21 modules, 242 tests, all passing)
 2. **`pattern-engine-v2.1.jsx`** — Standalone React demo (claude.ai artifact, no HTTP calls)
 
 **Do NOT modify `prepare.py` or this file unless explicitly asked.**
@@ -54,7 +54,7 @@ The three-filter signal gate keeps trade volume manageable at any universe size.
 pattern_engine/                    # 21 modules, version 2.1.0
 ├── __init__.py                    # Public API: PatternEngine, EngineConfig, CrossValidator
 ├── config.py                      # EngineConfig frozen dataclass (all proven defaults)
-├── features.py                    # FeatureSet/FeatureRegistry (5 pluggable sets + hybrid)
+├── features.py                    # FeatureSet/FeatureRegistry (7 pluggable sets + hybrid)
 ├── matching.py                    # Core KNN matcher (ball_tree, batched, 52-ticker SECTOR_MAP)
 ├── projection.py                  # Forward projection + three-filter signal gate
 ├── calibration.py                 # Platt/isotonic/none probability calibrators
@@ -179,6 +179,8 @@ feature_weights = {
 | `returns_candle` | 8 returns + 15 candlestick | Available |
 | `returns_vol` | 8 returns + 4 volatility | Available |
 | `returns_sector` | 8 returns + 3 sector-relative | Available |
+| `returns_overnight` | 8 returns + 4 overnight/session | New — research-driven |
+| `returns_session` | 8 returns + 4 overnight + 2 weekend | New — research-driven |
 | `full` | 34 features combined | Experimental |
 | `returns_hybrid` | 8 returns + 16 LSTM latent dims | Placeholder (needs trained model) |
 
@@ -272,7 +274,7 @@ BSS < 0    = worse than base rate
 - 2024 fold = positive BSS — genuine predictive skill on unseen data
 - 2022 bear market = worst fold (regime shift, fewer bear training analogues)
 - Expanding window means later folds have more training data → better performance
-- 218 automated tests all passing
+- 242 automated tests all passing
 
 ---
 
@@ -381,7 +383,7 @@ pip install -r requirements.txt  # includes optuna
 ```cmd
 python -m pytest tests/ -v
 ```
-All **218 tests** must pass (14 test files).
+All **242 tests** must pass (15 test files).
 
 ### Key Entry Points
 
@@ -446,7 +448,9 @@ print(results.sort_values("mean_bss", ascending=False).head(10))
 ## 12. DELIVERABLES PRODUCED
 
 ### 12.1 Python Package (`pattern_engine/`)
-21 modules, 218 tests, all passing. Fully modular replacement of monolithic strategy.py.
+21 modules, 242 tests, all passing. Fully modular replacement of monolithic strategy.py.
+Merged to main branch 2026-03-18. Legacy files (strategy.py, strategyv1-v4.py) preserved
+but marked superseded.
 
 ### 12.2 React Frontend Demo (`pattern-engine-v2.1.jsx`)
 Standalone React artifact for claude.ai (~1500 lines). No HTTP calls — all backend
@@ -482,9 +486,12 @@ Professional DOCX report (~20 pages, 4 sections):
 - [x] Native schema validation at fit/predict boundaries
 - [x] SQLite-persistent study state for cross-session resume
 - [x] Reliability infrastructure (atomic writes, lock files, checkpoints)
-- [x] 218 tests all passing
+- [x] 242 tests all passing (15 test files)
 - [x] React frontend demo (JSX)
 - [x] Professional project report (DOCX)
+- [x] Merged modular package to main (superseding strategy.py)
+- [x] Overnight/session feature sets (research-driven, pluggable)
+- [x] Research integration: 24/7 equities overnight drift analysis
 
 ### v3.0 — Neural Hybrid (Target: Q3-Q4 2026)
 - [ ] CONV_LSTM trained on price windows → 16-dim latent embeddings
@@ -555,3 +562,47 @@ fastapi         # Real-time prediction API
 | Schema validation | DataFrame checks at engine boundaries. Native Python, no pandera. |
 | Signal gate | Three-filter rule: min_matches ≥ 10, agreement ≥ 0.10, confidence ≥ 0.65. |
 | Walk-forward | 6-fold expanding validation 2019-2024. Standard fold = 2024. |
+
+---
+
+## 16. RESEARCH CONTEXT: 24/7 EQUITIES & OVERNIGHT DRIFT
+
+### Source
+"The Financial Microstructure of 24/7 Equities: An Exhaustive Analysis of the S&P 500
+and Trade Hyperliquid Partnership" (March 18, 2026). S&P 500 licensed to Trade/Hyperliquid
+for 24/7 perpetual contracts — first time in 69-year history the benchmark trades
+continuously on decentralized infrastructure.
+
+### Key Findings Relevant to FPPE
+1. **Overnight drift** (Fed NY Staff Report 917): US equities show ~3.7% annualized
+   positive return during off-hours, primarily at 02:00-03:00 ET when European liquidity
+   arrives. Driven by dealer inventory risk — market makers absorb selling pressure at
+   close and extract compensation overnight.
+2. **Gap risk as signal**: Weekend/overnight gaps represent forced price discovery
+   compression. Magnitude and direction contain predictive information.
+3. **Session decomposition**: Total daily return = overnight (gap) + intraday (session).
+   These components carry orthogonal information about different market mechanisms.
+4. **Cross-timezone correlation gaps**: Asian markets systematically overreact to US
+   movements during 21:00-02:00 HKT, creating predictable lag patterns.
+
+### Implementation in FPPE
+Two new pluggable feature sets added to `features.py`:
+
+| Feature Set | Columns | Description |
+|-------------|---------|-------------|
+| `returns_overnight` | 12 (8 returns + 4 overnight) | Adds ret_overnight, ret_intraday, gap_magnitude, gap_direction_streak |
+| `returns_session` | 14 (8 returns + 6 session) | Adds above + weekend_gap, weekend_gap_magnitude |
+
+Usage: `EngineConfig(feature_set="returns_overnight")` — default `returns_only` unchanged.
+
+### Feature Definitions
+- `ret_overnight`: Close[t-1] -> Open[t] (the gap component)
+- `ret_intraday`: Open[t] -> Close[t] (the session component)
+- `gap_magnitude`: |ret_overnight| (absolute gap size)
+- `gap_direction_streak`: Consecutive same-sign gaps (momentum signal)
+- `weekend_gap`: Friday close -> Monday open (only non-zero on Mondays)
+- `weekend_gap_magnitude`: |weekend_gap|
+
+### Status
+Features implemented and tested (24 new tests). Walk-forward validation pending.
+These are opt-in experimental features — default `returns_only` set is LOCKED.

@@ -1,3 +1,4 @@
+# SUPERSEDED by pattern_engine/ (v2.1) — kept for reference
 """
 strategy.py — System A: Historical Analogue Matching & Forward Projection
 THIS FILE IS MODIFIED BY THE AUTORESEARCH AGENT.

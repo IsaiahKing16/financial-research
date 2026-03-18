@@ -42,6 +42,19 @@ SECTOR_COLS = [
     "sector_relative_return_7d", "spy_correlation_30d", "sector_rank_30d",
 ]
 
+# Overnight/session decomposition features (research: Fed NY overnight drift)
+OVERNIGHT_COLS = [
+    "ret_overnight",        # Close[t-1] -> Open[t] (gap component)
+    "ret_intraday",         # Open[t] -> Close[t] (session component)
+    "gap_magnitude",        # |ret_overnight|
+    "gap_direction_streak", # Consecutive same-sign gaps
+]
+
+WEEKEND_COLS = [
+    "weekend_gap",           # Fri close -> Mon open
+    "weekend_gap_magnitude", # |weekend_gap|
+]
+
 # Forward targets
 FORWARD_WINDOWS = [1, 3, 7, 14, 30]
 FORWARD_RETURN_COLS = [f"fwd_{w}d" for w in FORWARD_WINDOWS]
@@ -111,6 +124,15 @@ FeatureRegistry.register(
 FeatureRegistry.register(
     "full", RETURN_COLS + SUPPLEMENT_COLS + CANDLE_COLS + SECTOR_COLS,
     "All features combined (experimental)"
+)
+
+FeatureRegistry.register(
+    "returns_overnight", RETURN_COLS + OVERNIGHT_COLS,
+    "8 returns + 4 overnight/session decomposition (research-driven)"
+)
+FeatureRegistry.register(
+    "returns_session", RETURN_COLS + OVERNIGHT_COLS + WEEKEND_COLS,
+    "8 returns + 4 overnight + 2 weekend gap features"
 )
 
 # CONV_LSTM hybrid feature set placeholder (requires trained network)

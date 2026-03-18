@@ -1,3 +1,4 @@
+# SUPERSEDED by pattern_engine/ (v2.1) — kept for reference
 """
 strategy.py — High-Performance Deep Research Engine (Master Version)
 THIS FILE IS MODIFIED BY THE AUTORESEARCH AGENT.

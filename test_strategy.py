@@ -1,3 +1,4 @@
+# SUPERSEDED by tests/ (pattern_engine v2.1) — kept for reference
 """
 test_strategy.py — Regression tests for strategy.py evaluation logic.
 

@@ -1,3 +1,4 @@
+# SUPERSEDED by pattern_engine/ (v2.1) — kept for reference
 """
 strategy_overnight.py — System A: 5-Hour Overnight Autoresearch Run
 DO NOT MODIFY DURING A RUN. Results append live to results_analogue.tsv.

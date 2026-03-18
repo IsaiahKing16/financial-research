@@ -17,6 +17,7 @@ from pathlib import Path
 from pattern_engine.features import (
     RETURN_WINDOWS, RETURN_COLS, SUPPLEMENT_COLS,
     FORWARD_WINDOWS, FORWARD_RETURN_COLS, FORWARD_BINARY_COLS,
+    OVERNIGHT_COLS, WEEKEND_COLS,
 )
 from pattern_engine.candlestick import add_candlestick_features
 from pattern_engine.sector import TICKERS, SECTOR_MAP, compute_sector_features
@@ -98,6 +99,7 @@ class DataLoader:
             # Drop rows with incomplete data
             required_cols = (RETURN_COLS + SUPPLEMENT_COLS +
                              FORWARD_RETURN_COLS + FORWARD_BINARY_COLS +
+                             OVERNIGHT_COLS + WEEKEND_COLS +
                              ["Date", "Ticker", "Open", "High", "Low", "Close"])
             available = [c for c in required_cols if c in df.columns]
             subset = df[available].dropna().reset_index(drop=True)
@@ -198,7 +200,38 @@ class DataLoader:
         # Candlestick features (1d/3d/5d)
         df = add_candlestick_features(df)
 
+        # Overnight/session features
+        df = self._compute_overnight_features(df)
+
         df["Ticker"] = ticker
+        return df
+
+    @staticmethod
+    def _compute_overnight_features(df: pd.DataFrame) -> pd.DataFrame:
+        """Compute overnight/session decomposition features.
+
+        Based on research: overnight drift (Fed NY Staff Report 917),
+        gap risk as predictive signal, and cross-timezone correlation gaps.
+        """
+        df = df.copy()
+
+        # Core decomposition: total return = overnight + intraday
+        df["ret_overnight"] = df["Open"] / df["Close"].shift(1) - 1
+        df["ret_intraday"] = df["Close"] / df["Open"] - 1
+        df["gap_magnitude"] = df["ret_overnight"].abs()
+
+        # Streak: consecutive same-sign gaps (vectorized)
+        gap_sign = np.sign(df["ret_overnight"])
+        streak = gap_sign.groupby(
+            (gap_sign != gap_sign.shift()).cumsum()
+        ).cumcount() + 1
+        df["gap_direction_streak"] = streak * gap_sign
+
+        # Weekend gap: Monday's overnight return = Fri close -> Mon open
+        day_of_week = pd.to_datetime(df["Date"]).dt.dayofweek
+        df["weekend_gap"] = np.where(day_of_week == 0, df["ret_overnight"], 0.0)
+        df["weekend_gap_magnitude"] = df["weekend_gap"].abs()
+
         return df
 
     @staticmethod

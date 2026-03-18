@@ -1,11 +1,11 @@
 # CLAUDE.md — Claude Code Context for FPPE
 
 ## Project
-Financial Pattern Prediction Engine (FPPE) v2.1 — K-NN analogue matching for probabilistic equity signals.
+Financial Pattern Prediction Engine (FPPE) v2.2 — K-NN analogue matching for probabilistic equity signals.
 See PROJECT_GUIDE.md for full architecture, API, and roadmap.
 
 ## Commands
-- `python -m pytest tests/ -v` — Run all 242 tests (always run before committing)
+- `python -m pytest tests/ -v` — Run all 279 tests (always run before committing)
 - `python -m pattern_engine.live` — Production EOD signals
 - `python -m pattern_engine.overnight` — 6-hour overnight runner
 - `venv\Scripts\activate` — Windows venv activation
@@ -16,6 +16,7 @@ See PROJECT_GUIDE.md for full architecture, API, and roadmap.
 - Docstrings: one-line summary, then Args/Returns sections
 - Tests in `tests/test_<module>.py` mirroring `pattern_engine/<module>.py`
 - Fixtures in `tests/conftest.py` (synthetic_db, train_db, val_db)
+- **Never use `assert` for public API validation** — use RuntimeError/ValueError
 
 ## Gotchas
 - `hash(EngineConfig)` fails — contains dict field (feature_weights). Use `repr()` instead
@@ -24,6 +25,7 @@ See PROJECT_GUIDE.md for full architecture, API, and roadmap.
 - `nn_jobs` must be 1 — joblib deadlocks on Windows/Python 3.12 with parallel NN
 - Windows bash paths: use single quotes for backslash paths, never end with trailing `\`
 - Schema validation is native Python (no pandera) — deliberate choice to avoid heavy deps
+- `cal_frac` was removed in v2.2 (was a no-op). Do not add it back without implementing the calibration holdout split
 
 ## Key Files
 - `PROJECT_GUIDE.md` — Cross-AI context doc (share with Gemini/ChatGPT sessions)
@@ -31,9 +33,10 @@ See PROJECT_GUIDE.md for full architecture, API, and roadmap.
 - `pattern_engine/engine.py` — Core fit/predict/evaluate API
 - `pattern_engine/sweep.py` — Grid + Bayesian (Optuna) sweep runners
 - `pattern_engine/schema.py` — DataFrame validation at engine boundaries
-- `pattern_engine/features.py` — Feature sets including new `returns_overnight` and `returns_session`
-- `tests/test_overnight_features.py` — 24 tests for overnight/session features
-- `prepare.py` — Data pipeline (HUMAN-ONLY, do not modify)
+- `pattern_engine/features.py` — Feature sets including `returns_overnight` and `returns_session`
+- `pattern_engine/overnight.py` — Checkpoint state machine (pending/running/completed/partial/failed)
+- `tests/test_review_fixes.py` — 37 tests for code review fixes (P0/P1)
+- `archive/` — Legacy Phase 1 scripts (superseded by pattern_engine/)
 
 ## Dependencies
 Core: pandas, numpy, scikit-learn, yfinance, ta, pyarrow, optuna

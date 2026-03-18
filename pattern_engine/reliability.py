@@ -199,6 +199,7 @@ class ProgressLog:
         with open(self.path, "a") as f:
             f.write(line)
             f.flush()
+            os.fsync(f.fileno())  # Ensure data hits disk for post-mortem safety
 
     def info(self, message: str) -> None:
         self._write("INFO", message)

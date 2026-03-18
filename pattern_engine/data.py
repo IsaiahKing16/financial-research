@@ -110,6 +110,19 @@ class DataLoader:
 
             all_rows.append(subset)
 
+        # Guard against empty universe (all tickers failed or insufficient)
+        if not all_rows:
+            raise RuntimeError(
+                "No tickers survived feature computation. Check data downloads "
+                "and ensure raw OHLCV data is available."
+            )
+
+        # Warn if universe coverage is too low for representative results
+        success_rate = len(all_rows) / len(raw_data) if raw_data else 0
+        if success_rate < 0.5:
+            print(f"  WARNING: Only {len(all_rows)}/{len(raw_data)} tickers "
+                  f"({success_rate:.0%}) survived — results may not be representative")
+
         db = pd.concat(all_rows, ignore_index=True)
         print(f"\n  Database built: {len(db):,} rows, "
               f"{db['Ticker'].nunique()} tickers")

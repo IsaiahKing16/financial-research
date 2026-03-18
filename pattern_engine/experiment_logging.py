@@ -15,6 +15,7 @@ import hashlib
 import json
 import os
 import tempfile
+from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
 
@@ -24,13 +25,15 @@ from pattern_engine.config import EngineConfig
 
 
 def _config_hash(config: EngineConfig) -> str:
-    """Deterministic hash of config for deduplication."""
-    key_fields = (
-        config.top_k, config.max_distance, config.distance_metric,
-        config.feature_set, config.calibration_method, config.cal_frac,
-        config.regime_mode, config.regime_filter,
-    )
-    return hashlib.md5(str(key_fields).encode()).hexdigest()[:12]
+    """Deterministic hash of the full config for deduplication.
+
+    Uses dataclasses.asdict() with sorted JSON serialization so that
+    every config field contributes to the hash. Changing any field
+    (including confidence_threshold, feature_weights, etc.) produces
+    a different hash.
+    """
+    payload = json.dumps(asdict(config), sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(payload.encode()).hexdigest()[:16]
 
 
 class ExperimentLogger:
@@ -108,7 +111,6 @@ class ExperimentLogger:
             "regime_fallback": config.regime_fallback,
             "adx_threshold": config.adx_threshold,
             "calibration_method": config.calibration_method,
-            "cal_frac": config.cal_frac,
         }
 
         df_row = pd.DataFrame([row])

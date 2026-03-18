@@ -6,6 +6,8 @@ trains on all data up to train_end, validates on val_start to val_end.
 Each fold builds a fresh PatternEngine instance.
 """
 
+import time
+
 import pandas as pd
 
 from pattern_engine.config import EngineConfig, WALKFORWARD_FOLDS
@@ -35,13 +37,15 @@ class WalkForwardRunner:
         self.cross_validate = cross_validate
 
     def run(self, full_db: pd.DataFrame, experiment_name: str = "walkforward",
-            verbose: int = 1) -> list[dict]:
+            verbose: int = 1, deadline_ts: float = None) -> list[dict]:
         """Run walk-forward validation across all folds.
 
         Args:
             full_db: complete analogue database (all dates)
             experiment_name: name for TSV logging
             verbose: 0=silent, 1=progress
+            deadline_ts: absolute timestamp deadline (None = no deadline).
+                If set, skips remaining folds when time budget is exhausted.
 
         Returns:
             list of metrics dicts, one per fold
@@ -52,6 +56,12 @@ class WalkForwardRunner:
         all_metrics = []
 
         for fold in self.folds:
+            # Check deadline before starting an expensive fold
+            if deadline_ts is not None and time.time() > deadline_ts:
+                if verbose:
+                    print(f"  Time budget exhausted — skipping remaining folds")
+                break
+
             label = fold["label"]
             if verbose:
                 print(f"\n{'=' * 60}")

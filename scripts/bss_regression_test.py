@@ -1,5 +1,5 @@
 """
-BSS Regression Test — Validates the rebuilt PatternEngine against System A.
+BSS Regression Test - Validates the rebuilt PatternEngine against System A.
 
 Uses real market data to run 6-fold walk-forward validation with proven
 defaults. The critical benchmark: 2024 fold should yield ~+0.00100 BSS
@@ -27,7 +27,7 @@ from pattern_engine.evaluation import print_metrics
 def main():
     start = time.time()
 
-    # ── Step 1: Build database from raw CSVs ──
+    # -- Step 1: Build database from raw CSVs --
     # Try worktree data dir first, fall back to main repo data dir
     worktree_data = project_root / "data"
     main_repo_data = project_root.parent.parent.parent / "data"
@@ -52,7 +52,7 @@ def main():
         data_dir = str(worktree_data)
 
     print("\n" + "=" * 70)
-    print("  BSS REGRESSION TEST — PatternEngine v2.0 vs System A")
+    print("  BSS REGRESSION TEST - PatternEngine v2.0 vs System A")
     print("=" * 70)
 
     loader = DataLoader(data_dir=data_dir)
@@ -76,7 +76,7 @@ def main():
     runner = WalkForwardRunner(config, folds=WALKFORWARD_FOLDS, logger=logger)
     fold_metrics = runner.run(full_db, experiment_name="bss_regression", verbose=1)
 
-    # ── Step 4: Report results ──
+    # -- Step 4: Report results --
     print("\n" + "=" * 70)
     print("  BSS REGRESSION RESULTS")
     print("=" * 70)
@@ -101,7 +101,7 @@ def main():
     print(f"  Mean BSS:              {'+' if mean_bss > 0 else ''}{mean_bss:.5f}")
     print(f"  Positive BSS folds:    {positive_folds}/{len(bss_values)}")
 
-    # ── Regression check ──
+    # -- Regression check --
     # System A achieved +0.00100 BSS on the 2024 fold with Platt
     fold_2024 = [m for m in fold_metrics if "2024" in m.get("fold", "")]
     if fold_2024:
@@ -109,13 +109,26 @@ def main():
         print(f"\n  2024 Fold BSS:          {'+' if bss_2024 > 0 else ''}{bss_2024:.5f}")
         print(f"  System A reference:     +0.00100")
         if bss_2024 > 0:
-            print(f"  RESULT: POSITIVE BSS on 2024 fold ✓")
+            print(f"  RESULT: POSITIVE BSS on 2024 fold [PASS]")
         else:
-            print(f"  RESULT: Negative BSS on 2024 fold — investigate")
+            print(f"  RESULT: Negative BSS on 2024 fold -- investigate")
 
     elapsed = (time.time() - start) / 60
     print(f"\n  Total time: {elapsed:.1f} min")
     print("=" * 70 + "\n")
+
+    # -- Step 5: Integrity check on 2024 fold --
+    print(f"\n[4/4] Running cross-model integrity check on 2024 fold...")
+    from pattern_engine.cross_validation import CrossValidator
+    import pandas as pd
+    fold_2024_def = [f for f in WALKFORWARD_FOLDS if "2024" in f["label"]][0]
+    full_db["Date"] = pd.to_datetime(full_db["Date"])
+    train_db = full_db[full_db["Date"] <= fold_2024_def["train_end"]].copy()
+    val_db = full_db[
+        (full_db["Date"] >= fold_2024_def["val_start"]) &
+        (full_db["Date"] <= fold_2024_def["val_end"])
+    ].copy()
+    integrity = CrossValidator.integrity_check(config, train_db, val_db, verbose=1)
 
     # Save results summary
     results_dir = worktree_data / "results"
@@ -128,6 +141,10 @@ def main():
             f.write(f"{m['fold']}: BSS={bss:+.5f}\n")
         f.write(f"\nMean BSS: {mean_bss:+.5f}\n")
         f.write(f"Positive folds: {positive_folds}/{len(bss_values)}\n")
+        f.write(f"\nIntegrity: {'PASS' if integrity['all_passed'] else 'FAIL'}\n")
+        for k, v in integrity.items():
+            if k != "all_passed":
+                f.write(f"  {k}: {v}\n")
 
     return fold_metrics
 

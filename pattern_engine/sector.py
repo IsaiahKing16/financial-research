@@ -70,34 +70,46 @@ def compute_sector_features(db: pd.DataFrame) -> pd.DataFrame:
     db["sector_rank_30d"] = 0.5
 
     # Sector-relative return: stock ret_7d - sector proxy ret_7d
-    for sector, proxy in SECTOR_PROXIES.items():
-        sector_tickers = [t for t, s in SECTOR_MAP.items() if s == sector and t != proxy]
-        if not sector_tickers:
-            continue
+    # Build proxy lookup keyed by the sector each proxy REPRESENTS
+    # (not the proxy ticker's own sector — QQQ is "Index" but represents "Tech")
+    db["_sector"] = db["Ticker"].map(SECTOR_MAP)
+    proxy_parts = []
+    for sector_name, proxy_ticker in SECTOR_PROXIES.items():
+        rows = db.loc[db["Ticker"] == proxy_ticker, ["Date", "ret_7d"]].copy()
+        rows["_sector"] = sector_name
+        proxy_parts.append(rows)
+    proxy_lookup = pd.concat(proxy_parts, ignore_index=True).rename(
+        columns={"ret_7d": "_proxy_ret_7d"}
+    )
+    db = db.merge(proxy_lookup, on=["Date", "_sector"], how="left")
+    db["sector_relative_return_7d"] = db["ret_7d"] - db["_proxy_ret_7d"].fillna(0)
+    db = db.drop(columns=["_proxy_ret_7d"])
 
-        proxy_data = db[db["Ticker"] == proxy][["Date", "ret_7d"]].copy()
-        proxy_data = proxy_data.rename(columns={"ret_7d": "proxy_ret_7d"})
-
-        for ticker in sector_tickers:
-            mask = db["Ticker"] == ticker
-            if mask.sum() == 0:
-                continue
-            ticker_data = db[mask][["Date", "ret_7d"]].copy()
-            merged = ticker_data.merge(proxy_data, on="Date", how="left")
-            relative = (merged["ret_7d"] - merged["proxy_ret_7d"]).values
-            db.loc[mask, "sector_relative_return_7d"] = relative
+    # SPY correlation: rolling 30-day correlation of each ticker's daily returns with SPY
+    if "Close" in db.columns:
+        spy_close = db.loc[db["Ticker"] == "SPY", ["Date", "Close"]].set_index("Date").sort_index()
+        if len(spy_close) > 0:
+            spy_ret = spy_close["Close"].pct_change().rename("_spy_ret")
+            corr_parts = []
+            for ticker, grp in db.groupby("Ticker"):
+                grp_sorted = grp[["Date", "Close"]].set_index("Date").sort_index()
+                ticker_ret = grp_sorted["Close"].pct_change()
+                aligned_spy = spy_ret.reindex(ticker_ret.index)
+                corr = ticker_ret.rolling(30, min_periods=15).corr(aligned_spy)
+                corr_df = pd.DataFrame({"Date": corr.index, "_corr": corr.values})
+                corr_df["Ticker"] = ticker
+                corr_parts.append(corr_df)
+            corr_all = pd.concat(corr_parts, ignore_index=True)
+            db = db.merge(corr_all, on=["Date", "Ticker"], how="left")
+            db["spy_correlation_30d"] = db["_corr"].fillna(0.0)
+            db = db.drop(columns=["_corr"])
 
     # Sector rank: percentile rank of ret_30d within sector peers on same date
-    for date in db["Date"].unique():
-        date_mask = db["Date"] == date
-        date_rows = db[date_mask]
-
-        for sector in SECTOR_MAP.values():
-            sector_mask = date_mask & (db["Ticker"].map(SECTOR_MAP) == sector)
-            sector_rows = db[sector_mask]
-            if len(sector_rows) < 2:
-                continue
-            ranks = sector_rows["ret_30d"].rank(pct=True)
-            db.loc[sector_mask, "sector_rank_30d"] = ranks.values
+    # _sector column already set above by vectorized relative return code
+    ranks = db.groupby(["Date", "_sector"])["ret_30d"].rank(pct=True)
+    # Only apply where group size >= 2 (rank is meaningful)
+    group_sizes = db.groupby(["Date", "_sector"])["ret_30d"].transform("count")
+    db["sector_rank_30d"] = np.where(group_sizes >= 2, ranks, 0.5)
+    db = db.drop(columns=["_sector"])
 
     return db

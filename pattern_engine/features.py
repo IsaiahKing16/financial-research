@@ -112,3 +112,10 @@ FeatureRegistry.register(
     "full", RETURN_COLS + SUPPLEMENT_COLS + CANDLE_COLS + SECTOR_COLS,
     "All features combined (experimental)"
 )
+
+# CONV_LSTM hybrid feature set placeholder (requires trained network)
+LSTM_LATENT_COLS = [f"lstm_latent_{i}" for i in range(16)]
+FeatureRegistry.register(
+    "returns_hybrid", RETURN_COLS + LSTM_LATENT_COLS,
+    "Returns + CONV_LSTM latent embeddings (requires trained network)"
+)

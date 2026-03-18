@@ -27,6 +27,7 @@ from pattern_engine.calibration import make_calibrator
 from pattern_engine.regime import RegimeLabeler
 from pattern_engine.evaluation import evaluate_probabilistic
 from pattern_engine.projection import generate_signal
+from pattern_engine.schema import validate_train_db, validate_query_db
 
 
 class PredictionResult:
@@ -102,8 +103,12 @@ class PatternEngine:
         Returns:
             self (for method chaining)
         """
-        self._train_db = train_db
         cfg = self.config
+
+        # Schema validation at boundary
+        validate_train_db(train_db, cfg.feature_set, cfg.projection_horizon)
+
+        self._train_db = train_db.copy()
         fcols = self._features.columns
 
         # Step 1: Fit regime labeler
@@ -151,6 +156,9 @@ class PatternEngine:
             PredictionResult with probabilities, signals, etc.
         """
         assert self._fitted, "Call fit() first"
+
+        # Schema validation at boundary
+        validate_query_db(query_db, self.config.feature_set)
 
         # Run matching
         raw_probs, signals, reasons, n_matches, mean_returns, ensembles = \
@@ -225,13 +233,16 @@ class PatternEngine:
         return metrics
 
     def save(self, path: str) -> None:
-        """Serialize fitted engine state to disk.
+        """Serialize fitted engine state to disk (atomic write).
 
+        Uses temp+fsync+rename so a crash mid-write preserves the old file.
         Saves: config, scaler, NN index, calibrator, regime thresholds.
         """
         assert self._fitted, "Call fit() first"
+        import tempfile, os
 
         state = {
+            "version": "2.1",
             "config": self.config,
             "matcher_scaler": self._matcher.scaler,
             "matcher_nn_index": self._matcher._nn_index,
@@ -243,18 +254,52 @@ class PatternEngine:
 
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
-        with open(path, "wb") as f:
-            pickle.dump(state, f)
+
+        fd, tmp_path = tempfile.mkstemp(
+            dir=str(path.parent), prefix=f".{path.name}.", suffix=".tmp"
+        )
+        try:
+            with os.fdopen(fd, "wb") as f:
+                pickle.dump(state, f)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp_path, str(path))
+        except Exception:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+            raise
 
     @classmethod
     def load(cls, path: str) -> "PatternEngine":
-        """Load a fitted engine from disk.
+        """Load a fitted engine from disk with validation.
+
+        Raises ValueError on corrupted or incompatible state files.
 
         Returns:
             Fitted PatternEngine instance ready for predict()/evaluate()
         """
-        with open(path, "rb") as f:
-            state = pickle.load(f)
+        path = Path(path)
+        if not path.exists():
+            raise FileNotFoundError(f"Engine state not found: {path}")
+
+        try:
+            with open(path, "rb") as f:
+                state = pickle.load(f)
+        except (pickle.UnpicklingError, EOFError, ImportError) as e:
+            raise ValueError(f"Corrupted engine state at {path}: {e}") from e
+
+        if not isinstance(state, dict) or "config" not in state:
+            raise ValueError(f"Invalid engine state format at {path}")
+
+        # Version check
+        version = state.get("version", "1.0")
+        if version not in ("2.0", "2.1"):
+            raise ValueError(
+                f"Incompatible engine state version {version!r} at {path}. "
+                f"Re-fit and re-save the engine."
+            )
 
         engine = cls(config=state["config"])
         engine._train_db = state["train_db"]
@@ -269,11 +314,13 @@ class PatternEngine:
         engine._matcher._train_db = state["train_db"]
         engine._matcher._fitted = True
 
-        # Re-compute regime labels for training data
+        # Re-compute regime labels for training data (G1: defensive None set)
         if engine._regime_labeler is not None and engine._regime_labeler.fitted:
             engine._matcher._regime_labels_train = engine._regime_labeler.label(
                 state["train_db"], reference_db=state["train_db"]
             )
+        else:
+            engine._matcher._regime_labels_train = None
 
         engine._features = FeatureRegistry.get(state["config"].feature_set)
         engine._fitted = True

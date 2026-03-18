@@ -27,7 +27,11 @@ import pandas as pd
 
 from pattern_engine.config import EngineConfig, WALKFORWARD_FOLDS
 from pattern_engine.walkforward import WalkForwardRunner
-from pattern_engine.experiment_logging import ExperimentLogger
+from pattern_engine.experiment_logging import ExperimentLogger, _config_hash
+from pattern_engine.manifest import (
+    RunManifest, generate_run_id, _get_git_sha,
+    load_prior_context,
+)
 from pattern_engine.reliability import (
     atomic_write_json, safe_read_json, LockFile, ProgressLog,
 )
@@ -102,17 +106,47 @@ class OvernightRunner:
 
             mode_label = "bayesian" if self.bayesian_mode else "static"
             phase_count = self.n_trials if self.bayesian_mode else len(self.phases)
+
+            # Create run manifest for provenance tracking
+            self._run_id = generate_run_id()
+            self._manifest = RunManifest(
+                run_id=self._run_id,
+                mode=mode_label,
+                started_at=datetime.now().isoformat(),
+                git_sha=_get_git_sha(),
+                config_hash=_config_hash(self.phases[0]) if self.phases else "",
+            )
+
+            # Load prior run context for proactive memory injection
+            prior = load_prior_context(str(self._results_dir / "runs"))
+            if prior["best_bss"] is not None and verbose:
+                print(f"  Prior context: best BSS={prior['best_bss']:+.5f}, "
+                      f"{len(prior['recent_manifests'])} recent runs")
             self._log.info(
                 f"Overnight run started: {phase_count} {mode_label} phases, "
-                f"{self.max_hours}h budget, PID={lock._pid}"
+                f"{self.max_hours}h budget, PID={lock._pid}, "
+                f"run_id={self._run_id}"
             )
 
             # Register atexit to log clean shutdown
             atexit.register(self._log.info, "Process exiting (atexit)")
 
             if self.bayesian_mode:
-                return self._run_bayesian(full_db, verbose)
-            return self._run_phases(full_db, verbose)
+                results = self._run_bayesian(full_db, verbose)
+            else:
+                results = self._run_phases(full_db, verbose)
+
+            # Finalize and save manifest
+            self._manifest.ended_at = datetime.now().isoformat()
+            self._manifest.artifact_paths = {
+                "checkpoint": str(self.checkpoint_path),
+                "log": str(self._results_dir / "overnight.log"),
+            }
+            self._manifest.save(str(self._results_dir / "runs"))
+            if verbose:
+                print(f"  Run manifest saved: {self._run_id}")
+
+            return results
 
     # Maximum retry attempts for failed phases before quarantine
     MAX_PHASE_RETRIES = 2
@@ -276,6 +310,33 @@ class OvernightRunner:
 
         self._log.info(f"Run complete: {len(results)} phases in "
                        f"{(time.time() - start_time) / 60:.1f} min")
+
+        # Update manifest with run statistics
+        if hasattr(self, "_manifest"):
+            self._manifest.elapsed_minutes = round(
+                (time.time() - start_time) / 60, 1
+            )
+            self._manifest.phases_completed = sum(
+                1 for p in phase_statuses.values()
+                if p.get("status") == "completed"
+            )
+            self._manifest.phases_failed = sum(
+                1 for p in phase_statuses.values()
+                if p.get("status") == "failed"
+            )
+            self._manifest.phases_partial = sum(
+                1 for p in phase_statuses.values()
+                if p.get("status") == "partial"
+            )
+            # Extract best BSS from results
+            all_bss = []
+            for r in results:
+                for fm in r.get("fold_metrics", []):
+                    bss = fm.get("brier_skill_score")
+                    if bss is not None:
+                        all_bss.append(bss)
+            if all_bss:
+                self._manifest.best_bss = max(all_bss)
 
         return results
 

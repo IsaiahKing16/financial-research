@@ -1,5 +1,5 @@
 # PROJECT_GUIDE.md — Multi-AI Collaboration Reference
-# Last Updated: 2026-03-18
+# Last Updated: 2026-03-19
 # Owner: Sleep (Isaia)
 # Primary AI: Claude (Anthropic) | Supporting: Gemini, ChatGPT
 
@@ -12,9 +12,15 @@ financial prediction system. The core engine uses K-nearest-neighbor historical
 analogue matching on return fingerprints to generate probabilistic BUY/SELL/HOLD
 signals across a 52-ticker universe.
 
-The project has two codebases:
-1. **`pattern_engine/`** — Python package (21 modules, 242 tests, all passing)
-2. **`pattern-engine-v2.1.jsx`** — Standalone React demo (claude.ai artifact, no HTTP calls)
+The project has three codebases:
+1. **`pattern_engine/`** — Python package (21 modules, 331 tests all passing)
+2. **`trading_system/`** — Four-layer trading system built on FPPE signals (Phase 1 complete)
+3. **`pattern-engine-v2.1.jsx`** — Standalone React demo (claude.ai artifact, no HTTP calls)
+
+**Key design documents (always reference before modifying related code):**
+- `FPPE_TRADING_SYSTEM_DESIGN.md` v0.3 — Architecture spec for all four trading layers
+- `PHASE1_FILE_REVIEW.md` — Structural stability review; all Phase 1 bugs documented and fixed
+- `CANDLESTICK_CATEGORIZATION_DESIGN.md` v0.2 — Future K-NN pre-filtering module (Phase 6)
 
 **Do NOT modify `prepare.py` or this file unless explicitly asked.**
 
@@ -64,16 +70,30 @@ pattern_engine/                    # 21 modules, version 2.1.0
 ├── candlestick.py                 # Continuous multi-timeframe encoding (1d/3d/5d)
 ├── sector.py                      # Cross-asset sector features (vectorized)
 ├── engine.py                      # PatternEngine class (fit/predict/evaluate/save/load)
-├── schema.py                      # NEW v2.1: Native DataFrame validation at boundaries
+├── schema.py                      # Native DataFrame validation at engine boundaries
 ├── cross_validation.py            # Cross-model validation & integrity checking
 ├── data.py                        # DataLoader pipeline (yfinance → features → parquet)
-├── experiment_logging.py          # TSV experiment logger with config provenance
+├── experiment_logging.py          # TSV experiment logger with full config hash (all ~20 fields)
 ├── walkforward.py                 # 6-fold walk-forward with optional cross-validation
-├── sweep.py                       # Grid sweep + NEW Bayesian (Optuna TPE) sweep
+├── sweep.py                       # Grid sweep + Bayesian (Optuna TPE) sweep
 ├── live.py                        # Production EOD signal generator with consensus mode
 ├── overnight.py                   # Multi-phase runner (static + Bayesian modes)
 └── reliability.py                 # Atomic writes, lock files, progress logging
 ```
+
+### Trading System Package (Phase 1 complete)
+
+```
+trading_system/                    # 4 modules, 88 tests, Phase 1 backtest complete
+├── __init__.py                    # Full package exports (all primary symbols)
+├── config.py                      # TradingConfig: 7 frozen sub-configs, from_profile()
+├── signal_adapter.py              # Normalizes FPPE K-NN / DL outputs → UnifiedSignal
+├── backtest_engine.py             # Layer 1: Trade simulation, friction model, P&L
+└── run_phase1.py                  # Phase 1 entry point (equal-weight, cached signals)
+```
+
+**Trading system design reference:** `FPPE_TRADING_SYSTEM_DESIGN.md` v0.3
+**Phase 1 bug audit:** `PHASE1_FILE_REVIEW.md` — 9 findings, all fixed
 
 ### Legacy Files (reference only — do not modify)
 
@@ -145,8 +165,8 @@ results = runner.run(full_db)
 CRM, AMD, NFLX, INTC, CSCO, QCOM, TXN, MU, PYPL
 **Finance (9):** JPM, BAC, WFC, GS, MS, V, MA, AXP, BRK-B
 **Health (10):** LLY, UNH, JNJ, ABBV, MRK, PFE, TMO, ISRG, AMGN, GILD
-**Consumer (6):** WMT, COST, PG, KO, PEP, HD
-**Industrial (4):** DIS, CAT, BA, GE
+**Consumer (7):** WMT, COST, PG, KO, PEP, HD, DIS *(DIS moved from Industrial — C1 fix)*
+**Industrial (3):** CAT, BA, GE
 **Energy (2):** XOM, CVX
 
 ### Data Split (Temporal — NO leakage)
@@ -274,11 +294,83 @@ BSS < 0    = worse than base rate
 - 2024 fold = positive BSS — genuine predictive skill on unseen data
 - 2022 bear market = worst fold (regime shift, fewer bear training analogues)
 - Expanding window means later folds have more training data → better performance
-- 242 automated tests all passing
+- 331 automated tests all passing (243 pattern_engine + 88 trading_system)
 
 ---
 
-## 7. v2.1 NEW FEATURES
+## 7. PHASE 1 TRADING SYSTEM RESULTS
+
+**Status:** Complete. All Phase 1 bugs fixed. Phase 2 (risk_engine.py) is next.
+**Full specification:** `FPPE_TRADING_SYSTEM_DESIGN.md` v0.3
+**Structural audit:** `PHASE1_FILE_REVIEW.md` — 9 findings (3 critical, 5 significant, 1 deferred)
+
+### 7.1 Phase 1 Configuration
+
+| Parameter | Value | Source |
+|-----------|-------|--------|
+| Capital | $10,000 | Paper trading baseline |
+| Position sizing | Equal-weight 5% | Phase 1 only; Phase 2 adds volatility-based sizing |
+| Confidence threshold | 0.60 | Empirically optimal (threshold_sweep.py, 5 values) |
+| Max holding days | 14 | Empirically optimal (holding_period_sweep.py, 7 windows) |
+| Transaction friction | 26 bps round-trip | 10 slippage + 3 spread, both sides |
+| Signal source | Cached FPPE K-NN | 2024 validation signals |
+
+### 7.2 Phase 1 Results (2024 validation year)
+
+| Metric | FPPE System | SPY Buy & Hold |
+|--------|-------------|----------------|
+| Annual return | 22.3% | 25.4% |
+| Sharpe ratio | **1.82** | 1.52 |
+| Max drawdown | **6.9%** | 8.4% |
+| Win rate | 60.8% | — |
+| Net expectancy | $7.39/trade | — |
+| Profit factor | 1.83 | — |
+| Total trades | 278 | 1 |
+| Avg idle cash | ~25% | 0% |
+
+**v1 success criteria: ALL PASSED.** Net expectancy > $0 after friction ✓, confidence calibration within expected range ✓, drawdown ≤ 25% ✓, beats SPY on risk-adjusted basis (Sharpe 1.82 > 1.52) ✓.
+
+**CAUTION:** 2024 was a strong bull year. Longer hold (14d) captures market beta. Re-validate max_holding_days in bear-market conditions before treating as permanent.
+
+### 7.3 Risk Profiles (empirically validated)
+
+| Profile | Threshold | Trades | Annual | Sharpe | Max DD | NE/Trade |
+|---------|-----------|--------|--------|--------|--------|----------|
+| Conservative | 0.68 | ~90 est. | ~10-12% est. | ~1.1 est. | ~3% est. | ~$5+ est. |
+| Moderate | 0.63 | 255 | 14.4% | 1.39 | 4.5% | $3.90 |
+| **Aggressive** | **0.60** | **278** | **22.3%** | **1.82** | **6.9%** | **$7.39** |
+
+*Conservative estimates are interpolated — run threshold_sweep.py at 0.68 to confirm empirically.*
+
+### 7.4 Phase 1 Bugs Fixed
+
+All findings from `PHASE1_FILE_REVIEW.md`:
+
+| ID | File | Finding | Status |
+|----|------|---------|--------|
+| C1 | config.py | DIS misclassified as Industrial (should be Consumer) | **Fixed** |
+| C2 | config.py | validate() missing SignalConfig checks | **Fixed** |
+| C3 | backtest_engine.py | "Unknown" sector bypassed concentration limits | **Fixed** |
+| S1 | backtest_engine.py | iterrows() → to_dict('records') (~5× faster lookup construction) | **Fixed** |
+| S2 | config.py | from_profile() described in design doc but not implemented | **Fixed** |
+| S3 | All modules | Stale design doc version references (v0.2 → v0.3) | **Fixed** |
+| S4 | __init__.py | Only 2 symbols exported; full API needed manual submodule imports | **Fixed** |
+| S5 | backtest_engine.py | P&L double-counting of entry friction (understated $6.65→$7.39/trade) | **Fixed** |
+| D1 | backtest_engine.py | Force-close exit friction not subtracted from final_equity() | **Fixed** |
+| D2 | backtest_engine.py | _advance_trading_days() silently truncated year-boundary cooldowns | **Fixed** |
+| D3 | backtest_engine.py | strategy_return_excl_cash is approximate (error < 1%) | Deferred to Phase 4 |
+
+### 7.5 Open Items Entering Phase 2
+
+| Item | Priority |
+|------|----------|
+| Phase 2: risk_engine.py (ATR stops, volatility sizing, drawdown brake) | **High — next** |
+| Conservative profile empirical validation (run threshold_sweep.py at 0.68) | Medium |
+| D3: TWRR decomposition in strategy_evaluator.py | Low — Phase 4 |
+
+---
+
+## 8. v2.1 NEW FEATURES
 
 ### 7.1 Bayesian Optimization (Optuna TPE)
 
@@ -346,7 +438,9 @@ For unattended 6+ hour overnight runs:
 
 ---
 
-## 8. BUGS FIXED (history)
+## 9. BUGS FIXED (history)
+
+### pattern_engine/ bugs
 
 1. Evaluator/signal mismatch — confident trades counted by threshold only
 2. Python default-arg binding — generate_signal called bare
@@ -367,6 +461,21 @@ For unattended 6+ hour overnight runs:
 17. **hash(config) TypeError** — EngineConfig contains dict (feature_weights), `hash()` fails. Fix: `repr(config)` for Optuna trial user attributes
 18. **SQLite WAL PermissionError** — Windows holds SQLite file handles after close. Fix: `TemporaryDirectory(ignore_cleanup_errors=True)` in tests
 19. **np.issubdtype() TypeError** — pandas StringDtype breaks numpy dtype check. Fix: `pd.api.types.is_numeric_dtype()` in schema.py
+20. **overnight.py checkpoint-on-failure** — `completed.add(phase_id)` executed unconditionally even after exception. Failed phases were permanently marked done and silently skipped on resume. Fix: moved checkpoint write inside `try` (success only); `except` block saves checkpoint WITHOUT the failed phase.
+21. **experiment_logging.py hash collision** — `_config_hash()` only hashed 8 of ~20 EngineConfig fields. Two configs differing in `confidence_threshold`, `feature_weights`, etc. shared the same hash. Fix: `dataclasses.asdict()` + `json.dumps(sort_keys=True)` covers all fields.
+22. **engine.py cal_frac no-op** — `cal_frac` declared in EngineConfig with comment "Platt cal_frac=0.76 best" but never used in any code path. Bayesian sweep wasted trials optimizing a ghost parameter. Fix: implemented chronological calibration split (earlier `1-cal_frac` → NN index, later `cal_frac` → calibration query) eliminating temporal adjacency leakage.
+23. **assert → RuntimeError** (`engine.py`, `matching.py`) — `assert self._fitted` is stripped under `-O` (optimized execution). Public API guards must raise `RuntimeError`. Fix applied to both modules; tests updated accordingly.
+
+### trading_system/ bugs (documented in PHASE1_FILE_REVIEW.md)
+
+24. **C1: DIS sector misclassification** — Disney classified as Industrial; corrected to Consumer. Sector concentration enforcement was silently incorrect.
+25. **C2: validate() missing SignalConfig checks** — confidence_threshold=0.30 passed validation. Added bounds checks for confidence_threshold, min_matches, max_holding_days.
+26. **C3: Unknown sector bypass** — "Unknown" sector had no concentration tracking; unlimited positions could accumulate silently. Added `warnings.warn()` on unknown sector fallback.
+27. **S1: iterrows() in price lookup** — Replaced with `to_dict('records')` (~5× faster for large DataFrames).
+28. **S2: from_profile() not implemented** — Design doc described method; code didn't have it. Implemented all three profiles (aggressive/moderate/conservative).
+29. **S5: P&L double-counting** — `gross_pnl` used friction-inclusive `entry_price`; `total_costs` re-added entry friction. Net expectancy understated by ~$0.74/trade ($203.71 total across 277 trades). Fix: stored `raw_entry_price` separately, gross_pnl uses raw prices only.
+30. **D1: Force-close exit friction in final_equity()** — Last daily MTM record reflected close price without exit friction on force-closed positions. final_equity() overstated by ~$10.50. Fix: accumulate and subtract `force_close_exit_friction`.
+31. **D2: Year-end cooldown truncation** — `_advance_trading_days()` silently returned last available date when cooldown exceeded data range. Fix: calendar estimate (`remaining × 1.4 + 1` days) when insufficient trading dates remain.
 
 ---
 
@@ -383,7 +492,7 @@ pip install -r requirements.txt  # includes optuna
 ```cmd
 python -m pytest tests/ -v
 ```
-All **242 tests** must pass (15 test files).
+All **331 tests** must pass (18 test files: 15 pattern_engine + 3 trading_system).
 
 ### Key Entry Points
 
@@ -448,11 +557,26 @@ print(results.sort_values("mean_bss", ascending=False).head(10))
 ## 12. DELIVERABLES PRODUCED
 
 ### 12.1 Python Package (`pattern_engine/`)
-21 modules, 242 tests, all passing. Fully modular replacement of monolithic strategy.py.
+21 modules, 243 tests, all passing. Fully modular replacement of monolithic strategy.py.
 Merged to main branch 2026-03-18. Legacy files (strategy.py, strategyv1-v4.py) preserved
 but marked superseded.
 
-### 12.2 React Frontend Demo (`pattern-engine-v2.1.jsx`)
+### 12.2 Trading System (`trading_system/`)
+4 modules, 88 tests, all passing. Phase 1 (equal-weight backtest) complete.
+- Annualized return 22.3%, Sharpe 1.82, Max DD 6.9% on 2024 validation year
+- All 9 Phase 1 bugs fixed and documented in `PHASE1_FILE_REVIEW.md`
+- `config.py`: 7 frozen sub-configs, 3 risk profiles, full validate() coverage
+- `backtest_engine.py`: Correct P&L (no double-counting), corrected final_equity(), calendar-aware cooldowns
+
+### 12.3 Design Documents
+
+| Document | Version | Status | Purpose |
+|----------|---------|--------|---------|
+| `FPPE_TRADING_SYSTEM_DESIGN.md` | v0.3 | Active | Architecture spec for all 4 trading layers |
+| `PHASE1_FILE_REVIEW.md` | — | Complete | Structural audit; all Phase 1 findings and fixes |
+| `CANDLESTICK_CATEGORIZATION_DESIGN.md` | v0.2 | Design phase | Future K-NN pre-filtering module (Phase 6) |
+
+### 12.4 React Frontend Demo (`pattern-engine-v2.1.jsx`)
 Standalone React artifact for claude.ai (~1500 lines). No HTTP calls — all backend
 concepts embedded in JavaScript:
 - 52 tickers matching SECTOR_MAP exactly
@@ -464,7 +588,7 @@ concepts embedded in JavaScript:
 - Feature weight visualization chart
 - Methodology section (4 columns: K-NN, Calibration, Regime, Validation)
 
-### 12.3 Project Report (`FPPE_v2.1_Project_Report.docx`)
+### 12.5 Project Report (`FPPE_v2.1_Project_Report.docx`)
 Professional DOCX report (~20 pages, 4 sections):
 1. **System Overview** — pipeline architecture, module map, headline results
 2. **Technical Deep Dive** — K-NN matching, calibration double-pass, regime detection, Bayesian optimization, walk-forward, schema validation, reliability
@@ -475,23 +599,50 @@ Professional DOCX report (~20 pages, 4 sections):
 
 ## 13. ROADMAP
 
-### v2.1 — Current (Complete)
+### v2.1 — pattern_engine Complete
 - [x] Modular pattern_engine package (21 modules)
 - [x] K-NN analogue matching with weighted Euclidean distance
 - [x] 8-state regime detection with fallback chain
-- [x] Platt calibration double-pass
+- [x] Platt calibration double-pass (chronological split, cal_frac active)
 - [x] Three-filter signal gate (min_matches, agreement, confidence)
 - [x] 6-fold walk-forward validation (BSS +0.00103 on 2024)
 - [x] Bayesian optimization via Optuna TPE
 - [x] Native schema validation at fit/predict boundaries
 - [x] SQLite-persistent study state for cross-session resume
 - [x] Reliability infrastructure (atomic writes, lock files, checkpoints)
-- [x] 242 tests all passing (15 test files)
+- [x] overnight.py: failed phases correctly retried on resume (not silently skipped)
+- [x] experiment_logging.py: full config hash (all ~20 fields, no dedup collisions)
 - [x] React frontend demo (JSX)
 - [x] Professional project report (DOCX)
 - [x] Merged modular package to main (superseding strategy.py)
 - [x] Overnight/session feature sets (research-driven, pluggable)
 - [x] Research integration: 24/7 equities overnight drift analysis
+
+### Phase 1 Trading System — Complete
+- [x] trading_system/config.py — all 7 sub-configs frozen, 3 risk profiles, full validate()
+- [x] trading_system/signal_adapter.py — UnifiedSignal, adapt_knn/dl_signals, import guard
+- [x] trading_system/backtest_engine.py — P&L (no double-count), D1/D2 fixes, all bugs patched
+- [x] 88 trading_system tests (test_trading_config, test_signal_adapter, test_backtest_engine)
+- [x] Phase 1 results: 22.3% annual, Sharpe 1.82, Max DD 6.9% (beats SPY risk-adjusted)
+- [x] FPPE_TRADING_SYSTEM_DESIGN.md v0.3
+- [x] PHASE1_FILE_REVIEW.md — structural audit complete
+- [x] CANDLESTICK_CATEGORIZATION_DESIGN.md v0.2 — future scaling module designed
+
+### Phase 2 — Risk Engine (Next)
+- [ ] `trading_system/risk_engine.py` — ATR stop-losses, volatility-based position sizing
+- [ ] Drawdown brake (linear scalar at 15%) and halt (full stop at 20%)
+- [ ] Integration: Layer 1 consumes Layer 2 sizing instead of fixed 5% equal-weight
+- [ ] Validate: re-run Phase 1 backtest with dynamic sizing, confirm Sharpe improvement
+- [ ] Re-validate max_holding_days in bear-market or multi-year data
+- [ ] Run threshold_sweep.py at 0.68 (conservative profile empirical validation)
+
+### Phase 3 — Portfolio Manager
+- [ ] `trading_system/portfolio_manager.py` — signal ranking, sector allocation, capital queue
+- [ ] Idle cash target ≤ 20% (from current ~25%)
+
+### Phase 4 — Strategy Evaluator
+- [ ] `trading_system/strategy_evaluator.py` — rolling metrics, RED/YELLOW/GREEN status
+- [ ] D3: TWRR decomposition separating trading alpha from cash yield
 
 ### v3.0 — Neural Hybrid (Target: Q3-Q4 2026)
 - [ ] CONV_LSTM trained on price windows → 16-dim latent embeddings

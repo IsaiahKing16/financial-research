@@ -12,43 +12,9 @@ import dataclasses
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
-
-# ============================================================
-# SECTOR MAP — 52 tickers across 7 sectors
-# Mirrors strategy.py SECTOR_MAP with Index split out
-# ============================================================
-
-SECTOR_MAP: Dict[str, str] = {
-    # Index (2)
-    "SPY": "Index", "QQQ": "Index",
-    # Tech (19)
-    "AAPL": "Tech", "MSFT": "Tech", "NVDA": "Tech", "AMZN": "Tech",
-    "GOOGL": "Tech", "META": "Tech", "TSLA": "Tech", "AVGO": "Tech",
-    "ORCL": "Tech", "ADBE": "Tech", "CRM": "Tech", "AMD": "Tech",
-    "NFLX": "Tech", "INTC": "Tech", "CSCO": "Tech", "QCOM": "Tech",
-    "TXN": "Tech", "MU": "Tech", "PYPL": "Tech",
-    # Finance (9)
-    "JPM": "Finance", "BAC": "Finance", "WFC": "Finance", "GS": "Finance",
-    "MS": "Finance", "V": "Finance", "MA": "Finance", "AXP": "Finance",
-    "BRK-B": "Finance",
-    # Healthcare (10)
-    "LLY": "Health", "UNH": "Health", "JNJ": "Health", "ABBV": "Health",
-    "MRK": "Health", "PFE": "Health", "TMO": "Health", "ISRG": "Health",
-    "AMGN": "Health", "GILD": "Health",
-    # Consumer (7) — includes DIS (Entertainment/Media, not Industrial)
-    # NOTE: DIS was incorrectly classified as Industrial in v0.1-0.3.
-    # Disney is Consumer Discretionary (Media & Entertainment). Sector
-    # concentration limits apply correctly after this fix.
-    "WMT": "Consumer", "COST": "Consumer", "PG": "Consumer",
-    "KO": "Consumer", "PEP": "Consumer", "HD": "Consumer",
-    "DIS": "Consumer",
-    # Industrial (3) — Manufacturing, Aerospace, Infrastructure
-    "CAT": "Industrial", "BA": "Industrial", "GE": "Industrial",
-    # Energy (2)
-    "XOM": "Energy", "CVX": "Energy",
-}
-
-ALL_TICKERS: List[str] = list(SECTOR_MAP.keys())
+# Canonical sector map lives in pattern_engine.sector — single source of truth.
+# Imported here so trading_system code uses the same map without duplication.
+from pattern_engine.sector import SECTOR_MAP, TICKERS as ALL_TICKERS
 
 
 @dataclass(frozen=True)

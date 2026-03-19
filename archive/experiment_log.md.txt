@@ -1,0 +1,12 @@
+experiment_log.md
+
+
+### v2 - lower threshold (2026-03-13)
+Changed: dropout 0.35, lr 0.0005, threshold 0.55
+Result: 55.7% all, 64.9% confident, 37 trades
+Verdict: KEEP — big improvement over baseline
+
+### v3 - even lower threshold
+Changed: threshold 0.52
+Result: ???
+Verdict: ???

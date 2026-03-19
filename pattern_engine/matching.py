@@ -20,27 +20,7 @@ from sklearn.preprocessing import StandardScaler
 
 from pattern_engine.projection import project_forward, generate_signal
 from pattern_engine.regime import RegimeLabeler, apply_regime_filter, fallback_regime_mode
-
-
-# Sector map for cohort filtering
-SECTOR_MAP = {
-    "SPY": "Index", "QQQ": "Index",
-    "AAPL": "Tech", "MSFT": "Tech", "NVDA": "Tech", "AMZN": "Tech",
-    "GOOGL": "Tech", "META": "Tech", "TSLA": "Tech", "AVGO": "Tech",
-    "ORCL": "Tech", "ADBE": "Tech", "CRM": "Tech", "AMD": "Tech",
-    "NFLX": "Tech", "INTC": "Tech", "CSCO": "Tech", "QCOM": "Tech",
-    "TXN": "Tech", "MU": "Tech", "PYPL": "Tech",
-    "JPM": "Finance", "BAC": "Finance", "WFC": "Finance", "GS": "Finance",
-    "MS": "Finance", "V": "Finance", "MA": "Finance", "AXP": "Finance",
-    "BRK-B": "Finance",
-    "LLY": "Health", "UNH": "Health", "JNJ": "Health", "ABBV": "Health",
-    "MRK": "Health", "PFE": "Health", "TMO": "Health", "ISRG": "Health",
-    "AMGN": "Health", "GILD": "Health",
-    "WMT": "Consumer", "COST": "Consumer", "PG": "Consumer", "KO": "Consumer",
-    "PEP": "Consumer", "HD": "Consumer",
-    "DIS": "Industrial", "CAT": "Industrial", "BA": "Industrial", "GE": "Industrial",
-    "XOM": "Energy", "CVX": "Energy",
-}
+from pattern_engine.sector import SECTOR_MAP
 
 
 def apply_feature_weights(X: np.ndarray, feature_cols: list[str],

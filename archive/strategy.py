@@ -1,4 +1,12 @@
-# SUPERSEDED by pattern_engine/ (v2.1) — kept for reference
+# ==========================================================================
+# DEPRECATED — DO NOT MODIFY
+# This file is superseded by pattern_engine/ (v2.1). It remains in the repo
+# root ONLY because trading_system/signal_adapter.py::simulate_signals_from_val_db()
+# still imports from it.  That dependency will be eliminated in Phase 2 when
+# simulate_signals_from_val_db() is migrated to use PatternEngine directly.
+# Once the Phase 2 migration is complete, move this file to archive/.
+# See TECH_DEBT_AUDIT.md item A1 for details.
+# ==========================================================================
 """
 strategy.py — System A: Historical Analogue Matching, Calibration & Live Signals
 

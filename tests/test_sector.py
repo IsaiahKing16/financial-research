@@ -20,6 +20,32 @@ class TestSectorConstants:
         for proxy in SECTOR_PROXIES.values():
             assert proxy in TICKERS
 
+    def test_dis_is_consumer_not_industrial(self):
+        """Regression test for C1 fix: DIS is Consumer (Entertainment/Media).
+
+        DIS was incorrectly classified as Industrial in v0.1-0.3.
+        This test ensures the fix is never reverted in the canonical
+        SECTOR_MAP (pattern_engine.sector), which all other modules import.
+        """
+        assert SECTOR_MAP["DIS"] == "Consumer"
+
+    def test_sector_counts(self):
+        """Verify expected sector distribution: 7 Consumer, 3 Industrial."""
+        from collections import Counter
+        counts = Counter(SECTOR_MAP.values())
+        assert counts["Consumer"] == 7, f"Expected 7 Consumer, got {counts['Consumer']}"
+        assert counts["Industrial"] == 3, f"Expected 3 Industrial, got {counts['Industrial']}"
+
+    def test_all_importers_share_canonical_map(self):
+        """Ensure matching.py and trading_system.config use the same SECTOR_MAP object."""
+        from pattern_engine.matching import SECTOR_MAP as matching_map
+        from trading_system.config import SECTOR_MAP as trading_map
+        # They should be the exact same dict (imported, not copied)
+        assert matching_map is SECTOR_MAP
+        # trading_system uses SECTOR_MAP.copy() in the dataclass default,
+        # but the module-level SECTOR_MAP should be the same reference
+        assert trading_map is SECTOR_MAP
+
 
 class TestGetSector:
     def test_known_ticker(self):

@@ -25,7 +25,9 @@ SECTOR_MAP = {
     "AMGN": "Health", "GILD": "Health",
     "WMT": "Consumer", "COST": "Consumer", "PG": "Consumer", "KO": "Consumer",
     "PEP": "Consumer", "HD": "Consumer",
-    "DIS": "Industrial", "CAT": "Industrial", "BA": "Industrial", "GE": "Industrial",
+    # NOTE: DIS is Consumer (Entertainment/Media), not Industrial (C1 fix, 2026-03-19)
+    "DIS": "Consumer",
+    "CAT": "Industrial", "BA": "Industrial", "GE": "Industrial",
     "XOM": "Energy", "CVX": "Energy",
 }
 

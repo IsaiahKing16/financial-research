@@ -71,6 +71,7 @@ class FeatureSet:
     name: str
     columns: list
     description: str = ""
+    requires_network: bool = False  # True for sets needing a trained encoder
 
 
 class FeatureRegistry:
@@ -84,18 +85,33 @@ class FeatureRegistry:
     _sets: dict[str, FeatureSet] = {}
 
     @classmethod
-    def register(cls, name: str, columns: list, description: str = "") -> None:
+    def register(cls, name: str, columns: list, description: str = "",
+                 requires_network: bool = False) -> None:
         """Register a new feature set."""
         cls._sets[name] = FeatureSet(name=name, columns=list(columns),
-                                     description=description)
+                                     description=description,
+                                     requires_network=requires_network)
 
     @classmethod
     def get(cls, name: str) -> FeatureSet:
-        """Get a registered feature set by name."""
+        """Get a registered feature set by name.
+
+        Raises:
+            KeyError: if the feature set name is not registered.
+            NotImplementedError: if the feature set requires a trained
+                neural network encoder that has not been built yet.
+        """
         if name not in cls._sets:
             available = ", ".join(sorted(cls._sets.keys()))
             raise KeyError(f"Unknown feature set: {name!r}. "
                            f"Available: {available}")
+        fset = cls._sets[name]
+        if fset.requires_network:
+            raise NotImplementedError(
+                f"Feature set {name!r} requires a trained neural network "
+                f"encoder that is not yet implemented. "
+                f"See Phase 3 roadmap in PROJECT_GUIDE.md."
+            )
         return cls._sets[name]
 
     @classmethod
@@ -139,5 +155,6 @@ FeatureRegistry.register(
 LSTM_LATENT_COLS = [f"lstm_latent_{i}" for i in range(16)]
 FeatureRegistry.register(
     "returns_hybrid", RETURN_COLS + LSTM_LATENT_COLS,
-    "Returns + CONV_LSTM latent embeddings (requires trained network)"
+    "Returns + CONV_LSTM latent embeddings (requires trained network)",
+    requires_network=True,
 )

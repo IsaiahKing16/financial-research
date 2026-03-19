@@ -83,3 +83,12 @@ class TestFeatureRegistry:
         assert fs.name == "test"
         assert fs.columns == ["x", "y"]
         assert fs.description == ""
+
+    def test_returns_hybrid_raises_not_implemented(self):
+        """C2 guard: returns_hybrid requires a trained CONV_LSTM encoder."""
+        with pytest.raises(NotImplementedError, match="neural network"):
+            FeatureRegistry.get("returns_hybrid")
+
+    def test_returns_hybrid_is_registered(self):
+        """returns_hybrid should appear in list_sets even though it can't be used."""
+        assert "returns_hybrid" in FeatureRegistry.list_sets()

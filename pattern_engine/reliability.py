@@ -11,6 +11,7 @@ The old file is preserved until the new one is fully written and fsynced.
 
 import json
 import os
+import sys
 import tempfile
 import time
 from datetime import datetime
@@ -162,14 +163,35 @@ class LockFile:
     def _is_pid_alive(pid: int) -> bool:
         """Check if a process is running (cross-platform).
 
-        Guards against pid <= 0 (os.kill(0, 0) signals entire process group)
-        and treats PermissionError as alive (process exists, different user).
+        On Windows, os.kill(pid, 0) sends CTRL_C_EVENT (signal.CTRL_C_EVENT == 0)
+        to the process group — it does NOT check existence and will interrupt the
+        calling process. Use ctypes OpenProcess/GetExitCodeProcess instead.
+
+        On Unix, signal 0 is a null signal that only checks process existence.
+        Guards against pid <= 0 (would target process group on Unix).
+        Treats PermissionError as alive (process exists, different user).
         """
         if not isinstance(pid, int) or pid <= 0:
             return False
         try:
-            os.kill(pid, 0)  # Signal 0 = check existence, don't kill
-            return True
+            if sys.platform == "win32":
+                import ctypes
+                PROCESS_QUERY_INFORMATION = 0x0400
+                STILL_ACTIVE = 259
+                handle = ctypes.windll.kernel32.OpenProcess(
+                    PROCESS_QUERY_INFORMATION, False, pid
+                )
+                if not handle:
+                    return False
+                exit_code = ctypes.c_ulong()
+                ret = ctypes.windll.kernel32.GetExitCodeProcess(
+                    handle, ctypes.byref(exit_code)
+                )
+                ctypes.windll.kernel32.CloseHandle(handle)
+                return bool(ret) and exit_code.value == STILL_ACTIVE
+            else:
+                os.kill(pid, 0)  # Signal 0 = null check on Unix only
+                return True
         except PermissionError:
             return True  # Process exists but owned by another user
         except (OSError, ProcessLookupError):

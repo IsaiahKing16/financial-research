@@ -170,7 +170,15 @@ def simulate_signals_from_val_db(
         DataFrame with unified signal columns:
         [date, ticker, signal, confidence, signal_source, sector, n_matches]
     """
-    # Import FPPE internals for signal generation
+    # Import FPPE internals for signal generation.
+    #
+    # DEPENDENCY NOTE (Issue #6): This function depends on root-level strategy.py
+    # (the legacy FPPE entrypoint).  On the v2.2 branch, strategy.py was moved to
+    # archive/.  If that branch merges before this function is ported to the new
+    # pattern_engine API, this import will raise ImportError at call time.
+    #
+    # Migration path: replace this block with pattern_engine.engine.PatternEngine
+    # calls once the trading_system↔pattern_engine integration is complete (Phase 2).
     import sys
     from pathlib import Path
 
@@ -179,13 +187,21 @@ def simulate_signals_from_val_db(
     if str(repo_root) not in sys.path:
         sys.path.insert(0, str(repo_root))
 
-    from strategy import (
-        _run_matching_loop, fit_platt_scaling, calibrate_probabilities,
-        generate_signal, FEATURE_WEIGHTS, PROJECTION_HORIZON,
-        MAX_DISTANCE, TOP_K, DISTANCE_WEIGHTING, AGREEMENT_SPREAD,
-        MIN_MATCHES, CONFIDENCE_THRESHOLD,
-    )
-    from prepare import FEATURE_COLS
+    try:
+        from strategy import (
+            _run_matching_loop, fit_platt_scaling, calibrate_probabilities,
+            generate_signal, FEATURE_WEIGHTS, PROJECTION_HORIZON,
+            MAX_DISTANCE, TOP_K, DISTANCE_WEIGHTING, AGREEMENT_SPREAD,
+            MIN_MATCHES, CONFIDENCE_THRESHOLD,
+        )
+        from prepare import FEATURE_COLS
+    except ImportError as exc:
+        raise ImportError(
+            "simulate_signals_from_val_db() requires root-level strategy.py. "
+            "If strategy.py has been moved to archive/, migrate this function to "
+            "use pattern_engine.engine.PatternEngine instead. "
+            f"Original error: {exc}"
+        ) from exc
     from sklearn.preprocessing import StandardScaler
 
     RETURN_ONLY = [c for c in FEATURE_COLS if c.startswith("ret_")]

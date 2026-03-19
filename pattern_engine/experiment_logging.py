@@ -24,13 +24,24 @@ from pattern_engine.config import EngineConfig
 
 
 def _config_hash(config: EngineConfig) -> str:
-    """Deterministic hash of config for deduplication."""
-    key_fields = (
-        config.top_k, config.max_distance, config.distance_metric,
-        config.feature_set, config.calibration_method, config.cal_frac,
-        config.regime_mode, config.regime_filter,
-    )
-    return hashlib.md5(str(key_fields).encode()).hexdigest()[:12]
+    """Deterministic hash of ALL config fields for deduplication.
+
+    Previously hashed only 8 of ~20 fields, causing collisions between
+    configs that differed on confidence_threshold, agreement_spread,
+    distance_weighting, projection_horizon, feature_weights,
+    exclude_same_ticker, same_sector_only, regime_fallback, adx_threshold,
+    or min_matches.  Two materially different configs would share a hash and
+    one would be silently skipped, wasting Bayesian sweep budget and
+    producing incorrect deduplication.
+
+    Fix: serialize the full config dict with sorted keys so every field
+    contributes to the hash.  feature_weights is a nested dict —
+    sort_keys=True ensures stable serialization regardless of insertion order.
+    """
+    import dataclasses
+    full_dict = dataclasses.asdict(config)
+    canonical = json.dumps(full_dict, sort_keys=True, default=str)
+    return hashlib.md5(canonical.encode()).hexdigest()[:12]
 
 
 class ExperimentLogger:

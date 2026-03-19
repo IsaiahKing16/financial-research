@@ -76,7 +76,7 @@ class TestMatcher:
 
     def test_query_before_fit_raises(self, val_db):
         matcher = Matcher(EngineConfig())
-        with pytest.raises(AssertionError, match="fit"):
+        with pytest.raises(RuntimeError, match="fit"):
             matcher.query(val_db)
 
     def test_exclude_same_ticker(self, train_db, val_db):

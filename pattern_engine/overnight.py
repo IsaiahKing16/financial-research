@@ -180,6 +180,12 @@ class OvernightRunner:
                 duration = time.time() - phase_start
                 self._log.phase_end(phase_id, duration, "OK")
 
+                # Only mark as completed on SUCCESS so the next run can
+                # retry a failed phase.  Checkpointing on failure was the
+                # original bug: a crash caused permanent phase-skipping.
+                completed.add(phase_id)
+                self._save_checkpoint(completed)
+
             except Exception as e:
                 duration = time.time() - phase_start
                 if verbose:
@@ -191,10 +197,10 @@ class OvernightRunner:
                     "config": config,
                     "error": str(e),
                 })
-
-            # Always checkpoint, even on failure
-            completed.add(phase_id)
-            self._save_checkpoint(completed)
+                # Save checkpoint WITHOUT adding this phase so the next run
+                # retries it.  Still persist the set of already-completed
+                # phases so successful prior work is not re-run.
+                self._save_checkpoint(completed)
 
         if verbose:
             total_elapsed = (time.time() - start_time) / 60

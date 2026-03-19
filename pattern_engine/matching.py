@@ -128,7 +128,8 @@ class Matcher:
         Returns:
             (probabilities, signals, reasons, n_matches, mean_returns, ensemble_list)
         """
-        assert self._fitted, "Call fit() first"
+        if not self._fitted:
+            raise RuntimeError("Matcher is not fitted. Call fit() first.")
         cfg = self.config
         train_db = self._train_db
         fcols = self._feature_cols

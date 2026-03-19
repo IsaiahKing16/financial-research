@@ -54,7 +54,9 @@ class TestPatternEngine:
 
     def test_predict_before_fit_raises(self, val_db, config):
         engine = PatternEngine(config)
-        with pytest.raises(AssertionError, match="fit"):
+        # assert was replaced with RuntimeError so unfitted engines fail
+        # loudly even when Python is run with optimizations (-O flag).
+        with pytest.raises(RuntimeError, match="fit"):
             engine.predict(val_db)
 
     def test_predict(self, train_db, val_db, config):

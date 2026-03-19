@@ -218,10 +218,13 @@ class ProgressLog:
     def _write(self, level: str, message: str) -> None:
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         line = f"[{timestamp}] {level}: {message}\n"
-        with open(self.path, "a") as f:
-            f.write(line)
-            f.flush()
-            os.fsync(f.fileno())  # Ensure data hits disk for post-mortem safety
+        try:
+            with open(self.path, "a") as f:
+                f.write(line)
+                f.flush()
+                os.fsync(f.fileno())  # Ensure data hits disk for post-mortem safety
+        except FileNotFoundError:
+            pass  # temp directory already cleaned up (atexit race)
 
     def info(self, message: str) -> None:
         self._write("INFO", message)

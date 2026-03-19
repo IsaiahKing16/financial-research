@@ -155,7 +155,6 @@ class BayesianSweepRunner:
         "max_distance": (0.8, 2.0),           # float range
         "top_k": (20, 100),                    # int range
         "calibration_method": ["platt", "isotonic"],  # categorical
-        "cal_frac": (0.5, 0.95),              # float range
         "confidence_threshold": (0.55, 0.80),  # float range
         "regime_mode": ["binary", "multi"],    # categorical
     }
@@ -248,8 +247,7 @@ class BayesianSweepRunner:
             print(f"  TRIAL {trial.number}: {tag}")
             print(f"  max_distance={config.max_distance:.4f} | "
                   f"top_k={config.top_k} | "
-                  f"cal={config.calibration_method} | "
-                  f"cal_frac={config.cal_frac:.2f}")
+                  f"cal={config.calibration_method}")
             print(f"  confidence={config.confidence_threshold:.2f} | "
                   f"regime={config.regime_mode}")
             print(f"{'=' * 60}")
@@ -421,7 +419,6 @@ class BayesianSweepRunner:
             print(f"    max_distance = {best.max_distance:.4f}")
             print(f"    top_k        = {best.top_k}")
             print(f"    cal_method   = {best.calibration_method}")
-            print(f"    cal_frac     = {best.cal_frac:.2f}")
             print(f"    confidence   = {best.confidence_threshold:.2f}")
             print(f"    regime_mode  = {best.regime_mode}")
 

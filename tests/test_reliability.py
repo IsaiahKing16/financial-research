@@ -259,4 +259,4 @@ class TestConfigHash:
 
     def test_hash_length(self):
         h = _config_hash(EngineConfig())
-        assert len(h) == 12
+        assert len(h) == 16  # SHA-256 truncated to 16 hex chars

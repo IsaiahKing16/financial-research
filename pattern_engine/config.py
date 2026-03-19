@@ -75,7 +75,6 @@ class EngineConfig:
 
     # --- Calibration ---
     calibration_method: str = "platt"  # "platt", "isotonic", "none"
-    cal_frac: float = 0.76  # Platt cal_frac=0.76 best on 2024 fold
 
     @property
     def nn_algorithm(self) -> str:

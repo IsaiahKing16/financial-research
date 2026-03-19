@@ -155,7 +155,8 @@ class PatternEngine:
         Returns:
             PredictionResult with probabilities, signals, etc.
         """
-        assert self._fitted, "Call fit() first"
+        if not self._fitted:
+            raise RuntimeError("Call fit() before predict().")
 
         # Schema validation at boundary
         validate_query_db(query_db, self.config.feature_set)
@@ -238,7 +239,8 @@ class PatternEngine:
         Uses temp+fsync+rename so a crash mid-write preserves the old file.
         Saves: config, scaler, NN index, calibrator, regime thresholds.
         """
-        assert self._fitted, "Call fit() first"
+        if not self._fitted:
+            raise RuntimeError("Call fit() before save().")
         import tempfile, os
 
         state = {

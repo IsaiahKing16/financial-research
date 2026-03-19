@@ -51,11 +51,17 @@ class LiveSignalRunner:
         """
         # Fit engine if needed
         if self.engine is None:
-            assert train_db is not None, "Provide train_db or a pre-fitted engine"
+            if train_db is None:
+                raise ValueError(
+                    "Provide train_db or a pre-fitted PatternEngine."
+                )
             self.engine = PatternEngine(self.config)
             self.engine.fit(train_db)
 
-        assert query_db is not None, "Provide query_db with today's data"
+        if query_db is None:
+            raise ValueError(
+                "Provide query_db with today's market data."
+            )
 
         # Run predictions
         result = self.engine.predict(query_db, verbose=verbose)

@@ -28,7 +28,7 @@ class TestEngineConfig:
         assert cfg.regime_fallback is True
         assert cfg.adx_threshold == 25.0
         assert cfg.calibration_method == "platt"
-        assert cfg.cal_frac == 0.76
+        # cal_frac removed (was a no-op parameter — see review P0-3)
 
     def test_frozen(self):
         cfg = EngineConfig()

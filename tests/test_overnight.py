@@ -96,6 +96,59 @@ class TestOvernightRunner:
             # No new phases should run
             assert len(results2) == 0
 
+    def test_failed_phase_not_checkpointed(self, synthetic_db, two_folds):
+        """A phase that raises must NOT be added to completed_phase_ids.
+
+        This is the regression test for the original bug: failed phases were
+        checkpointed as completed and then permanently skipped on resume,
+        meaning a crash caused silent phase loss with no retry.
+        """
+        import json
+        from unittest.mock import patch
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cp = os.path.join(tmpdir, "checkpoint.json")
+
+            always_fail = EngineConfig(
+                max_distance=50.0, calibration_method="platt",
+                regime_filter=False, top_k=10, batch_size=64,
+            )
+            will_succeed = EngineConfig(
+                max_distance=50.0, calibration_method="isotonic",
+                regime_filter=False, top_k=10, batch_size=64,
+            )
+
+            runner = OvernightRunner(
+                phases=[always_fail, will_succeed],
+                folds=two_folds,
+                checkpoint_path=cp,
+                max_hours=0.5,
+                integrity_check_enabled=False,
+                results_dir=tmpdir,
+            )
+
+            # Make the first phase always raise
+            original_run = runner.phases[0]
+            with patch(
+                "pattern_engine.overnight.WalkForwardRunner.run",
+                side_effect=[RuntimeError("simulated failure"), [{}]],
+            ):
+                results = runner.run(synthetic_db, verbose=0)
+
+            # Both phases attempted: one error, one success
+            assert len(results) == 2
+            assert "error" in results[0]
+            assert "fold_metrics" in results[1]
+
+            # Checkpoint should contain p01 (success) but NOT p00 (failure)
+            with open(cp) as f:
+                checkpoint = json.load(f)
+            phases = checkpoint["phases"]
+            assert "p01" in phases and phases["p01"]["status"] == "completed", \
+                "Successful phase must be checkpointed as completed"
+            assert "p00" not in phases or phases["p00"]["status"] != "completed", \
+                "Failed phase must NOT be checkpointed as completed"
+
     def test_bayesian_run(self, synthetic_db, two_folds):
         """Bayesian mode runs Optuna study."""
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:

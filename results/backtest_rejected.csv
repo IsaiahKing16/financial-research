@@ -1,0 +1,1593 @@
+date,ticker,signal,confidence,rejection_reason,rejection_layer
+2024-01-02,CRM,BUY,0.604343,Sector Tech at max 3 positions,sector_limit
+2024-01-03,WFC,BUY,0.667297,Already holding position,backtest
+2024-01-03,ISRG,BUY,0.64536,Already holding position,backtest
+2024-01-03,GILD,BUY,0.622793,Already holding position,backtest
+2024-01-03,AMZN,BUY,0.604343,Sector Tech at max 3 positions,sector_limit
+2024-01-03,NFLX,BUY,0.603762,Already holding position,backtest
+2024-01-04,NVDA,BUY,0.666545,Already holding position,backtest
+2024-01-04,GILD,BUY,0.6498,Already holding position,backtest
+2024-01-04,ISRG,BUY,0.635761,Already holding position,backtest
+2024-01-04,MS,BUY,0.622793,Already holding position,backtest
+2024-01-04,AMZN,BUY,0.622793,Sector Tech at max 3 positions,sector_limit
+2024-01-04,COST,BUY,0.622793,Already holding position,backtest
+2024-01-04,META,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-01-04,JNJ,BUY,0.613609,Sector Health at max 3 positions,sector_limit
+2024-01-04,NFLX,BUY,0.604343,Already holding position,backtest
+2024-01-04,AMGN,BUY,0.604343,Already holding position,backtest
+2024-01-05,META,BUY,0.63189,Sector Tech at max 3 positions,sector_limit
+2024-01-05,GS,BUY,0.622793,Already holding position,backtest
+2024-01-05,LLY,BUY,0.622793,Sector Health at max 3 positions,sector_limit
+2024-01-05,CRM,BUY,0.604343,Sector Tech at max 3 positions,sector_limit
+2024-01-08,GILD,BUY,0.622793,Already holding position,backtest
+2024-01-08,V,BUY,0.622793,Sector Finance at max 3 positions,sector_limit
+2024-01-08,QCOM,BUY,0.619864,Sector Tech at max 3 positions,sector_limit
+2024-01-08,QQQ,BUY,0.613609,Already holding position,backtest
+2024-01-08,LLY,BUY,0.613609,Sector Health at max 3 positions,sector_limit
+2024-01-08,TXN,BUY,0.604343,Sector Tech at max 3 positions,sector_limit
+2024-01-08,MU,BUY,0.604343,Sector Tech at max 3 positions,sector_limit
+2024-01-08,GS,BUY,0.604343,Already holding position,backtest
+2024-01-09,BRK-B,BUY,0.639941,Sector Finance at max 3 positions,sector_limit
+2024-01-09,NFLX,BUY,0.629171,Already holding position,backtest
+2024-01-09,WMT,BUY,0.625602,Sector Consumer at max 3 positions,sector_limit
+2024-01-09,CRM,BUY,0.620713,Sector Tech at max 3 positions,sector_limit
+2024-01-09,AMZN,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-01-09,GOOGL,BUY,0.606289,Sector Tech at max 3 positions,sector_limit
+2024-01-09,ADBE,BUY,0.600989,Sector Tech at max 3 positions,sector_limit
+2024-01-10,PG,BUY,0.6471,Sector Consumer at max 3 positions,sector_limit
+2024-01-10,BRK-B,BUY,0.635761,Sector Finance at max 3 positions,sector_limit
+2024-01-10,LLY,BUY,0.63189,Sector Health at max 3 positions,sector_limit
+2024-01-10,AXP,BUY,0.622793,Sector Finance at max 3 positions,sector_limit
+2024-01-10,MS,BUY,0.604343,Already holding position,backtest
+2024-01-10,QQQ,BUY,0.604343,Already holding position,backtest
+2024-01-11,PG,BUY,0.662173,Sector Consumer at max 3 positions,sector_limit
+2024-01-11,WMT,BUY,0.643302,Sector Consumer at max 3 positions,sector_limit
+2024-01-11,WFC,BUY,0.63189,Already holding position,backtest
+2024-01-11,AXP,BUY,0.63189,Sector Finance at max 3 positions,sector_limit
+2024-01-11,KO,BUY,0.629171,Already holding position,backtest
+2024-01-11,JNJ,BUY,0.625602,Sector Health at max 3 positions,sector_limit
+2024-01-11,GS,BUY,0.622793,Already holding position,backtest
+2024-01-11,DIS,BUY,0.622793,Already holding position,backtest
+2024-01-11,GOOGL,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-01-11,BAC,BUY,0.604343,Sector Finance at max 3 positions,sector_limit
+2024-01-11,QQQ,BUY,0.604343,Already holding position,backtest
+2024-01-12,MSFT,BUY,0.640894,Already holding position,backtest
+2024-01-12,CAT,BUY,0.629171,Already holding position,backtest
+2024-01-12,PG,BUY,0.613609,Sector Consumer at max 3 positions,sector_limit
+2024-01-12,AXP,BUY,0.604343,Sector Finance at max 3 positions,sector_limit
+2024-01-12,HD,BUY,0.604343,Sector Consumer at max 3 positions,sector_limit
+2024-01-16,LLY,BUY,0.63189,Sector Health at max 3 positions,sector_limit
+2024-01-16,PYPL,BUY,0.623364,Sector Tech at max 3 positions,sector_limit
+2024-01-16,MRK,BUY,0.604343,Sector Health at max 3 positions,sector_limit
+2024-01-16,HD,BUY,0.600989,Sector Consumer at max 3 positions,sector_limit
+2024-01-17,AMZN,BUY,0.619864,Sector Tech at max 3 positions,sector_limit
+2024-01-17,NFLX,BUY,0.613609,Already holding position,backtest
+2024-01-17,MSFT,BUY,0.604343,Already holding position,backtest
+2024-01-17,GS,BUY,0.604343,Already holding position,backtest
+2024-01-17,AXP,BUY,0.604343,Sector Finance at max 3 positions,sector_limit
+2024-01-18,CAT,BUY,0.644468,Already holding position,backtest
+2024-01-18,ADBE,BUY,0.629171,Already holding position,backtest
+2024-01-18,CRM,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-01-18,AXP,BUY,0.613609,Sector Finance at max 3 positions,sector_limit
+2024-01-18,TXN,BUY,0.605738,Sector Tech at max 3 positions,sector_limit
+2024-01-18,V,BUY,0.604343,Sector Finance at max 3 positions,sector_limit
+2024-01-18,MU,BUY,0.604343,Sector Tech at max 3 positions,sector_limit
+2024-01-19,NFLX,BUY,0.63189,Already holding position,backtest
+2024-01-19,DIS,BUY,0.622793,Already holding position,backtest
+2024-01-19,HD,BUY,0.604343,Sector Consumer at max 3 positions,sector_limit
+2024-01-22,TXN,BUY,0.648787,Sector Tech at max 3 positions,sector_limit
+2024-01-22,PG,BUY,0.63189,Sector Consumer at max 3 positions,sector_limit
+2024-01-22,WMT,BUY,0.629171,Sector Consumer at max 3 positions,sector_limit
+2024-01-22,UNH,BUY,0.603102,Sector Health at max 3 positions,sector_limit
+2024-01-23,AMGN,BUY,0.613609,Already holding position,backtest
+2024-01-23,WMT,BUY,0.602348,Sector Consumer at max 3 positions,sector_limit
+2024-01-24,PG,BUY,0.629171,Already holding position,backtest
+2024-01-24,MSFT,BUY,0.622793,In cooldown until 2024-01-29; need confidence ≥ 0.67,cooldown
+2024-01-24,AMGN,BUY,0.613609,In cooldown until 2024-01-30; need confidence ≥ 0.70,cooldown
+2024-01-24,GS,BUY,0.604343,Already holding position,backtest
+2024-01-24,ADBE,BUY,0.604343,Already holding position,backtest
+2024-01-24,HD,BUY,0.603762,Already holding position,backtest
+2024-01-24,UNH,BUY,0.600989,Already holding position,backtest
+2024-01-25,CSCO,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-01-25,AAPL,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-01-25,MSFT,BUY,0.604343,In cooldown until 2024-01-29; need confidence ≥ 0.67,cooldown
+2024-01-25,GS,BUY,0.604343,In cooldown until 2024-01-31; need confidence ≥ 0.65,cooldown
+2024-01-25,PG,BUY,0.602348,Already holding position,backtest
+2024-01-26,MS,BUY,0.658602,In cooldown until 2024-01-29; need confidence ≥ 0.69,cooldown
+2024-01-26,AMZN,BUY,0.622793,Sector Tech at max 3 positions,sector_limit
+2024-01-26,PG,BUY,0.620261,Already holding position,backtest
+2024-01-26,ORCL,BUY,0.606289,Sector Tech at max 3 positions,sector_limit
+2024-01-26,UNH,BUY,0.604343,Already holding position,backtest
+2024-01-26,KO,BUY,0.600989,In cooldown until 2024-01-29; need confidence ≥ 0.66,cooldown
+2024-01-29,QCOM,BUY,0.638383,Already holding position,backtest
+2024-01-29,MSFT,BUY,0.63189,Sector Tech at max 3 positions,sector_limit
+2024-01-29,CAT,BUY,0.623364,Already holding position,backtest
+2024-01-29,DIS,BUY,0.622793,Already holding position,backtest
+2024-01-29,TXN,BUY,0.613609,Already holding position,backtest
+2024-01-29,ABBV,BUY,0.604343,Sector Health at max 3 positions,sector_limit
+2024-01-30,CSCO,BUY,0.669566,Sector Tech at max 3 positions,sector_limit
+2024-01-30,PYPL,BUY,0.641708,Sector Tech at max 3 positions,sector_limit
+2024-01-30,PG,BUY,0.616805,Already holding position,backtest
+2024-01-30,AMZN,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-01-30,META,BUY,0.604343,Sector Tech at max 3 positions,sector_limit
+2024-01-31,WMT,BUY,0.674172,Already holding position,backtest
+2024-01-31,MRK,BUY,0.622793,Sector Health at max 3 positions,sector_limit
+2024-01-31,UNH,BUY,0.617523,Already holding position,backtest
+2024-01-31,AMZN,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-01-31,CAT,BUY,0.613609,Already holding position,backtest
+2024-01-31,ADBE,BUY,0.604343,Already holding position,backtest
+2024-02-01,ADBE,BUY,0.640894,Already holding position,backtest
+2024-02-01,GOOGL,BUY,0.63189,Sector Tech at max 3 positions,sector_limit
+2024-02-01,COST,BUY,0.63189,Sector Consumer at max 3 positions,sector_limit
+2024-02-01,LLY,BUY,0.63189,Already holding position,backtest
+2024-02-01,PEP,BUY,0.630884,Sector Consumer at max 3 positions,sector_limit
+2024-02-01,AMZN,BUY,0.622793,Sector Tech at max 3 positions,sector_limit
+2024-02-01,PYPL,BUY,0.619864,Sector Tech at max 3 positions,sector_limit
+2024-02-01,CRM,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-02-01,UNH,BUY,0.613609,Already holding position,backtest
+2024-02-01,AXP,BUY,0.610267,Already holding position,backtest
+2024-02-01,JNJ,BUY,0.609474,Sector Health at max 3 positions,sector_limit
+2024-02-01,WFC,BUY,0.604343,Sector Finance at max 3 positions,sector_limit
+2024-02-02,AXP,BUY,0.705983,Already holding position,backtest
+2024-02-02,ORCL,BUY,0.658602,Sector Tech at max 3 positions,sector_limit
+2024-02-02,ADBE,BUY,0.658602,Already holding position,backtest
+2024-02-02,PEP,BUY,0.627155,Sector Consumer at max 3 positions,sector_limit
+2024-02-02,WMT,BUY,0.620261,Already holding position,backtest
+2024-02-02,GS,BUY,0.613609,Sector Finance at max 3 positions,sector_limit
+2024-02-02,PYPL,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-02-02,GILD,BUY,0.608697,Sector Health at max 3 positions,sector_limit
+2024-02-02,BRK-B,BUY,0.604343,Already holding position,backtest
+2024-02-05,AXP,BUY,0.643729,Already holding position,backtest
+2024-02-05,GILD,BUY,0.625602,Sector Health at max 3 positions,sector_limit
+2024-02-05,JPM,BUY,0.613609,Sector Finance at max 3 positions,sector_limit
+2024-02-05,MS,BUY,0.613609,Already holding position,backtest
+2024-02-05,PEP,BUY,0.609118,Sector Consumer at max 3 positions,sector_limit
+2024-02-06,UNH,BUY,0.63364,Already holding position,backtest
+2024-02-06,BAC,BUY,0.63189,Sector Finance at max 3 positions,sector_limit
+2024-02-06,MS,BUY,0.63189,Already holding position,backtest
+2024-02-06,COST,BUY,0.63189,Sector Consumer at max 3 positions,sector_limit
+2024-02-06,GOOGL,BUY,0.622793,Sector Tech at max 3 positions,sector_limit
+2024-02-06,MU,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-02-06,QCOM,BUY,0.613609,Already holding position,backtest
+2024-02-06,PEP,BUY,0.610039,Sector Consumer at max 3 positions,sector_limit
+2024-02-06,ADBE,BUY,0.604343,In cooldown until 2024-02-09; need confidence ≥ 0.69,cooldown
+2024-02-06,AMGN,BUY,0.604343,Sector Health at max 3 positions,sector_limit
+2024-02-07,PYPL,BUY,0.63189,Sector Tech at max 3 positions,sector_limit
+2024-02-07,COST,BUY,0.613609,Sector Consumer at max 3 positions,sector_limit
+2024-02-07,MS,BUY,0.613609,Already holding position,backtest
+2024-02-07,ADBE,BUY,0.604343,In cooldown until 2024-02-09; need confidence ≥ 0.69,cooldown
+2024-02-07,WFC,BUY,0.604343,Sector Finance at max 3 positions,sector_limit
+2024-02-07,INTC,BUY,0.604343,Already holding position,backtest
+2024-02-07,DIS,BUY,0.604343,Already holding position,backtest
+2024-02-07,PEP,BUY,0.603102,Sector Consumer at max 3 positions,sector_limit
+2024-02-08,GILD,BUY,0.65201,Sector Health at max 3 positions,sector_limit
+2024-02-08,QCOM,BUY,0.613609,Already holding position,backtest
+2024-02-08,JPM,BUY,0.613609,Sector Finance at max 3 positions,sector_limit
+2024-02-08,JNJ,BUY,0.610267,Sector Health at max 3 positions,sector_limit
+2024-02-08,MRK,BUY,0.604343,Sector Health at max 3 positions,sector_limit
+2024-02-08,AMZN,BUY,0.604343,Sector Tech at max 3 positions,sector_limit
+2024-02-08,PG,BUY,0.604343,Already holding position,backtest
+2024-02-08,GS,BUY,0.604343,Sector Finance at max 3 positions,sector_limit
+2024-02-08,NFLX,BUY,0.602348,Sector Tech at max 3 positions,sector_limit
+2024-02-08,MS,BUY,0.600989,Already holding position,backtest
+2024-02-09,COST,BUY,0.6498,Sector Consumer at max 3 positions,sector_limit
+2024-02-09,MS,BUY,0.622793,Already holding position,backtest
+2024-02-09,AAPL,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-02-09,BAC,BUY,0.613609,Sector Finance at max 3 positions,sector_limit
+2024-02-09,TMO,BUY,0.604343,Already holding position,backtest
+2024-02-12,PYPL,BUY,0.638809,Sector Tech at max 3 positions,sector_limit
+2024-02-12,NFLX,BUY,0.621831,Sector Tech at max 3 positions,sector_limit
+2024-02-12,BAC,BUY,0.613609,Sector Finance at max 3 positions,sector_limit
+2024-02-12,WFC,BUY,0.604343,Sector Finance at max 3 positions,sector_limit
+2024-02-12,MS,BUY,0.604343,Already holding position,backtest
+2024-02-13,MRK,BUY,0.640894,Sector Health at max 3 positions,sector_limit
+2024-02-13,CAT,BUY,0.622532,Already holding position,backtest
+2024-02-13,GS,BUY,0.613609,Sector Finance at max 3 positions,sector_limit
+2024-02-13,MS,BUY,0.607188,Already holding position,backtest
+2024-02-14,WFC,BUY,0.63189,Sector Finance at max 3 positions,sector_limit
+2024-02-14,WMT,BUY,0.613609,In cooldown until 2024-02-21; need confidence ≥ 0.66,cooldown
+2024-02-14,MS,BUY,0.610468,Already holding position,backtest
+2024-02-14,PYPL,BUY,0.605738,Sector Tech at max 3 positions,sector_limit
+2024-02-15,DIS,BUY,0.629171,Already holding position,backtest
+2024-02-15,GS,BUY,0.613609,Sector Finance at max 3 positions,sector_limit
+2024-02-15,BAC,BUY,0.604343,Sector Finance at max 3 positions,sector_limit
+2024-02-16,UNH,BUY,0.63364,Sector Health at max 3 positions,sector_limit
+2024-02-16,DIS,BUY,0.629171,Already holding position,backtest
+2024-02-16,AMGN,BUY,0.613609,Sector Health at max 3 positions,sector_limit
+2024-02-16,MA,BUY,0.613609,Sector Finance at max 3 positions,sector_limit
+2024-02-16,TMO,BUY,0.604343,In cooldown until 2024-02-22; need confidence ≥ 0.66,cooldown
+2024-02-16,AAPL,BUY,0.602348,Sector Tech at max 3 positions,sector_limit
+2024-02-20,CRM,BUY,0.640894,Sector Tech at max 3 positions,sector_limit
+2024-02-20,ORCL,BUY,0.633021,Already holding position,backtest
+2024-02-20,DIS,BUY,0.624368,Already holding position,backtest
+2024-02-20,AAPL,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-02-20,CVX,BUY,0.613609,Already holding position,backtest
+2024-02-20,NFLX,BUY,0.608187,Sector Tech at max 3 positions,sector_limit
+2024-02-20,ISRG,BUY,0.604343,Already holding position,backtest
+2024-02-20,CAT,BUY,0.604343,Already holding position,backtest
+2024-02-21,UNH,BUY,0.666545,Sector Health at max 3 positions,sector_limit
+2024-02-21,PYPL,BUY,0.657351,Sector Tech at max 3 positions,sector_limit
+2024-02-21,HD,BUY,0.6498,Already holding position,backtest
+2024-02-21,CVX,BUY,0.625602,Already holding position,backtest
+2024-02-21,MS,BUY,0.622793,In cooldown until 2024-02-26; need confidence ≥ 0.68,cooldown
+2024-02-21,TMO,BUY,0.622793,In cooldown until 2024-02-22; need confidence ≥ 0.66,cooldown
+2024-02-21,V,BUY,0.613609,Already holding position,backtest
+2024-02-21,QQQ,BUY,0.613609,In cooldown until 2024-02-27; need confidence ≥ 0.66,cooldown
+2024-02-21,AMGN,BUY,0.613609,Sector Health at max 3 positions,sector_limit
+2024-02-21,LLY,BUY,0.613609,Sector Health at max 3 positions,sector_limit
+2024-02-21,DIS,BUY,0.605738,Already holding position,backtest
+2024-02-22,DIS,BUY,0.65201,Already holding position,backtest
+2024-02-22,XOM,BUY,0.65201,Already holding position,backtest
+2024-02-22,CVX,BUY,0.638383,Already holding position,backtest
+2024-02-22,GOOGL,BUY,0.633021,Sector Tech at max 3 positions,sector_limit
+2024-02-22,ORCL,BUY,0.629171,Already holding position,backtest
+2024-02-22,UNH,BUY,0.629171,Sector Health at max 3 positions,sector_limit
+2024-02-22,PYPL,BUY,0.620713,Sector Tech at max 3 positions,sector_limit
+2024-02-22,BRK-B,BUY,0.604343,In cooldown until 2024-02-26; need confidence ≥ 0.67,cooldown
+2024-02-22,TMO,BUY,0.604343,Sector Health at max 3 positions,sector_limit
+2024-02-23,XOM,BUY,0.688532,Already holding position,backtest
+2024-02-23,MS,BUY,0.658602,In cooldown until 2024-02-26; need confidence ≥ 0.68,cooldown
+2024-02-23,DIS,BUY,0.638383,Already holding position,backtest
+2024-02-23,TMO,BUY,0.622793,Sector Health at max 3 positions,sector_limit
+2024-02-23,GOOGL,BUY,0.619864,Sector Tech at max 3 positions,sector_limit
+2024-02-23,UNH,BUY,0.613609,Sector Health at max 3 positions,sector_limit
+2024-02-23,MRK,BUY,0.604343,Already holding position,backtest
+2024-02-23,CRM,BUY,0.604343,Sector Tech at max 3 positions,sector_limit
+2024-02-26,CVX,BUY,0.667914,Already holding position,backtest
+2024-02-26,XOM,BUY,0.660619,Already holding position,backtest
+2024-02-26,UNH,BUY,0.635761,Sector Health at max 3 positions,sector_limit
+2024-02-26,JNJ,BUY,0.629171,Sector Health at max 3 positions,sector_limit
+2024-02-26,ISRG,BUY,0.622793,Already holding position,backtest
+2024-02-26,META,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-02-26,MSFT,BUY,0.604343,Sector Tech at max 3 positions,sector_limit
+2024-02-26,CRM,BUY,0.603443,Sector Tech at max 3 positions,sector_limit
+2024-02-27,GS,BUY,0.640894,Already holding position,backtest
+2024-02-27,JNJ,BUY,0.629171,Sector Health at max 3 positions,sector_limit
+2024-02-27,AAPL,BUY,0.621231,Sector Tech at max 3 positions,sector_limit
+2024-02-27,GOOGL,BUY,0.619195,Sector Tech at max 3 positions,sector_limit
+2024-02-27,AMZN,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-02-27,AMGN,BUY,0.613609,Sector Health at max 3 positions,sector_limit
+2024-02-28,AMZN,BUY,0.640894,Sector Tech at max 3 positions,sector_limit
+2024-02-28,ADBE,BUY,0.623364,Sector Tech at max 3 positions,sector_limit
+2024-02-28,GS,BUY,0.622793,Already holding position,backtest
+2024-02-28,GOOGL,BUY,0.606768,Sector Tech at max 3 positions,sector_limit
+2024-02-28,CRM,BUY,0.604343,Sector Tech at max 3 positions,sector_limit
+2024-02-29,AMGN,BUY,0.67831,Sector Health at max 3 positions,sector_limit
+2024-02-29,JNJ,BUY,0.667297,Sector Health at max 3 positions,sector_limit
+2024-02-29,TXN,BUY,0.604343,Sector Tech at max 3 positions,sector_limit
+2024-02-29,TMO,BUY,0.604343,Sector Health at max 3 positions,sector_limit
+2024-03-01,INTC,BUY,0.667914,In cooldown until 2024-03-04; need confidence ≥ 0.71,cooldown
+2024-03-01,AAPL,BUY,0.61725,Sector Tech at max 3 positions,sector_limit
+2024-03-01,AMGN,BUY,0.613609,Sector Health at max 3 positions,sector_limit
+2024-03-01,HD,BUY,0.613609,Already holding position,backtest
+2024-03-01,JNJ,BUY,0.604343,Sector Health at max 3 positions,sector_limit
+2024-03-04,MS,BUY,0.705983,Already holding position,backtest
+2024-03-04,MRK,BUY,0.6498,Already holding position,backtest
+2024-03-04,CRM,BUY,0.644468,Sector Tech at max 3 positions,sector_limit
+2024-03-04,NFLX,BUY,0.6394,Sector Tech at max 3 positions,sector_limit
+2024-03-04,GS,BUY,0.622793,Already holding position,backtest
+2024-03-04,V,BUY,0.613609,Already holding position,backtest
+2024-03-04,MSFT,BUY,0.604343,Sector Tech at max 3 positions,sector_limit
+2024-03-04,GOOGL,BUY,0.602348,Sector Tech at max 3 positions,sector_limit
+2024-03-05,GS,BUY,0.6498,Already holding position,backtest
+2024-03-05,ADBE,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-03-05,MSFT,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-03-05,MS,BUY,0.613609,Already holding position,backtest
+2024-03-05,MRK,BUY,0.604343,Already holding position,backtest
+2024-03-06,JPM,BUY,0.684344,Sector Finance at max 3 positions,sector_limit
+2024-03-06,GS,BUY,0.63189,Already holding position,backtest
+2024-03-06,WFC,BUY,0.629171,Sector Finance at max 3 positions,sector_limit
+2024-03-06,BAC,BUY,0.622793,Sector Finance at max 3 positions,sector_limit
+2024-03-06,AMGN,BUY,0.617523,Already holding position,backtest
+2024-03-06,JNJ,BUY,0.613609,Sector Health at max 3 positions,sector_limit
+2024-03-06,PEP,BUY,0.609118,Already holding position,backtest
+2024-03-06,MRK,BUY,0.604343,In cooldown until 2024-03-12; need confidence ≥ 0.67,cooldown
+2024-03-06,HD,BUY,0.604343,Already holding position,backtest
+2024-03-07,BAC,BUY,0.613609,Sector Finance at max 3 positions,sector_limit
+2024-03-07,JPM,BUY,0.613609,Sector Finance at max 3 positions,sector_limit
+2024-03-07,GS,BUY,0.613609,Already holding position,backtest
+2024-03-07,AMGN,BUY,0.609474,Already holding position,backtest
+2024-03-07,GOOGL,BUY,0.607188,Sector Tech at max 3 positions,sector_limit
+2024-03-07,QQQ,BUY,0.604343,Already holding position,backtest
+2024-03-07,MRK,BUY,0.604343,In cooldown until 2024-03-12; need confidence ≥ 0.67,cooldown
+2024-03-07,TMO,BUY,0.604343,Already holding position,backtest
+2024-03-08,SPY,BUY,0.613609,Already holding position,backtest
+2024-03-08,TXN,BUY,0.613609,Already holding position,backtest
+2024-03-08,TMO,BUY,0.613609,Already holding position,backtest
+2024-03-08,PG,BUY,0.604343,Sector Consumer at max 3 positions,sector_limit
+2024-03-11,PYPL,BUY,0.6498,Sector Tech at max 3 positions,sector_limit
+2024-03-11,PFE,BUY,0.63189,Sector Health at max 3 positions,sector_limit
+2024-03-11,GOOGL,BUY,0.63189,Sector Tech at max 3 positions,sector_limit
+2024-03-11,GS,BUY,0.613609,Already holding position,backtest
+2024-03-11,INTC,BUY,0.604343,Sector Tech at max 3 positions,sector_limit
+2024-03-12,ADBE,BUY,0.635761,Sector Tech at max 3 positions,sector_limit
+2024-03-12,QQQ,BUY,0.63189,Already holding position,backtest
+2024-03-12,SPY,BUY,0.622793,In cooldown until 2024-03-18; need confidence ≥ 0.66,cooldown
+2024-03-12,V,BUY,0.622793,In cooldown until 2024-03-15; need confidence ≥ 0.68,cooldown
+2024-03-12,AAPL,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-03-12,MA,BUY,0.613609,Sector Finance at max 3 positions,sector_limit
+2024-03-12,KO,BUY,0.604343,Already holding position,backtest
+2024-03-12,ABBV,BUY,0.604343,Already holding position,backtest
+2024-03-12,HD,BUY,0.604343,In cooldown until 2024-03-15; need confidence ≥ 0.66,cooldown
+2024-03-12,NFLX,BUY,0.602348,Already holding position,backtest
+2024-03-13,QCOM,BUY,0.693962,Sector Tech at max 3 positions,sector_limit
+2024-03-13,JPM,BUY,0.640894,Already holding position,backtest
+2024-03-13,PFE,BUY,0.630884,Sector Health at max 3 positions,sector_limit
+2024-03-13,PG,BUY,0.622793,Sector Consumer at max 3 positions,sector_limit
+2024-03-13,MSFT,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-03-13,ABBV,BUY,0.613609,Already holding position,backtest
+2024-03-13,ADBE,BUY,0.609474,Sector Tech at max 3 positions,sector_limit
+2024-03-13,PYPL,BUY,0.604343,Sector Tech at max 3 positions,sector_limit
+2024-03-13,CRM,BUY,0.604343,Sector Tech at max 3 positions,sector_limit
+2024-03-14,MSFT,BUY,0.640894,Sector Tech at max 3 positions,sector_limit
+2024-03-14,PFE,BUY,0.635761,Sector Health at max 3 positions,sector_limit
+2024-03-14,QQQ,BUY,0.63189,Already holding position,backtest
+2024-03-14,ISRG,BUY,0.63189,Sector Health at max 3 positions,sector_limit
+2024-03-14,JPM,BUY,0.622793,Already holding position,backtest
+2024-03-14,ABBV,BUY,0.622793,Already holding position,backtest
+2024-03-14,JNJ,BUY,0.604343,Sector Health at max 3 positions,sector_limit
+2024-03-14,ADBE,BUY,0.602348,Sector Tech at max 3 positions,sector_limit
+2024-03-15,MU,BUY,0.632552,Already holding position,backtest
+2024-03-15,QQQ,BUY,0.63189,Already holding position,backtest
+2024-03-15,MRK,BUY,0.63189,Sector Health at max 3 positions,sector_limit
+2024-03-15,ORCL,BUY,0.620713,Sector Tech at max 3 positions,sector_limit
+2024-03-15,PEP,BUY,0.608187,Already holding position,backtest
+2024-03-18,ISRG,BUY,0.604343,Sector Health at max 3 positions,sector_limit
+2024-03-18,KO,BUY,0.604343,In cooldown until 2024-03-20; need confidence ≥ 0.67,cooldown
+2024-03-19,JPM,BUY,0.658602,Already holding position,backtest
+2024-03-19,CVX,BUY,0.658602,Already holding position,backtest
+2024-03-19,MSFT,BUY,0.63189,Sector Tech at max 3 positions,sector_limit
+2024-03-19,COST,BUY,0.622793,Already holding position,backtest
+2024-03-19,TMO,BUY,0.622793,Already holding position,backtest
+2024-03-19,MRK,BUY,0.604343,Sector Health at max 3 positions,sector_limit
+2024-03-19,ISRG,BUY,0.604343,Sector Health at max 3 positions,sector_limit
+2024-03-20,AVGO,BUY,0.667914,Sector Tech at max 3 positions,sector_limit
+2024-03-20,MSFT,BUY,0.6498,Sector Tech at max 3 positions,sector_limit
+2024-03-20,TMO,BUY,0.640894,Already holding position,backtest
+2024-03-20,COST,BUY,0.640894,Already holding position,backtest
+2024-03-20,PG,BUY,0.613609,Already holding position,backtest
+2024-03-20,AAPL,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-03-20,LLY,BUY,0.613609,Sector Health at max 3 positions,sector_limit
+2024-03-20,PEP,BUY,0.606768,In cooldown until 2024-03-22; need confidence ≥ 0.69,cooldown
+2024-03-20,AMZN,BUY,0.604343,Sector Tech at max 3 positions,sector_limit
+2024-03-20,JPM,BUY,0.604343,Already holding position,backtest
+2024-03-21,AMZN,BUY,0.6498,Sector Tech at max 3 positions,sector_limit
+2024-03-21,CRM,BUY,0.622793,Sector Tech at max 3 positions,sector_limit
+2024-03-21,MRK,BUY,0.622793,Sector Health at max 3 positions,sector_limit
+2024-03-21,WFC,BUY,0.613609,Already holding position,backtest
+2024-03-21,QQQ,BUY,0.604343,Already holding position,backtest
+2024-03-21,JNJ,BUY,0.604343,Sector Health at max 3 positions,sector_limit
+2024-03-22,V,BUY,0.63189,Sector Finance at max 3 positions,sector_limit
+2024-03-22,AMZN,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-03-22,GOOGL,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-03-22,GE,BUY,0.606768,Already holding position,backtest
+2024-03-22,GS,BUY,0.604343,Sector Finance at max 3 positions,sector_limit
+2024-03-22,WFC,BUY,0.604343,Already holding position,backtest
+2024-03-25,GOOGL,BUY,0.63189,Sector Tech at max 3 positions,sector_limit
+2024-03-25,CVX,BUY,0.622793,Already holding position,backtest
+2024-03-25,MRK,BUY,0.613609,Sector Health at max 3 positions,sector_limit
+2024-03-25,LLY,BUY,0.604343,Sector Health at max 3 positions,sector_limit
+2024-03-25,PYPL,BUY,0.604343,Sector Tech at max 3 positions,sector_limit
+2024-03-26,CVX,BUY,0.6498,Already holding position,backtest
+2024-03-27,LLY,BUY,0.63189,Sector Health at max 3 positions,sector_limit
+2024-03-27,META,BUY,0.629171,Sector Tech at max 3 positions,sector_limit
+2024-03-27,PEP,BUY,0.622793,Sector Consumer at max 3 positions,sector_limit
+2024-03-27,ISRG,BUY,0.604343,Already holding position,backtest
+2024-03-27,CVX,BUY,0.604343,Already holding position,backtest
+2024-03-28,GOOGL,BUY,0.6498,Already holding position,backtest
+2024-03-28,ABBV,BUY,0.640894,In cooldown until 2024-04-04; need confidence ≥ 0.69,cooldown
+2024-03-28,AMZN,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-03-28,WFC,BUY,0.604343,Already holding position,backtest
+2024-03-28,KO,BUY,0.604343,Sector Consumer at max 3 positions,sector_limit
+2024-04-01,GOOGL,BUY,0.63189,Already holding position,backtest
+2024-04-01,QQQ,BUY,0.622793,In cooldown until 2024-04-02; need confidence ≥ 0.65,cooldown
+2024-04-01,MA,BUY,0.622793,Already holding position,backtest
+2024-04-01,JPM,BUY,0.613609,Already holding position,backtest
+2024-04-01,BAC,BUY,0.604343,Sector Finance at max 3 positions,sector_limit
+2024-04-02,MA,BUY,0.6498,Already holding position,backtest
+2024-04-02,PG,BUY,0.640894,Already holding position,backtest
+2024-04-02,NFLX,BUY,0.640894,Sector Tech at max 3 positions,sector_limit
+2024-04-02,ISRG,BUY,0.63189,Already holding position,backtest
+2024-04-02,WMT,BUY,0.613609,Sector Consumer at max 3 positions,sector_limit
+2024-04-02,AVGO,BUY,0.604343,Sector Tech at max 3 positions,sector_limit
+2024-04-02,ABBV,BUY,0.604343,In cooldown until 2024-04-04; need confidence ≥ 0.69,cooldown
+2024-04-03,GOOGL,BUY,0.6498,Already holding position,backtest
+2024-04-03,WMT,BUY,0.622793,Sector Consumer at max 3 positions,sector_limit
+2024-04-03,V,BUY,0.613609,Sector Finance at max 3 positions,sector_limit
+2024-04-03,SPY,BUY,0.604343,Already holding position,backtest
+2024-04-03,CRM,BUY,0.604343,Sector Tech at max 3 positions,sector_limit
+2024-04-03,AXP,BUY,0.604343,Already holding position,backtest
+2024-04-04,MA,BUY,0.622793,In cooldown until 2024-04-10; need confidence ≥ 0.66,cooldown
+2024-04-04,LLY,BUY,0.622793,Already holding position,backtest
+2024-04-04,AXP,BUY,0.622793,Already holding position,backtest
+2024-04-04,ABBV,BUY,0.613609,Sector Health at max 3 positions,sector_limit
+2024-04-04,SPY,BUY,0.604343,Already holding position,backtest
+2024-04-05,ABBV,BUY,0.622793,Sector Health at max 3 positions,sector_limit
+2024-04-05,PG,BUY,0.606768,Already holding position,backtest
+2024-04-05,JNJ,BUY,0.606768,Sector Health at max 3 positions,sector_limit
+2024-04-05,WFC,BUY,0.604343,Already holding position,backtest
+2024-04-05,MRK,BUY,0.604343,Sector Health at max 3 positions,sector_limit
+2024-04-08,MA,BUY,0.667297,Sector Finance at max 3 positions,sector_limit
+2024-04-08,LLY,BUY,0.63189,Already holding position,backtest
+2024-04-08,CAT,BUY,0.613609,Already holding position,backtest
+2024-04-08,AVGO,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-04-08,QQQ,BUY,0.604343,Already holding position,backtest
+2024-04-08,ABBV,BUY,0.604343,Sector Health at max 3 positions,sector_limit
+2024-04-09,SPY,BUY,0.6498,Already holding position,backtest
+2024-04-09,JNJ,BUY,0.634031,Sector Health at max 3 positions,sector_limit
+2024-04-09,AVGO,BUY,0.622793,Sector Tech at max 3 positions,sector_limit
+2024-04-09,QQQ,BUY,0.613609,Already holding position,backtest
+2024-04-09,CRM,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-04-09,WFC,BUY,0.613609,Already holding position,backtest
+2024-04-10,AMD,BUY,0.688532,Sector Tech at max 3 positions,sector_limit
+2024-04-10,AVGO,BUY,0.640894,Sector Tech at max 3 positions,sector_limit
+2024-04-10,CSCO,BUY,0.628093,Sector Tech at max 3 positions,sector_limit
+2024-04-10,BRK-B,BUY,0.622793,Already holding position,backtest
+2024-04-10,HD,BUY,0.622793,In cooldown until 2024-04-15; need confidence ≥ 0.65,cooldown
+2024-04-10,TMO,BUY,0.613609,Sector Health at max 3 positions,sector_limit
+2024-04-10,CRM,BUY,0.604343,Sector Tech at max 3 positions,sector_limit
+2024-04-10,WFC,BUY,0.604343,In cooldown until 2024-04-16; need confidence ≥ 0.69,cooldown
+2024-04-11,MS,BUY,0.645087,Sector Finance at max 3 positions,sector_limit
+2024-04-11,CSCO,BUY,0.616805,Sector Tech at max 3 positions,sector_limit
+2024-04-11,GOOGL,BUY,0.613609,Already holding position,backtest
+2024-04-11,PYPL,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-04-11,AMZN,BUY,0.604343,Sector Tech at max 3 positions,sector_limit
+2024-04-11,WFC,BUY,0.604343,In cooldown until 2024-04-16; need confidence ≥ 0.69,cooldown
+2024-04-11,TMO,BUY,0.604343,Sector Health at max 3 positions,sector_limit
+2024-04-12,CRM,BUY,0.6498,Sector Tech at max 3 positions,sector_limit
+2024-04-12,NFLX,BUY,0.63189,Already holding position,backtest
+2024-04-12,MSFT,BUY,0.622793,Already holding position,backtest
+2024-04-12,WFC,BUY,0.613609,In cooldown until 2024-04-16; need confidence ≥ 0.69,cooldown
+2024-04-12,ABBV,BUY,0.613609,Sector Health at max 3 positions,sector_limit
+2024-04-12,HD,BUY,0.606768,In cooldown until 2024-04-15; need confidence ≥ 0.65,cooldown
+2024-04-12,MA,BUY,0.604343,Sector Finance at max 3 positions,sector_limit
+2024-04-15,PEP,BUY,0.643302,Already holding position,backtest
+2024-04-15,WFC,BUY,0.63189,In cooldown until 2024-04-16; need confidence ≥ 0.69,cooldown
+2024-04-15,AXP,BUY,0.613609,Already holding position,backtest
+2024-04-15,QCOM,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-04-15,TXN,BUY,0.604343,Sector Tech at max 3 positions,sector_limit
+2024-04-15,MS,BUY,0.604343,Sector Finance at max 3 positions,sector_limit
+2024-04-15,BRK-B,BUY,0.604343,Already holding position,backtest
+2024-04-15,XOM,BUY,0.604343,Already holding position,backtest
+2024-04-16,ABBV,BUY,0.63189,Already holding position,backtest
+2024-04-16,BAC,BUY,0.622793,Already holding position,backtest
+2024-04-16,WFC,BUY,0.613609,Sector Finance at max 3 positions,sector_limit
+2024-04-16,MA,BUY,0.604343,Sector Finance at max 3 positions,sector_limit
+2024-04-16,LLY,BUY,0.604343,Already holding position,backtest
+2024-04-17,HD,BUY,0.647829,Already holding position,backtest
+2024-04-17,NFLX,BUY,0.640894,Already holding position,backtest
+2024-04-17,KO,BUY,0.625602,Already holding position,backtest
+2024-04-17,QQQ,BUY,0.622793,Already holding position,backtest
+2024-04-17,BAC,BUY,0.622793,Already holding position,backtest
+2024-04-17,ABBV,BUY,0.613609,Already holding position,backtest
+2024-04-17,PEP,BUY,0.606289,Already holding position,backtest
+2024-04-17,V,BUY,0.604343,Sector Finance at max 3 positions,sector_limit
+2024-04-17,WFC,BUY,0.604343,Sector Finance at max 3 positions,sector_limit
+2024-04-17,MS,BUY,0.604343,Sector Finance at max 3 positions,sector_limit
+2024-04-18,PEP,BUY,0.635761,Already holding position,backtest
+2024-04-18,BAC,BUY,0.622793,Already holding position,backtest
+2024-04-18,LLY,BUY,0.613609,In cooldown until 2024-04-24; need confidence ≥ 0.73,cooldown
+2024-04-18,PG,BUY,0.613609,Sector Consumer at max 3 positions,sector_limit
+2024-04-18,NFLX,BUY,0.604343,Already holding position,backtest
+2024-04-18,ISRG,BUY,0.604343,In cooldown until 2024-04-22; need confidence ≥ 0.68,cooldown
+2024-04-18,KO,BUY,0.603443,Already holding position,backtest
+2024-04-19,PEP,BUY,0.622793,In cooldown until 2024-04-25; need confidence ≥ 0.68,cooldown
+2024-04-19,ABBV,BUY,0.613609,Already holding position,backtest
+2024-04-19,TXN,BUY,0.608697,Sector Tech at max 3 positions,sector_limit
+2024-04-19,SPY,BUY,0.604343,Already holding position,backtest
+2024-04-19,LLY,BUY,0.604343,In cooldown until 2024-04-24; need confidence ≥ 0.73,cooldown
+2024-04-19,AMZN,BUY,0.604343,Sector Tech at max 3 positions,sector_limit
+2024-04-22,TXN,BUY,0.641708,Sector Tech at max 3 positions,sector_limit
+2024-04-22,TMO,BUY,0.63189,Already holding position,backtest
+2024-04-22,QCOM,BUY,0.613609,Already holding position,backtest
+2024-04-22,WMT,BUY,0.613609,Sector Consumer at max 3 positions,sector_limit
+2024-04-23,PYPL,BUY,0.638383,Sector Tech at max 3 positions,sector_limit
+2024-04-23,PEP,BUY,0.626595,In cooldown until 2024-04-25; need confidence ≥ 0.68,cooldown
+2024-04-23,WMT,BUY,0.613609,Sector Consumer at max 3 positions,sector_limit
+2024-04-23,QCOM,BUY,0.613609,Already holding position,backtest
+2024-04-23,AVGO,BUY,0.604343,Sector Tech at max 3 positions,sector_limit
+2024-04-23,BAC,BUY,0.604343,Already holding position,backtest
+2024-04-24,QQQ,BUY,0.665394,In cooldown until 2024-04-30; need confidence ≥ 0.70,cooldown
+2024-04-24,SPY,BUY,0.640894,In cooldown until 2024-04-26; need confidence ≥ 0.65,cooldown
+2024-04-24,MSFT,BUY,0.640894,Sector Tech at max 3 positions,sector_limit
+2024-04-24,ISRG,BUY,0.63189,Sector Health at max 3 positions,sector_limit
+2024-04-24,META,BUY,0.623364,Sector Tech at max 3 positions,sector_limit
+2024-04-24,MRK,BUY,0.622793,Sector Health at max 3 positions,sector_limit
+2024-04-24,AVGO,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-04-24,PYPL,BUY,0.610267,Sector Tech at max 3 positions,sector_limit
+2024-04-24,DIS,BUY,0.604343,Already holding position,backtest
+2024-04-24,CAT,BUY,0.604343,Already holding position,backtest
+2024-04-25,LLY,BUY,0.640894,Sector Health at max 3 positions,sector_limit
+2024-04-25,QCOM,BUY,0.63189,Already holding position,backtest
+2024-04-25,CVX,BUY,0.63189,Already holding position,backtest
+2024-04-25,BAC,BUY,0.622793,Already holding position,backtest
+2024-04-25,TMO,BUY,0.610468,Already holding position,backtest
+2024-04-25,WFC,BUY,0.604343,Sector Finance at max 3 positions,sector_limit
+2024-04-25,PG,BUY,0.604343,Already holding position,backtest
+2024-04-26,CVX,BUY,0.667297,Already holding position,backtest
+2024-04-26,XOM,BUY,0.6498,Already holding position,backtest
+2024-04-26,PEP,BUY,0.640894,Sector Consumer at max 3 positions,sector_limit
+2024-04-26,CRM,BUY,0.625602,Sector Tech at max 3 positions,sector_limit
+2024-04-26,WMT,BUY,0.622793,Sector Consumer at max 3 positions,sector_limit
+2024-04-26,LLY,BUY,0.613609,Sector Health at max 3 positions,sector_limit
+2024-04-26,TMO,BUY,0.613609,Already holding position,backtest
+2024-04-26,ABBV,BUY,0.603443,Already holding position,backtest
+2024-04-29,ABBV,BUY,0.631273,Already holding position,backtest
+2024-04-29,PEP,BUY,0.629171,Sector Consumer at max 3 positions,sector_limit
+2024-04-29,PG,BUY,0.622793,Already holding position,backtest
+2024-04-29,CVX,BUY,0.622793,Already holding position,backtest
+2024-04-29,GS,BUY,0.613609,Sector Finance at max 3 positions,sector_limit
+2024-04-29,TMO,BUY,0.613609,Already holding position,backtest
+2024-04-29,LLY,BUY,0.604343,Sector Health at max 3 positions,sector_limit
+2024-04-29,TXN,BUY,0.600989,Already holding position,backtest
+2024-04-30,KO,BUY,0.656499,Already holding position,backtest
+2024-04-30,PEP,BUY,0.6498,Sector Consumer at max 3 positions,sector_limit
+2024-04-30,TMO,BUY,0.626331,Already holding position,backtest
+2024-04-30,CAT,BUY,0.613609,Already holding position,backtest
+2024-04-30,CVX,BUY,0.604343,Already holding position,backtest
+2024-04-30,WFC,BUY,0.604343,Sector Finance at max 3 positions,sector_limit
+2024-04-30,ORCL,BUY,0.600179,Sector Tech at max 3 positions,sector_limit
+2024-04-30,NFLX,BUY,0.600179,In cooldown until 2024-05-02; need confidence ≥ 0.67,cooldown
+2024-05-01,KO,BUY,0.675879,In cooldown until 2024-05-07; need confidence ≥ 0.70,cooldown
+2024-05-01,TXN,BUY,0.629171,Already holding position,backtest
+2024-05-01,DIS,BUY,0.622793,Already holding position,backtest
+2024-05-01,PG,BUY,0.613609,Already holding position,backtest
+2024-05-01,BAC,BUY,0.613609,In cooldown until 2024-05-06; need confidence ≥ 0.68,cooldown
+2024-05-01,AXP,BUY,0.604343,Sector Finance at max 3 positions,sector_limit
+2024-05-02,PEP,BUY,0.658602,Already holding position,backtest
+2024-05-02,AMGN,BUY,0.65201,Already holding position,backtest
+2024-05-02,KO,BUY,0.6498,In cooldown until 2024-05-07; need confidence ≥ 0.70,cooldown
+2024-05-02,CAT,BUY,0.613609,Already holding position,backtest
+2024-05-02,V,BUY,0.609474,Already holding position,backtest
+2024-05-02,MSFT,BUY,0.600989,Sector Tech at max 3 positions,sector_limit
+2024-05-02,PFE,BUY,0.600989,Sector Health at max 3 positions,sector_limit
+2024-05-02,AVGO,BUY,0.600989,Sector Tech at max 3 positions,sector_limit
+2024-05-02,TXN,BUY,0.600989,Already holding position,backtest
+2024-05-03,MSFT,BUY,0.642571,Sector Tech at max 3 positions,sector_limit
+2024-05-03,PG,BUY,0.622793,Already holding position,backtest
+2024-05-03,KO,BUY,0.613609,In cooldown until 2024-05-07; need confidence ≥ 0.70,cooldown
+2024-05-03,MA,BUY,0.609474,Already holding position,backtest
+2024-05-03,PFE,BUY,0.605738,Sector Health at max 3 positions,sector_limit
+2024-05-03,WFC,BUY,0.604343,Sector Finance at max 3 positions,sector_limit
+2024-05-06,PFE,BUY,0.664411,Sector Health at max 3 positions,sector_limit
+2024-05-06,PEP,BUY,0.656499,Already holding position,backtest
+2024-05-06,ISRG,BUY,0.63189,Already holding position,backtest
+2024-05-06,V,BUY,0.629171,Already holding position,backtest
+2024-05-06,AXP,BUY,0.604343,Sector Finance at max 3 positions,sector_limit
+2024-05-06,QQQ,BUY,0.604343,Already holding position,backtest
+2024-05-06,PG,BUY,0.604343,Already holding position,backtest
+2024-05-06,CAT,BUY,0.604343,Already holding position,backtest
+2024-05-07,UNH,BUY,0.719828,Sector Health at max 3 positions,sector_limit
+2024-05-07,AVGO,BUY,0.639941,Sector Tech at max 3 positions,sector_limit
+2024-05-07,V,BUY,0.638383,Already holding position,backtest
+2024-05-07,ORCL,BUY,0.63189,Sector Tech at max 3 positions,sector_limit
+2024-05-07,MA,BUY,0.629171,Already holding position,backtest
+2024-05-07,CVX,BUY,0.613609,Already holding position,backtest
+2024-05-07,MSFT,BUY,0.604343,Sector Tech at max 3 positions,sector_limit
+2024-05-07,AAPL,BUY,0.602348,Sector Tech at max 3 positions,sector_limit
+2024-05-08,MA,BUY,0.6498,Already holding position,backtest
+2024-05-08,PEP,BUY,0.622793,Already holding position,backtest
+2024-05-08,CAT,BUY,0.613609,Already holding position,backtest
+2024-05-08,QQQ,BUY,0.604343,Already holding position,backtest
+2024-05-08,AVGO,BUY,0.604343,Sector Tech at max 3 positions,sector_limit
+2024-05-09,AMGN,BUY,0.65201,Already holding position,backtest
+2024-05-09,QQQ,BUY,0.622793,Already holding position,backtest
+2024-05-09,AXP,BUY,0.622793,Sector Finance at max 3 positions,sector_limit
+2024-05-09,MA,BUY,0.613609,Already holding position,backtest
+2024-05-09,TMO,BUY,0.604343,In cooldown until 2024-05-15; need confidence ≥ 0.67,cooldown
+2024-05-09,NFLX,BUY,0.603762,Already holding position,backtest
+2024-05-10,QCOM,BUY,0.670529,In cooldown until 2024-05-15; need confidence ≥ 0.68,cooldown
+2024-05-10,CAT,BUY,0.6498,Already holding position,backtest
+2024-05-10,TXN,BUY,0.63189,Already holding position,backtest
+2024-05-10,ABBV,BUY,0.618656,Sector Health at max 3 positions,sector_limit
+2024-05-10,QQQ,BUY,0.613609,Already holding position,backtest
+2024-05-10,JPM,BUY,0.613609,Already holding position,backtest
+2024-05-10,AXP,BUY,0.604343,Sector Finance at max 3 positions,sector_limit
+2024-05-10,MA,BUY,0.604343,Already holding position,backtest
+2024-05-10,V,BUY,0.604343,Already holding position,backtest
+2024-05-10,CVX,BUY,0.604343,Already holding position,backtest
+2024-05-13,MA,BUY,0.6498,In cooldown until 2024-05-17; need confidence ≥ 0.66,cooldown
+2024-05-14,PFE,BUY,0.660619,Sector Health at max 3 positions,sector_limit
+2024-05-14,JPM,BUY,0.640894,Already holding position,backtest
+2024-05-14,TXN,BUY,0.613609,Already holding position,backtest
+2024-05-14,AMGN,BUY,0.609777,In cooldown until 2024-05-17; need confidence ≥ 0.68,cooldown
+2024-05-14,CVX,BUY,0.604343,In cooldown until 2024-05-17; need confidence ≥ 0.69,cooldown
+2024-05-15,UNH,BUY,0.698574,Already holding position,backtest
+2024-05-15,KO,BUY,0.640894,Sector Consumer at max 3 positions,sector_limit
+2024-05-15,LLY,BUY,0.604343,Sector Health at max 3 positions,sector_limit
+2024-05-15,TMO,BUY,0.604343,Sector Health at max 3 positions,sector_limit
+2024-05-16,UNH,BUY,0.716175,Already holding position,backtest
+2024-05-16,ISRG,BUY,0.640894,Already holding position,backtest
+2024-05-16,JPM,BUY,0.622793,Already holding position,backtest
+2024-05-16,BAC,BUY,0.622793,Sector Finance at max 3 positions,sector_limit
+2024-05-16,PFE,BUY,0.617523,Sector Health at max 3 positions,sector_limit
+2024-05-16,TMO,BUY,0.604343,Sector Health at max 3 positions,sector_limit
+2024-05-16,KO,BUY,0.604343,Sector Consumer at max 3 positions,sector_limit
+2024-05-17,PFE,BUY,0.683443,Sector Health at max 3 positions,sector_limit
+2024-05-17,UNH,BUY,0.657351,Already holding position,backtest
+2024-05-17,QQQ,BUY,0.63189,Already holding position,backtest
+2024-05-17,SPY,BUY,0.622793,Already holding position,backtest
+2024-05-17,MA,BUY,0.613609,Sector Finance at max 3 positions,sector_limit
+2024-05-17,V,BUY,0.604343,In cooldown until 2024-05-21; need confidence ≥ 0.66,cooldown
+2024-05-20,ISRG,BUY,0.640894,Already holding position,backtest
+2024-05-20,TMO,BUY,0.613609,Sector Health at max 3 positions,sector_limit
+2024-05-21,QQQ,BUY,0.63189,In cooldown until 2024-05-24; need confidence ≥ 0.66,cooldown
+2024-05-21,PFE,BUY,0.623364,Sector Health at max 3 positions,sector_limit
+2024-05-21,SPY,BUY,0.622793,Already holding position,backtest
+2024-05-21,WFC,BUY,0.622793,Already holding position,backtest
+2024-05-21,PEP,BUY,0.613609,In cooldown until 2024-05-28; need confidence ≥ 0.65,cooldown
+2024-05-21,JPM,BUY,0.604343,In cooldown until 2024-05-24; need confidence ≥ 0.65,cooldown
+2024-05-21,PYPL,BUY,0.603762,Already holding position,backtest
+2024-05-22,PYPL,BUY,0.6394,Already holding position,backtest
+2024-05-22,KO,BUY,0.622793,Sector Consumer at max 3 positions,sector_limit
+2024-05-22,QQQ,BUY,0.622793,In cooldown until 2024-05-24; need confidence ≥ 0.66,cooldown
+2024-05-22,UNH,BUY,0.613609,Already holding position,backtest
+2024-05-22,SPY,BUY,0.604343,Already holding position,backtest
+2024-05-22,AVGO,BUY,0.604343,Sector Tech at max 3 positions,sector_limit
+2024-05-22,JPM,BUY,0.604343,In cooldown until 2024-05-24; need confidence ≥ 0.65,cooldown
+2024-05-23,GS,BUY,0.640894,Sector Finance at max 3 positions,sector_limit
+2024-05-23,BAC,BUY,0.63189,Already holding position,backtest
+2024-05-23,MRK,BUY,0.63189,Already holding position,backtest
+2024-05-23,AAPL,BUY,0.631273,Sector Tech at max 3 positions,sector_limit
+2024-05-23,ISRG,BUY,0.613609,In cooldown until 2024-05-30; need confidence ≥ 0.67,cooldown
+2024-05-23,PYPL,BUY,0.610039,Already holding position,backtest
+2024-05-23,MSFT,BUY,0.604343,Sector Tech at max 3 positions,sector_limit
+2024-05-24,V,BUY,0.655046,Sector Finance at max 3 positions,sector_limit
+2024-05-24,GS,BUY,0.622793,Sector Finance at max 3 positions,sector_limit
+2024-05-24,KO,BUY,0.616805,Sector Consumer at max 3 positions,sector_limit
+2024-05-24,PYPL,BUY,0.613609,Already holding position,backtest
+2024-05-24,AAPL,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-05-24,MS,BUY,0.604343,Sector Finance at max 3 positions,sector_limit
+2024-05-24,XOM,BUY,0.604343,Already holding position,backtest
+2024-05-28,AAPL,BUY,0.637187,Sector Tech at max 3 positions,sector_limit
+2024-05-28,GS,BUY,0.63189,Sector Finance at max 3 positions,sector_limit
+2024-05-28,PEP,BUY,0.626331,Sector Consumer at max 3 positions,sector_limit
+2024-05-28,MSFT,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-05-28,GOOGL,BUY,0.604343,Sector Tech at max 3 positions,sector_limit
+2024-05-28,AMGN,BUY,0.601477,Sector Health at max 3 positions,sector_limit
+2024-05-29,MS,BUY,0.622793,Sector Finance at max 3 positions,sector_limit
+2024-05-29,MU,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-05-29,PG,BUY,0.604343,Sector Consumer at max 3 positions,sector_limit
+2024-05-30,AAPL,BUY,0.644468,Sector Tech at max 3 positions,sector_limit
+2024-05-30,TXN,BUY,0.640894,Sector Tech at max 3 positions,sector_limit
+2024-05-30,MS,BUY,0.640894,Sector Finance at max 3 positions,sector_limit
+2024-05-30,SPY,BUY,0.63189,Already holding position,backtest
+2024-05-30,UNH,BUY,0.625602,In cooldown until 2024-06-05; need confidence ≥ 0.72,cooldown
+2024-05-30,V,BUY,0.619195,Sector Finance at max 3 positions,sector_limit
+2024-05-30,AVGO,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-05-30,GOOGL,BUY,0.604343,Sector Tech at max 3 positions,sector_limit
+2024-05-31,UNH,BUY,0.641708,In cooldown until 2024-06-05; need confidence ≥ 0.72,cooldown
+2024-05-31,AMZN,BUY,0.63189,Sector Tech at max 3 positions,sector_limit
+2024-05-31,TXN,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-05-31,V,BUY,0.608187,Sector Finance at max 3 positions,sector_limit
+2024-06-03,MRK,BUY,0.640894,In cooldown until 2024-06-07; need confidence ≥ 0.65,cooldown
+2024-06-03,AMZN,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-06-03,PYPL,BUY,0.604343,Already holding position,backtest
+2024-06-03,PFE,BUY,0.600989,Already holding position,backtest
+2024-06-04,MRK,BUY,0.613609,In cooldown until 2024-06-07; need confidence ≥ 0.65,cooldown
+2024-06-04,V,BUY,0.608187,Sector Finance at max 3 positions,sector_limit
+2024-06-04,META,BUY,0.604343,Sector Tech at max 3 positions,sector_limit
+2024-06-04,QQQ,BUY,0.604343,Already holding position,backtest
+2024-06-05,META,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-06-05,ORCL,BUY,0.613609,Already holding position,backtest
+2024-06-05,AAPL,BUY,0.606289,Sector Tech at max 3 positions,sector_limit
+2024-06-05,QQQ,BUY,0.604343,Already holding position,backtest
+2024-06-05,AMZN,BUY,0.604343,Sector Tech at max 3 positions,sector_limit
+2024-06-05,WFC,BUY,0.604343,In cooldown until 2024-06-07; need confidence ≥ 0.65,cooldown
+2024-06-05,BA,BUY,0.604343,Sector Industrial at max 3 positions,sector_limit
+2024-06-05,ISRG,BUY,0.604343,Already holding position,backtest
+2024-06-05,MSFT,BUY,0.600989,Already holding position,backtest
+2024-06-05,PYPL,BUY,0.600179,Already holding position,backtest
+2024-06-06,AXP,BUY,0.622793,In cooldown until 2024-06-11; need confidence ≥ 0.66,cooldown
+2024-06-06,MSFT,BUY,0.617013,Already holding position,backtest
+2024-06-06,CVX,BUY,0.613609,Already holding position,backtest
+2024-06-06,ORCL,BUY,0.607188,In cooldown until 2024-06-12; need confidence ≥ 0.68,cooldown
+2024-06-06,WFC,BUY,0.604343,In cooldown until 2024-06-07; need confidence ≥ 0.65,cooldown
+2024-06-07,AVGO,BUY,0.658602,Already holding position,backtest
+2024-06-07,GE,BUY,0.63189,Already holding position,backtest
+2024-06-07,ISRG,BUY,0.622793,Already holding position,backtest
+2024-06-07,MRK,BUY,0.613609,Sector Health at max 3 positions,sector_limit
+2024-06-07,PYPL,BUY,0.603762,In cooldown until 2024-06-13; need confidence ≥ 0.66,cooldown
+2024-06-10,GE,BUY,0.671158,Already holding position,backtest
+2024-06-10,MRK,BUY,0.63189,Sector Health at max 3 positions,sector_limit
+2024-06-10,PEP,BUY,0.625602,Already holding position,backtest
+2024-06-10,AVGO,BUY,0.604343,Already holding position,backtest
+2024-06-10,WMT,BUY,0.604343,Already holding position,backtest
+2024-06-11,TMO,BUY,0.629171,Already holding position,backtest
+2024-06-11,ABBV,BUY,0.613609,Sector Health at max 3 positions,sector_limit
+2024-06-11,QCOM,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-06-11,PEP,BUY,0.60756,Already holding position,backtest
+2024-06-11,AMZN,BUY,0.604343,Sector Tech at max 3 positions,sector_limit
+2024-06-12,META,BUY,0.624011,Sector Tech at max 3 positions,sector_limit
+2024-06-12,MRK,BUY,0.607188,Sector Health at max 3 positions,sector_limit
+2024-06-12,PFE,BUY,0.605098,Already holding position,backtest
+2024-06-12,WFC,BUY,0.604343,Already holding position,backtest
+2024-06-13,PYPL,BUY,0.65201,Sector Tech at max 3 positions,sector_limit
+2024-06-13,TMO,BUY,0.623364,Already holding position,backtest
+2024-06-13,PG,BUY,0.604343,Already holding position,backtest
+2024-06-13,BAC,BUY,0.604343,In cooldown until 2024-06-14; need confidence ≥ 0.65,cooldown
+2024-06-13,AMZN,BUY,0.600989,Sector Tech at max 3 positions,sector_limit
+2024-06-13,PFE,BUY,0.600179,Already holding position,backtest
+2024-06-14,ABBV,BUY,0.674172,Sector Health at max 3 positions,sector_limit
+2024-06-14,PFE,BUY,0.668866,Already holding position,backtest
+2024-06-14,HD,BUY,0.646062,Sector Consumer at max 3 positions,sector_limit
+2024-06-14,COST,BUY,0.613609,Sector Consumer at max 3 positions,sector_limit
+2024-06-14,PEP,BUY,0.613609,Already holding position,backtest
+2024-06-14,QCOM,BUY,0.600989,Sector Tech at max 3 positions,sector_limit
+2024-06-17,HD,BUY,0.667914,Sector Consumer at max 3 positions,sector_limit
+2024-06-17,BAC,BUY,0.6498,Sector Finance at max 3 positions,sector_limit
+2024-06-17,CVX,BUY,0.6343,Already holding position,backtest
+2024-06-17,TXN,BUY,0.622793,Sector Tech at max 3 positions,sector_limit
+2024-06-17,ISRG,BUY,0.613609,Already holding position,backtest
+2024-06-17,PEP,BUY,0.613609,Already holding position,backtest
+2024-06-17,KO,BUY,0.604343,Already holding position,backtest
+2024-06-18,HD,BUY,0.646062,Sector Consumer at max 3 positions,sector_limit
+2024-06-18,AXP,BUY,0.610468,Sector Finance at max 3 positions,sector_limit
+2024-06-18,WFC,BUY,0.604343,Already holding position,backtest
+2024-06-20,V,BUY,0.655414,Sector Finance at max 3 positions,sector_limit
+2024-06-20,HD,BUY,0.646062,Sector Consumer at max 3 positions,sector_limit
+2024-06-20,CVX,BUY,0.620261,In cooldown until 2024-06-25; need confidence ≥ 0.69,cooldown
+2024-06-20,PFE,BUY,0.600179,In cooldown until 2024-06-24; need confidence ≥ 0.65,cooldown
+2024-06-21,AAPL,BUY,0.674172,Sector Tech at max 3 positions,sector_limit
+2024-06-21,PEP,BUY,0.65201,In cooldown until 2024-06-27; need confidence ≥ 0.66,cooldown
+2024-06-21,BRK-B,BUY,0.607188,Sector Finance at max 3 positions,sector_limit
+2024-06-21,ABBV,BUY,0.605738,Already holding position,backtest
+2024-06-21,CAT,BUY,0.602348,Already holding position,backtest
+2024-06-24,ABBV,BUY,0.65201,Already holding position,backtest
+2024-06-24,SPY,BUY,0.622793,Already holding position,backtest
+2024-06-24,AAPL,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-06-24,WMT,BUY,0.613609,Sector Consumer at max 3 positions,sector_limit
+2024-06-24,ISRG,BUY,0.604343,In cooldown until 2024-06-28; need confidence ≥ 0.65,cooldown
+2024-06-24,COST,BUY,0.604343,Sector Consumer at max 3 positions,sector_limit
+2024-06-24,GE,BUY,0.600179,In cooldown until 2024-06-26; need confidence ≥ 0.71,cooldown
+2024-06-25,PYPL,BUY,0.660619,Sector Tech at max 3 positions,sector_limit
+2024-06-25,META,BUY,0.658602,Sector Tech at max 3 positions,sector_limit
+2024-06-25,ORCL,BUY,0.655414,Sector Tech at max 3 positions,sector_limit
+2024-06-25,TXN,BUY,0.63189,Sector Tech at max 3 positions,sector_limit
+2024-06-25,ABBV,BUY,0.63189,Already holding position,backtest
+2024-06-25,SPY,BUY,0.622793,Already holding position,backtest
+2024-06-25,AXP,BUY,0.622793,Sector Finance at max 3 positions,sector_limit
+2024-06-25,AAPL,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-06-25,MA,BUY,0.613609,In cooldown until 2024-06-28; need confidence ≥ 0.67,cooldown
+2024-06-25,XOM,BUY,0.604343,Already holding position,backtest
+2024-06-26,ORCL,BUY,0.63189,Sector Tech at max 3 positions,sector_limit
+2024-06-26,SPY,BUY,0.622793,Already holding position,backtest
+2024-06-26,BAC,BUY,0.622793,Already holding position,backtest
+2024-06-26,AXP,BUY,0.622793,Sector Finance at max 3 positions,sector_limit
+2024-06-26,PEP,BUY,0.620713,In cooldown until 2024-06-27; need confidence ≥ 0.66,cooldown
+2024-06-26,AAPL,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-06-27,WMT,BUY,0.63189,Sector Consumer at max 3 positions,sector_limit
+2024-06-27,TMO,BUY,0.629171,Already holding position,backtest
+2024-06-27,PEP,BUY,0.627766,Sector Consumer at max 3 positions,sector_limit
+2024-06-27,AMGN,BUY,0.613609,Sector Health at max 3 positions,sector_limit
+2024-06-27,META,BUY,0.604343,Sector Tech at max 3 positions,sector_limit
+2024-06-28,ABBV,BUY,0.664411,Already holding position,backtest
+2024-06-28,META,BUY,0.663407,Sector Tech at max 3 positions,sector_limit
+2024-06-28,MRK,BUY,0.641708,Already holding position,backtest
+2024-06-28,PG,BUY,0.622793,Already holding position,backtest
+2024-06-28,MS,BUY,0.622793,Sector Finance at max 3 positions,sector_limit
+2024-06-28,AMZN,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-06-28,CSCO,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-06-28,TMO,BUY,0.600989,Already holding position,backtest
+2024-07-01,GILD,BUY,0.719828,Sector Health at max 3 positions,sector_limit
+2024-07-01,CSCO,BUY,0.65201,Sector Tech at max 3 positions,sector_limit
+2024-07-01,META,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-07-01,PG,BUY,0.606768,Already holding position,backtest
+2024-07-01,GOOGL,BUY,0.604343,Already holding position,backtest
+2024-07-01,AXP,BUY,0.604343,Sector Finance at max 3 positions,sector_limit
+2024-07-01,MRK,BUY,0.60046,Already holding position,backtest
+2024-07-02,GILD,BUY,0.625602,Sector Health at max 3 positions,sector_limit
+2024-07-02,AMZN,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-07-02,UNH,BUY,0.606768,Sector Health at max 3 positions,sector_limit
+2024-07-02,BAC,BUY,0.604343,Already holding position,backtest
+2024-07-03,ISRG,BUY,0.622793,Sector Health at max 3 positions,sector_limit
+2024-07-03,CVX,BUY,0.622532,Already holding position,backtest
+2024-07-03,NFLX,BUY,0.604343,In cooldown until 2024-07-05; need confidence ≥ 0.65,cooldown
+2024-07-03,JPM,BUY,0.604343,Sector Finance at max 3 positions,sector_limit
+2024-07-03,PG,BUY,0.603762,In cooldown until 2024-07-10; need confidence ≥ 0.65,cooldown
+2024-07-05,UNH,BUY,0.629171,Sector Health at max 3 positions,sector_limit
+2024-07-05,BRK-B,BUY,0.623364,Already holding position,backtest
+2024-07-05,AMZN,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-07-05,QCOM,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-07-05,AMGN,BUY,0.613609,Sector Health at max 3 positions,sector_limit
+2024-07-05,AXP,BUY,0.604343,Sector Finance at max 3 positions,sector_limit
+2024-07-08,QCOM,BUY,0.674172,Sector Tech at max 3 positions,sector_limit
+2024-07-08,META,BUY,0.660619,Sector Tech at max 3 positions,sector_limit
+2024-07-08,BAC,BUY,0.640894,Already holding position,backtest
+2024-07-08,JPM,BUY,0.63189,Sector Finance at max 3 positions,sector_limit
+2024-07-08,CSCO,BUY,0.629171,Sector Tech at max 3 positions,sector_limit
+2024-07-08,GOOGL,BUY,0.622793,Already holding position,backtest
+2024-07-08,SPY,BUY,0.613609,Already holding position,backtest
+2024-07-08,PEP,BUY,0.613609,Already holding position,backtest
+2024-07-08,CVX,BUY,0.609474,Already holding position,backtest
+2024-07-08,GS,BUY,0.604343,In cooldown until 2024-07-09; need confidence ≥ 0.67,cooldown
+2024-07-09,PEP,BUY,0.65201,Already holding position,backtest
+2024-07-09,JPM,BUY,0.6498,Sector Finance at max 3 positions,sector_limit
+2024-07-09,KO,BUY,0.640894,Already holding position,backtest
+2024-07-09,WFC,BUY,0.63189,Sector Finance at max 3 positions,sector_limit
+2024-07-09,NFLX,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-07-09,MRK,BUY,0.606768,Already holding position,backtest
+2024-07-09,GOOGL,BUY,0.604343,Already holding position,backtest
+2024-07-09,BAC,BUY,0.604343,Already holding position,backtest
+2024-07-10,AXP,BUY,0.640894,Sector Finance at max 3 positions,sector_limit
+2024-07-10,GOOGL,BUY,0.622793,Already holding position,backtest
+2024-07-10,WMT,BUY,0.613609,Sector Consumer at max 3 positions,sector_limit
+2024-07-10,MS,BUY,0.604343,Sector Finance at max 3 positions,sector_limit
+2024-07-11,ISRG,BUY,0.613609,Sector Health at max 3 positions,sector_limit
+2024-07-11,ORCL,BUY,0.604343,Sector Tech at max 3 positions,sector_limit
+2024-07-11,AXP,BUY,0.604343,Sector Finance at max 3 positions,sector_limit
+2024-07-12,WFC,BUY,0.608697,Sector Finance at max 3 positions,sector_limit
+2024-07-12,CVX,BUY,0.607188,Already holding position,backtest
+2024-07-12,MU,BUY,0.603102,Sector Tech at max 3 positions,sector_limit
+2024-07-12,BRK-B,BUY,0.600989,Already holding position,backtest
+2024-07-12,ABBV,BUY,0.600989,In cooldown until 2024-07-15; need confidence ≥ 0.66,cooldown
+2024-07-15,CAT,BUY,0.692253,Already holding position,backtest
+2024-07-15,XOM,BUY,0.6498,In cooldown until 2024-07-17; need confidence ≥ 0.65,cooldown
+2024-07-15,HD,BUY,0.635761,In cooldown until 2024-07-19; need confidence ≥ 0.72,cooldown
+2024-07-15,NFLX,BUY,0.63189,Sector Tech at max 3 positions,sector_limit
+2024-07-15,PFE,BUY,0.622793,Sector Health at max 3 positions,sector_limit
+2024-07-15,PYPL,BUY,0.609474,Already holding position,backtest
+2024-07-15,WFC,BUY,0.605098,Sector Finance at max 3 positions,sector_limit
+2024-07-15,CVX,BUY,0.604343,Already holding position,backtest
+2024-07-16,META,BUY,0.65201,Sector Tech at max 3 positions,sector_limit
+2024-07-16,AXP,BUY,0.63189,Sector Finance at max 3 positions,sector_limit
+2024-07-16,V,BUY,0.629171,Already holding position,backtest
+2024-07-16,BAC,BUY,0.619864,In cooldown until 2024-07-19; need confidence ≥ 0.71,cooldown
+2024-07-16,UNH,BUY,0.613609,Sector Health at max 3 positions,sector_limit
+2024-07-16,CVX,BUY,0.604343,Already holding position,backtest
+2024-07-16,AVGO,BUY,0.600989,Sector Tech at max 3 positions,sector_limit
+2024-07-17,JNJ,BUY,0.692253,Sector Health at max 3 positions,sector_limit
+2024-07-17,BRK-B,BUY,0.640894,Already holding position,backtest
+2024-07-17,GE,BUY,0.63189,Already holding position,backtest
+2024-07-17,NFLX,BUY,0.629171,Sector Tech at max 3 positions,sector_limit
+2024-07-17,ISRG,BUY,0.613609,Sector Health at max 3 positions,sector_limit
+2024-07-17,CSCO,BUY,0.609474,Sector Tech at max 3 positions,sector_limit
+2024-07-17,GILD,BUY,0.601477,Already holding position,backtest
+2024-07-18,CAT,BUY,0.637442,Already holding position,backtest
+2024-07-18,ORCL,BUY,0.622793,Sector Tech at max 3 positions,sector_limit
+2024-07-18,NFLX,BUY,0.610468,Sector Tech at max 3 positions,sector_limit
+2024-07-19,HD,BUY,0.63364,Sector Consumer at max 3 positions,sector_limit
+2024-07-19,JNJ,BUY,0.621831,Sector Health at max 3 positions,sector_limit
+2024-07-19,GOOGL,BUY,0.613609,In cooldown until 2024-07-24; need confidence ≥ 0.67,cooldown
+2024-07-19,MSFT,BUY,0.610468,Already holding position,backtest
+2024-07-19,KO,BUY,0.604343,Already holding position,backtest
+2024-07-22,AMGN,BUY,0.63189,Already holding position,backtest
+2024-07-22,GE,BUY,0.622793,In cooldown until 2024-07-24; need confidence ≥ 0.70,cooldown
+2024-07-22,PFE,BUY,0.616805,Sector Health at max 3 positions,sector_limit
+2024-07-22,ISRG,BUY,0.610039,Sector Health at max 3 positions,sector_limit
+2024-07-22,BAC,BUY,0.604343,Sector Finance at max 3 positions,sector_limit
+2024-07-22,PG,BUY,0.604343,Already holding position,backtest
+2024-07-23,ABBV,BUY,0.664411,Sector Health at max 3 positions,sector_limit
+2024-07-23,GILD,BUY,0.635761,Already holding position,backtest
+2024-07-23,NFLX,BUY,0.63189,Sector Tech at max 3 positions,sector_limit
+2024-07-23,TXN,BUY,0.622793,Sector Tech at max 3 positions,sector_limit
+2024-07-23,GOOGL,BUY,0.613609,In cooldown until 2024-07-24; need confidence ≥ 0.67,cooldown
+2024-07-23,BRK-B,BUY,0.610468,In cooldown until 2024-07-29; need confidence ≥ 0.69,cooldown
+2024-07-23,CAT,BUY,0.605098,Already holding position,backtest
+2024-07-23,MRK,BUY,0.602348,Sector Health at max 3 positions,sector_limit
+2024-07-24,JNJ,BUY,0.644468,Sector Health at max 3 positions,sector_limit
+2024-07-24,GOOGL,BUY,0.628093,Sector Tech at max 3 positions,sector_limit
+2024-07-24,CVX,BUY,0.618656,In cooldown until 2024-07-29; need confidence ≥ 0.66,cooldown
+2024-07-24,AMZN,BUY,0.608697,Already holding position,backtest
+2024-07-24,AMGN,BUY,0.604343,Already holding position,backtest
+2024-07-25,UNH,BUY,0.63189,Sector Health at max 3 positions,sector_limit
+2024-07-25,PEP,BUY,0.631273,In cooldown until 2024-07-31; need confidence ≥ 0.67,cooldown
+2024-07-25,CSCO,BUY,0.623364,Sector Tech at max 3 positions,sector_limit
+2024-07-25,ISRG,BUY,0.613609,Sector Health at max 3 positions,sector_limit
+2024-07-26,SPY,BUY,0.658602,Already holding position,backtest
+2024-07-26,PEP,BUY,0.640276,In cooldown until 2024-07-31; need confidence ≥ 0.67,cooldown
+2024-07-26,ISRG,BUY,0.63189,Sector Health at max 3 positions,sector_limit
+2024-07-26,LLY,BUY,0.624368,Already holding position,backtest
+2024-07-26,ORCL,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-07-26,CSCO,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-07-26,AAPL,BUY,0.604343,Sector Tech at max 3 positions,sector_limit
+2024-07-26,PG,BUY,0.604343,Already holding position,backtest
+2024-07-29,BA,BUY,0.6343,In cooldown until 2024-08-01; need confidence ≥ 0.80,cooldown
+2024-07-29,CAT,BUY,0.629171,Already holding position,backtest
+2024-07-29,UNH,BUY,0.622793,Sector Health at max 3 positions,sector_limit
+2024-07-29,MRK,BUY,0.619864,Sector Health at max 3 positions,sector_limit
+2024-07-29,CSCO,BUY,0.618656,Sector Tech at max 3 positions,sector_limit
+2024-07-29,BRK-B,BUY,0.613609,Sector Finance at max 3 positions,sector_limit
+2024-07-29,GOOGL,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-07-29,PFE,BUY,0.613609,Sector Health at max 3 positions,sector_limit
+2024-07-29,TMO,BUY,0.613609,Sector Health at max 3 positions,sector_limit
+2024-07-29,GE,BUY,0.604343,Already holding position,backtest
+2024-07-30,ORCL,BUY,0.654304,Sector Tech at max 3 positions,sector_limit
+2024-07-30,TMO,BUY,0.641708,Sector Health at max 3 positions,sector_limit
+2024-07-30,CSCO,BUY,0.63364,Sector Tech at max 3 positions,sector_limit
+2024-07-30,AMGN,BUY,0.63189,Already holding position,backtest
+2024-07-30,CVX,BUY,0.61725,Already holding position,backtest
+2024-07-30,TXN,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-07-30,PFE,BUY,0.613609,Sector Health at max 3 positions,sector_limit
+2024-07-30,ISRG,BUY,0.610468,Sector Health at max 3 positions,sector_limit
+2024-07-30,NFLX,BUY,0.60756,Sector Tech at max 3 positions,sector_limit
+2024-07-30,AAPL,BUY,0.604343,Sector Tech at max 3 positions,sector_limit
+2024-07-31,MSFT,BUY,0.644468,In cooldown until 2024-08-06; need confidence ≥ 0.65,cooldown
+2024-07-31,PFE,BUY,0.63189,Sector Health at max 3 positions,sector_limit
+2024-07-31,XOM,BUY,0.63189,Already holding position,backtest
+2024-07-31,BAC,BUY,0.629171,Sector Finance at max 3 positions,sector_limit
+2024-07-31,PEP,BUY,0.623364,Sector Consumer at max 3 positions,sector_limit
+2024-07-31,SPY,BUY,0.622793,Already holding position,backtest
+2024-07-31,COST,BUY,0.613609,Already holding position,backtest
+2024-07-31,CAT,BUY,0.613609,In cooldown until 2024-08-05; need confidence ≥ 0.78,cooldown
+2024-07-31,MA,BUY,0.605738,Sector Finance at max 3 positions,sector_limit
+2024-07-31,TXN,BUY,0.604343,Sector Tech at max 3 positions,sector_limit
+2024-07-31,LLY,BUY,0.604343,Already holding position,backtest
+2024-08-01,CAT,BUY,0.65201,In cooldown until 2024-08-05; need confidence ≥ 0.78,cooldown
+2024-08-01,MSFT,BUY,0.635761,In cooldown until 2024-08-06; need confidence ≥ 0.65,cooldown
+2024-08-01,COST,BUY,0.63189,Already holding position,backtest
+2024-08-01,NFLX,BUY,0.629171,Already holding position,backtest
+2024-08-01,TMO,BUY,0.624011,Sector Health at max 3 positions,sector_limit
+2024-08-01,ORCL,BUY,0.619864,Sector Tech at max 3 positions,sector_limit
+2024-08-01,WFC,BUY,0.613609,Already holding position,backtest
+2024-08-01,CSCO,BUY,0.602348,Sector Tech at max 3 positions,sector_limit
+2024-08-02,META,BUY,0.702539,Sector Tech at max 3 positions,sector_limit
+2024-08-02,TXN,BUY,0.675879,Sector Tech at max 3 positions,sector_limit
+2024-08-02,MS,BUY,0.646631,In cooldown until 2024-08-08; need confidence ≥ 0.67,cooldown
+2024-08-02,BRK-B,BUY,0.623364,Sector Finance at max 3 positions,sector_limit
+2024-08-02,GOOGL,BUY,0.616805,Sector Tech at max 3 positions,sector_limit
+2024-08-05,BRK-B,BUY,0.6394,Sector Finance at max 3 positions,sector_limit
+2024-08-05,COST,BUY,0.613609,Already holding position,backtest
+2024-08-05,SPY,BUY,0.60756,Already holding position,backtest
+2024-08-05,QQQ,BUY,0.602348,Already holding position,backtest
+2024-08-06,GS,BUY,0.658602,Already holding position,backtest
+2024-08-06,AXP,BUY,0.65201,Already holding position,backtest
+2024-08-06,AMGN,BUY,0.6498,In cooldown until 2024-08-08; need confidence ≥ 0.70,cooldown
+2024-08-06,NFLX,BUY,0.643302,Already holding position,backtest
+2024-08-06,MSFT,BUY,0.629171,Sector Tech at max 3 positions,sector_limit
+2024-08-06,BAC,BUY,0.629171,Sector Finance at max 3 positions,sector_limit
+2024-08-06,JPM,BUY,0.628093,Sector Finance at max 3 positions,sector_limit
+2024-08-06,SPY,BUY,0.626595,Already holding position,backtest
+2024-08-06,QQQ,BUY,0.613609,Already holding position,backtest
+2024-08-06,GOOGL,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-08-07,QQQ,BUY,0.644468,Already holding position,backtest
+2024-08-07,AMD,BUY,0.6394,Sector Tech at max 3 positions,sector_limit
+2024-08-07,AMZN,BUY,0.613609,Already holding position,backtest
+2024-08-07,V,BUY,0.613609,Sector Finance at max 3 positions,sector_limit
+2024-08-07,LLY,BUY,0.608187,In cooldown until 2024-08-12; need confidence ≥ 0.75,cooldown
+2024-08-07,WFC,BUY,0.600989,Already holding position,backtest
+2024-08-08,BRK-B,BUY,0.65201,Sector Finance at max 3 positions,sector_limit
+2024-08-08,WMT,BUY,0.6498,Already holding position,backtest
+2024-08-08,PG,BUY,0.6498,Sector Consumer at max 3 positions,sector_limit
+2024-08-08,PEP,BUY,0.635761,Sector Consumer at max 3 positions,sector_limit
+2024-08-08,JPM,BUY,0.628093,Sector Finance at max 3 positions,sector_limit
+2024-08-08,GS,BUY,0.625602,Already holding position,backtest
+2024-08-08,GE,BUY,0.613609,Already holding position,backtest
+2024-08-08,JNJ,BUY,0.613609,Already holding position,backtest
+2024-08-08,SPY,BUY,0.604343,In cooldown until 2024-08-13; need confidence ≥ 0.65,cooldown
+2024-08-08,XOM,BUY,0.60046,Already holding position,backtest
+2024-08-09,HD,BUY,0.684344,Already holding position,backtest
+2024-08-09,BAC,BUY,0.63781,Sector Finance at max 3 positions,sector_limit
+2024-08-09,MS,BUY,0.630421,Sector Finance at max 3 positions,sector_limit
+2024-08-09,GS,BUY,0.613609,Already holding position,backtest
+2024-08-09,NFLX,BUY,0.609777,Already holding position,backtest
+2024-08-09,BRK-B,BUY,0.600179,Sector Finance at max 3 positions,sector_limit
+2024-08-12,JNJ,BUY,0.604343,Already holding position,backtest
+2024-08-12,COST,BUY,0.604343,Already holding position,backtest
+2024-08-13,MA,BUY,0.629171,Sector Finance at max 3 positions,sector_limit
+2024-08-13,PYPL,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-08-13,PG,BUY,0.613609,Sector Consumer at max 3 positions,sector_limit
+2024-08-14,COST,BUY,0.613609,Already holding position,backtest
+2024-08-14,ADBE,BUY,0.604343,Sector Tech at max 3 positions,sector_limit
+2024-08-14,BRK-B,BUY,0.603762,Sector Finance at max 3 positions,sector_limit
+2024-08-14,BAC,BUY,0.602348,Sector Finance at max 3 positions,sector_limit
+2024-08-14,TMO,BUY,0.600179,Already holding position,backtest
+2024-08-15,HD,BUY,0.657911,Already holding position,backtest
+2024-08-15,BRK-B,BUY,0.613609,Sector Finance at max 3 positions,sector_limit
+2024-08-15,JPM,BUY,0.610468,Sector Finance at max 3 positions,sector_limit
+2024-08-15,MA,BUY,0.60756,Sector Finance at max 3 positions,sector_limit
+2024-08-15,AAPL,BUY,0.604343,Sector Tech at max 3 positions,sector_limit
+2024-08-15,AXP,BUY,0.604343,Already holding position,backtest
+2024-08-15,COST,BUY,0.604343,Already holding position,backtest
+2024-08-15,GILD,BUY,0.604343,Sector Health at max 3 positions,sector_limit
+2024-08-16,SPY,BUY,0.649611,Already holding position,backtest
+2024-08-16,AAPL,BUY,0.63189,Sector Tech at max 3 positions,sector_limit
+2024-08-16,META,BUY,0.629171,Sector Tech at max 3 positions,sector_limit
+2024-08-16,HD,BUY,0.613609,In cooldown until 2024-08-22; need confidence ≥ 0.71,cooldown
+2024-08-16,BRK-B,BUY,0.604343,Sector Finance at max 3 positions,sector_limit
+2024-08-16,COST,BUY,0.604343,In cooldown until 2024-08-22; need confidence ≥ 0.72,cooldown
+2024-08-16,V,BUY,0.602348,Already holding position,backtest
+2024-08-16,PYPL,BUY,0.602348,Sector Tech at max 3 positions,sector_limit
+2024-08-19,AXP,BUY,0.63189,Already holding position,backtest
+2024-08-19,PFE,BUY,0.622793,Sector Health at max 3 positions,sector_limit
+2024-08-19,GS,BUY,0.613609,Sector Finance at max 3 positions,sector_limit
+2024-08-19,HD,BUY,0.610468,In cooldown until 2024-08-22; need confidence ≥ 0.71,cooldown
+2024-08-19,MA,BUY,0.609474,Sector Finance at max 3 positions,sector_limit
+2024-08-19,ADBE,BUY,0.60756,Sector Tech at max 3 positions,sector_limit
+2024-08-20,SPY,BUY,0.6498,Already holding position,backtest
+2024-08-20,TMO,BUY,0.635761,Already holding position,backtest
+2024-08-20,WMT,BUY,0.613609,Already holding position,backtest
+2024-08-20,QQQ,BUY,0.604343,Already holding position,backtest
+2024-08-20,CSCO,BUY,0.602348,Sector Tech at max 3 positions,sector_limit
+2024-08-21,BA,BUY,0.667914,Already holding position,backtest
+2024-08-21,MS,BUY,0.6498,Already holding position,backtest
+2024-08-21,V,BUY,0.6394,Already holding position,backtest
+2024-08-21,MA,BUY,0.638809,Sector Finance at max 3 positions,sector_limit
+2024-08-21,ORCL,BUY,0.622793,Already holding position,backtest
+2024-08-21,WMT,BUY,0.604343,Already holding position,backtest
+2024-08-21,UNH,BUY,0.604343,Already holding position,backtest
+2024-08-21,HD,BUY,0.604343,In cooldown until 2024-08-22; need confidence ≥ 0.71,cooldown
+2024-08-21,META,BUY,0.600989,Sector Tech at max 3 positions,sector_limit
+2024-08-22,ISRG,BUY,0.6498,Already holding position,backtest
+2024-08-22,CRM,BUY,0.635761,Sector Tech at max 3 positions,sector_limit
+2024-08-22,WMT,BUY,0.63189,In cooldown until 2024-08-28; need confidence ≥ 0.65,cooldown
+2024-08-22,MSFT,BUY,0.621831,Sector Tech at max 3 positions,sector_limit
+2024-08-22,SPY,BUY,0.604343,Already holding position,backtest
+2024-08-22,NFLX,BUY,0.604343,In cooldown until 2024-08-26; need confidence ≥ 0.66,cooldown
+2024-08-22,AAPL,BUY,0.604343,Sector Tech at max 3 positions,sector_limit
+2024-08-23,AMZN,BUY,0.667914,Sector Tech at max 3 positions,sector_limit
+2024-08-23,JPM,BUY,0.622793,Sector Finance at max 3 positions,sector_limit
+2024-08-23,XOM,BUY,0.622532,Already holding position,backtest
+2024-08-23,TXN,BUY,0.613609,Already holding position,backtest
+2024-08-23,AXP,BUY,0.613609,In cooldown until 2024-08-28; need confidence ≥ 0.68,cooldown
+2024-08-23,CAT,BUY,0.613609,Already holding position,backtest
+2024-08-23,MA,BUY,0.610039,Already holding position,backtest
+2024-08-26,CRM,BUY,0.667063,Sector Tech at max 3 positions,sector_limit
+2024-08-26,CSCO,BUY,0.635761,Sector Tech at max 3 positions,sector_limit
+2024-08-26,SPY,BUY,0.622793,Already holding position,backtest
+2024-08-26,NFLX,BUY,0.610468,Sector Tech at max 3 positions,sector_limit
+2024-08-26,XOM,BUY,0.605738,Already holding position,backtest
+2024-08-26,ORCL,BUY,0.604343,Already holding position,backtest
+2024-08-26,KO,BUY,0.604343,Sector Consumer at max 3 positions,sector_limit
+2024-08-26,GE,BUY,0.604343,Sector Industrial at max 3 positions,sector_limit
+2024-08-27,WFC,BUY,0.667914,Sector Finance at max 3 positions,sector_limit
+2024-08-27,PEP,BUY,0.630155,Already holding position,backtest
+2024-08-27,ABBV,BUY,0.622793,Sector Health at max 3 positions,sector_limit
+2024-08-27,V,BUY,0.608697,Already holding position,backtest
+2024-08-27,XOM,BUY,0.60756,Already holding position,backtest
+2024-08-27,SPY,BUY,0.604343,Already holding position,backtest
+2024-08-27,AXP,BUY,0.604343,In cooldown until 2024-08-28; need confidence ≥ 0.68,cooldown
+2024-08-27,UNH,BUY,0.604343,Already holding position,backtest
+2024-08-27,WMT,BUY,0.604343,In cooldown until 2024-08-28; need confidence ≥ 0.65,cooldown
+2024-08-28,AAPL,BUY,0.63189,Sector Tech at max 3 positions,sector_limit
+2024-08-28,ISRG,BUY,0.63189,In cooldown until 2024-08-29; need confidence ≥ 0.69,cooldown
+2024-08-28,XOM,BUY,0.624368,Already holding position,backtest
+2024-08-28,TMO,BUY,0.622793,Already holding position,backtest
+2024-08-28,UNH,BUY,0.622793,Already holding position,backtest
+2024-08-28,CSCO,BUY,0.606768,Already holding position,backtest
+2024-08-28,ORCL,BUY,0.604343,Already holding position,backtest
+2024-08-29,WMT,BUY,0.667297,Sector Consumer at max 3 positions,sector_limit
+2024-08-29,V,BUY,0.642828,Already holding position,backtest
+2024-08-29,WFC,BUY,0.625602,Sector Finance at max 3 positions,sector_limit
+2024-08-29,META,BUY,0.622793,Sector Tech at max 3 positions,sector_limit
+2024-08-29,AAPL,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-08-29,ORCL,BUY,0.613609,Already holding position,backtest
+2024-08-29,GS,BUY,0.613609,Sector Finance at max 3 positions,sector_limit
+2024-08-29,ISRG,BUY,0.613609,Sector Health at max 3 positions,sector_limit
+2024-08-29,HD,BUY,0.613609,Already holding position,backtest
+2024-08-30,XOM,BUY,0.63364,Already holding position,backtest
+2024-08-30,PFE,BUY,0.63189,Already holding position,backtest
+2024-08-30,TMO,BUY,0.63189,In cooldown until 2024-09-05; need confidence ≥ 0.65,cooldown
+2024-08-30,UNH,BUY,0.622793,Already holding position,backtest
+2024-08-30,V,BUY,0.61725,Already holding position,backtest
+2024-08-30,JPM,BUY,0.613609,Sector Finance at max 3 positions,sector_limit
+2024-08-30,AAPL,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-08-30,SPY,BUY,0.604343,Already holding position,backtest
+2024-08-30,MSFT,BUY,0.601477,Sector Tech at max 3 positions,sector_limit
+2024-09-03,TMO,BUY,0.633021,In cooldown until 2024-09-05; need confidence ≥ 0.65,cooldown
+2024-09-03,MA,BUY,0.63189,Already holding position,backtest
+2024-09-03,WFC,BUY,0.625602,Already holding position,backtest
+2024-09-03,ISRG,BUY,0.622793,Sector Health at max 3 positions,sector_limit
+2024-09-03,V,BUY,0.613609,Already holding position,backtest
+2024-09-03,UNH,BUY,0.604343,Already holding position,backtest
+2024-09-04,WFC,BUY,0.65201,Already holding position,backtest
+2024-09-04,PEP,BUY,0.602348,Already holding position,backtest
+2024-09-05,V,BUY,0.632552,In cooldown until 2024-09-11; need confidence ≥ 0.77,cooldown
+2024-09-05,LLY,BUY,0.622793,Sector Health at max 3 positions,sector_limit
+2024-09-05,PEP,BUY,0.613609,Already holding position,backtest
+2024-09-05,TMO,BUY,0.610468,Sector Health at max 3 positions,sector_limit
+2024-09-06,CSCO,BUY,0.65201,Already holding position,backtest
+2024-09-06,JPM,BUY,0.640894,Sector Finance at max 3 positions,sector_limit
+2024-09-06,META,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-09-06,UNH,BUY,0.613609,In cooldown until 2024-09-12; need confidence ≥ 0.72,cooldown
+2024-09-06,AXP,BUY,0.603762,Sector Finance at max 3 positions,sector_limit
+2024-09-09,CAT,BUY,0.640276,Already holding position,backtest
+2024-09-09,UNH,BUY,0.63189,In cooldown until 2024-09-12; need confidence ≥ 0.72,cooldown
+2024-09-09,TXN,BUY,0.622793,Sector Tech at max 3 positions,sector_limit
+2024-09-09,WMT,BUY,0.613609,Sector Consumer at max 3 positions,sector_limit
+2024-09-09,PEP,BUY,0.613609,Already holding position,backtest
+2024-09-09,ADBE,BUY,0.604343,Sector Tech at max 3 positions,sector_limit
+2024-09-09,PG,BUY,0.604343,Sector Consumer at max 3 positions,sector_limit
+2024-09-09,V,BUY,0.600989,In cooldown until 2024-09-11; need confidence ≥ 0.77,cooldown
+2024-09-10,AMGN,BUY,0.63189,Sector Health at max 3 positions,sector_limit
+2024-09-10,PG,BUY,0.613609,Sector Consumer at max 3 positions,sector_limit
+2024-09-10,WMT,BUY,0.613609,Sector Consumer at max 3 positions,sector_limit
+2024-09-10,AXP,BUY,0.607188,Sector Finance at max 3 positions,sector_limit
+2024-09-11,PG,BUY,0.647494,Sector Consumer at max 3 positions,sector_limit
+2024-09-11,MSFT,BUY,0.646631,Sector Tech at max 3 positions,sector_limit
+2024-09-11,AMZN,BUY,0.633021,Already holding position,backtest
+2024-09-11,UNH,BUY,0.622793,In cooldown until 2024-09-12; need confidence ≥ 0.72,cooldown
+2024-09-11,ISRG,BUY,0.613609,Sector Health at max 3 positions,sector_limit
+2024-09-11,KO,BUY,0.613609,Sector Consumer at max 3 positions,sector_limit
+2024-09-11,PYPL,BUY,0.603102,Sector Tech at max 3 positions,sector_limit
+2024-09-12,QQQ,BUY,0.654304,Already holding position,backtest
+2024-09-12,XOM,BUY,0.65201,Already holding position,backtest
+2024-09-12,CRM,BUY,0.629171,Sector Tech at max 3 positions,sector_limit
+2024-09-12,ISRG,BUY,0.613609,Sector Health at max 3 positions,sector_limit
+2024-09-12,UNH,BUY,0.613609,Sector Health at max 3 positions,sector_limit
+2024-09-13,COST,BUY,0.622793,In cooldown until 2024-09-18; need confidence ≥ 0.69,cooldown
+2024-09-13,QQQ,BUY,0.619864,Already holding position,backtest
+2024-09-13,GS,BUY,0.613609,Already holding position,backtest
+2024-09-13,TMO,BUY,0.613609,Already holding position,backtest
+2024-09-13,AMZN,BUY,0.608187,Already holding position,backtest
+2024-09-13,CAT,BUY,0.605738,Already holding position,backtest
+2024-09-13,SPY,BUY,0.604343,Already holding position,backtest
+2024-09-13,AAPL,BUY,0.604343,Sector Tech at max 3 positions,sector_limit
+2024-09-13,TSLA,BUY,0.600989,Sector Tech at max 3 positions,sector_limit
+2024-09-16,CAT,BUY,0.641708,Already holding position,backtest
+2024-09-16,HD,BUY,0.63189,In cooldown until 2024-09-19; need confidence ≥ 0.66,cooldown
+2024-09-16,AAPL,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-09-16,NFLX,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-09-16,MS,BUY,0.600179,Sector Finance at max 3 positions,sector_limit
+2024-09-17,CAT,BUY,0.621231,Already holding position,backtest
+2024-09-17,WMT,BUY,0.613609,Already holding position,backtest
+2024-09-17,PYPL,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-09-17,HD,BUY,0.613609,In cooldown until 2024-09-19; need confidence ≥ 0.66,cooldown
+2024-09-17,MA,BUY,0.604343,In cooldown until 2024-09-18; need confidence ≥ 0.66,cooldown
+2024-09-18,UNH,BUY,0.6498,Already holding position,backtest
+2024-09-18,XOM,BUY,0.629171,Already holding position,backtest
+2024-09-18,CAT,BUY,0.613609,Already holding position,backtest
+2024-09-18,HD,BUY,0.613609,In cooldown until 2024-09-19; need confidence ≥ 0.66,cooldown
+2024-09-18,MSFT,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-09-18,BAC,BUY,0.609474,Sector Finance at max 3 positions,sector_limit
+2024-09-18,SPY,BUY,0.604343,Already holding position,backtest
+2024-09-18,TXN,BUY,0.604343,Already holding position,backtest
+2024-09-18,GE,BUY,0.600989,Already holding position,backtest
+2024-09-19,META,BUY,0.664411,Already holding position,backtest
+2024-09-19,AAPL,BUY,0.641708,Sector Tech at max 3 positions,sector_limit
+2024-09-19,GS,BUY,0.629171,Already holding position,backtest
+2024-09-19,CSCO,BUY,0.622793,In cooldown until 2024-09-23; need confidence ≥ 0.71,cooldown
+2024-09-19,AMZN,BUY,0.609118,Already holding position,backtest
+2024-09-20,AAPL,BUY,0.640894,Sector Tech at max 3 positions,sector_limit
+2024-09-20,JNJ,BUY,0.63189,Sector Health at max 3 positions,sector_limit
+2024-09-20,PFE,BUY,0.616805,Sector Health at max 3 positions,sector_limit
+2024-09-20,CSCO,BUY,0.613609,In cooldown until 2024-09-23; need confidence ≥ 0.71,cooldown
+2024-09-20,AMZN,BUY,0.608697,Already holding position,backtest
+2024-09-23,JNJ,BUY,0.640894,Sector Health at max 3 positions,sector_limit
+2024-09-23,AMZN,BUY,0.63364,In cooldown until 2024-09-27; need confidence ≥ 0.69,cooldown
+2024-09-23,HD,BUY,0.63189,Already holding position,backtest
+2024-09-23,CAT,BUY,0.626331,Already holding position,backtest
+2024-09-23,XOM,BUY,0.609474,Already holding position,backtest
+2024-09-24,AXP,BUY,0.63189,Already holding position,backtest
+2024-09-24,AMD,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-09-24,NFLX,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-09-24,AAPL,BUY,0.604343,Sector Tech at max 3 positions,sector_limit
+2024-09-24,CAT,BUY,0.602348,Already holding position,backtest
+2024-09-24,AMZN,BUY,0.601477,In cooldown until 2024-09-27; need confidence ≥ 0.69,cooldown
+2024-09-25,ISRG,BUY,0.667297,Already holding position,backtest
+2024-09-25,TXN,BUY,0.658602,Already holding position,backtest
+2024-09-25,AMGN,BUY,0.641708,Sector Health at max 3 positions,sector_limit
+2024-09-25,GE,BUY,0.640894,In cooldown until 2024-09-30; need confidence ≥ 0.67,cooldown
+2024-09-25,JNJ,BUY,0.638383,Sector Health at max 3 positions,sector_limit
+2024-09-25,BAC,BUY,0.623364,Sector Finance at max 3 positions,sector_limit
+2024-09-25,AXP,BUY,0.622793,Already holding position,backtest
+2024-09-25,GILD,BUY,0.622793,Sector Health at max 3 positions,sector_limit
+2024-09-25,ABBV,BUY,0.622793,Sector Health at max 3 positions,sector_limit
+2024-09-25,GS,BUY,0.613609,Already holding position,backtest
+2024-09-25,PYPL,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-09-25,AVGO,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-09-25,BRK-B,BUY,0.604343,In cooldown until 2024-10-01; need confidence ≥ 0.68,cooldown
+2024-09-26,QQQ,BUY,0.647494,Already holding position,backtest
+2024-09-26,AAPL,BUY,0.63189,Sector Tech at max 3 positions,sector_limit
+2024-09-26,NFLX,BUY,0.63189,Sector Tech at max 3 positions,sector_limit
+2024-09-26,PG,BUY,0.629171,Sector Consumer at max 3 positions,sector_limit
+2024-09-26,CAT,BUY,0.623364,In cooldown until 2024-10-02; need confidence ≥ 0.65,cooldown
+2024-09-26,GE,BUY,0.619195,In cooldown until 2024-09-30; need confidence ≥ 0.67,cooldown
+2024-09-26,SPY,BUY,0.613609,Already holding position,backtest
+2024-09-26,AMZN,BUY,0.613609,In cooldown until 2024-09-27; need confidence ≥ 0.69,cooldown
+2024-09-26,AMGN,BUY,0.613609,Sector Health at max 3 positions,sector_limit
+2024-09-26,COST,BUY,0.613609,Sector Consumer at max 3 positions,sector_limit
+2024-09-26,MS,BUY,0.600179,Already holding position,backtest
+2024-09-27,SPY,BUY,0.63189,Already holding position,backtest
+2024-09-27,BRK-B,BUY,0.622793,In cooldown until 2024-10-01; need confidence ≥ 0.68,cooldown
+2024-09-27,AMGN,BUY,0.613609,Sector Health at max 3 positions,sector_limit
+2024-09-27,QQQ,BUY,0.613609,In cooldown until 2024-10-03; need confidence ≥ 0.66,cooldown
+2024-09-27,COST,BUY,0.613609,Sector Consumer at max 3 positions,sector_limit
+2024-09-27,META,BUY,0.604343,Already holding position,backtest
+2024-09-27,WMT,BUY,0.604343,Already holding position,backtest
+2024-09-27,AMZN,BUY,0.60046,Sector Tech at max 3 positions,sector_limit
+2024-09-30,AMD,BUY,0.638383,Sector Tech at max 3 positions,sector_limit
+2024-09-30,AMZN,BUY,0.63189,Sector Tech at max 3 positions,sector_limit
+2024-09-30,QQQ,BUY,0.622793,In cooldown until 2024-10-03; need confidence ≥ 0.66,cooldown
+2024-09-30,LLY,BUY,0.619864,Already holding position,backtest
+2024-09-30,SPY,BUY,0.613609,Already holding position,backtest
+2024-09-30,MS,BUY,0.606768,Already holding position,backtest
+2024-09-30,NFLX,BUY,0.604343,Sector Tech at max 3 positions,sector_limit
+2024-10-01,PFE,BUY,0.666545,Sector Health at max 3 positions,sector_limit
+2024-10-01,ADBE,BUY,0.627155,Sector Tech at max 3 positions,sector_limit
+2024-10-01,NFLX,BUY,0.622793,Sector Tech at max 3 positions,sector_limit
+2024-10-01,PEP,BUY,0.613609,Sector Consumer at max 3 positions,sector_limit
+2024-10-01,MS,BUY,0.607188,Already holding position,backtest
+2024-10-01,GILD,BUY,0.604343,Sector Health at max 3 positions,sector_limit
+2024-10-02,ORCL,BUY,0.63189,Sector Tech at max 3 positions,sector_limit
+2024-10-02,JNJ,BUY,0.63189,Sector Health at max 3 positions,sector_limit
+2024-10-02,MS,BUY,0.63189,Already holding position,backtest
+2024-10-02,TMO,BUY,0.622793,In cooldown until 2024-10-03; need confidence ≥ 0.65,cooldown
+2024-10-02,BAC,BUY,0.619195,Sector Finance at max 3 positions,sector_limit
+2024-10-02,PYPL,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-10-02,AMGN,BUY,0.607188,Sector Health at max 3 positions,sector_limit
+2024-10-02,PFE,BUY,0.604343,Sector Health at max 3 positions,sector_limit
+2024-10-02,TXN,BUY,0.600179,In cooldown until 2024-10-04; need confidence ≥ 0.65,cooldown
+2024-10-03,MA,BUY,0.63189,Sector Finance at max 3 positions,sector_limit
+2024-10-03,JNJ,BUY,0.63189,Sector Health at max 3 positions,sector_limit
+2024-10-03,ABBV,BUY,0.622793,Sector Health at max 3 positions,sector_limit
+2024-10-03,BAC,BUY,0.613609,Sector Finance at max 3 positions,sector_limit
+2024-10-03,TMO,BUY,0.613609,Sector Health at max 3 positions,sector_limit
+2024-10-03,GILD,BUY,0.613609,Sector Health at max 3 positions,sector_limit
+2024-10-04,ABBV,BUY,0.640894,Sector Health at max 3 positions,sector_limit
+2024-10-04,AXP,BUY,0.640894,Already holding position,backtest
+2024-10-04,AVGO,BUY,0.625602,Sector Tech at max 3 positions,sector_limit
+2024-10-07,MA,BUY,0.622793,Sector Finance at max 3 positions,sector_limit
+2024-10-07,WFC,BUY,0.619195,Sector Finance at max 3 positions,sector_limit
+2024-10-07,NFLX,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-10-07,KO,BUY,0.613609,Already holding position,backtest
+2024-10-07,BRK-B,BUY,0.604343,Sector Finance at max 3 positions,sector_limit
+2024-10-07,WMT,BUY,0.604343,In cooldown until 2024-10-08; need confidence ≥ 0.65,cooldown
+2024-10-07,GILD,BUY,0.604343,Sector Health at max 3 positions,sector_limit
+2024-10-08,CAT,BUY,0.63189,Already holding position,backtest
+2024-10-08,TMO,BUY,0.63189,Sector Health at max 3 positions,sector_limit
+2024-10-08,TXN,BUY,0.628093,Sector Tech at max 3 positions,sector_limit
+2024-10-08,CRM,BUY,0.622532,Already holding position,backtest
+2024-10-08,GE,BUY,0.613609,Already holding position,backtest
+2024-10-08,JNJ,BUY,0.613609,Sector Health at max 3 positions,sector_limit
+2024-10-08,ADBE,BUY,0.606289,Sector Tech at max 3 positions,sector_limit
+2024-10-08,ABBV,BUY,0.604343,Already holding position,backtest
+2024-10-09,WFC,BUY,0.65201,Sector Finance at max 3 positions,sector_limit
+2024-10-09,ABBV,BUY,0.63189,Already holding position,backtest
+2024-10-09,GILD,BUY,0.604343,Sector Health at max 3 positions,sector_limit
+2024-10-10,CVX,BUY,0.641708,Already holding position,backtest
+2024-10-10,ABBV,BUY,0.622793,Already holding position,backtest
+2024-10-10,QQQ,BUY,0.604343,Already holding position,backtest
+2024-10-10,KO,BUY,0.604343,In cooldown until 2024-10-15; need confidence ≥ 0.67,cooldown
+2024-10-10,AMGN,BUY,0.603102,Sector Health at max 3 positions,sector_limit
+2024-10-10,ADBE,BUY,0.600989,Sector Tech at max 3 positions,sector_limit
+2024-10-11,ISRG,BUY,0.640894,In cooldown until 2024-10-15; need confidence ≥ 0.67,cooldown
+2024-10-11,CVX,BUY,0.629171,Already holding position,backtest
+2024-10-11,HD,BUY,0.622793,In cooldown until 2024-10-16; need confidence ≥ 0.67,cooldown
+2024-10-11,BRK-B,BUY,0.622793,Sector Finance at max 3 positions,sector_limit
+2024-10-11,V,BUY,0.621231,Already holding position,backtest
+2024-10-11,UNH,BUY,0.613609,Sector Health at max 3 positions,sector_limit
+2024-10-11,NFLX,BUY,0.604343,Sector Tech at max 3 positions,sector_limit
+2024-10-11,PYPL,BUY,0.604343,Sector Tech at max 3 positions,sector_limit
+2024-10-11,KO,BUY,0.604343,In cooldown until 2024-10-15; need confidence ≥ 0.67,cooldown
+2024-10-11,ABBV,BUY,0.604343,Already holding position,backtest
+2024-10-11,WMT,BUY,0.604343,Already holding position,backtest
+2024-10-11,AMGN,BUY,0.600989,Sector Health at max 3 positions,sector_limit
+2024-10-14,PFE,BUY,0.688532,Sector Health at max 3 positions,sector_limit
+2024-10-14,ABBV,BUY,0.640894,Already holding position,backtest
+2024-10-14,CVX,BUY,0.629171,Already holding position,backtest
+2024-10-14,BRK-B,BUY,0.622793,Sector Finance at max 3 positions,sector_limit
+2024-10-14,NFLX,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-10-14,LLY,BUY,0.613609,Already holding position,backtest
+2024-10-14,GE,BUY,0.613609,Already holding position,backtest
+2024-10-14,META,BUY,0.604343,Sector Tech at max 3 positions,sector_limit
+2024-10-14,UNH,BUY,0.604343,Sector Health at max 3 positions,sector_limit
+2024-10-14,V,BUY,0.600179,Already holding position,backtest
+2024-10-15,CRM,BUY,0.622793,Already holding position,backtest
+2024-10-15,COST,BUY,0.622793,Already holding position,backtest
+2024-10-15,CAT,BUY,0.613609,Already holding position,backtest
+2024-10-15,WMT,BUY,0.613609,Already holding position,backtest
+2024-10-15,PFE,BUY,0.613609,Sector Health at max 3 positions,sector_limit
+2024-10-15,PEP,BUY,0.610468,Already holding position,backtest
+2024-10-15,META,BUY,0.604343,Sector Tech at max 3 positions,sector_limit
+2024-10-15,JNJ,BUY,0.604343,Sector Health at max 3 positions,sector_limit
+2024-10-15,NFLX,BUY,0.604343,Sector Tech at max 3 positions,sector_limit
+2024-10-15,HD,BUY,0.604343,In cooldown until 2024-10-16; need confidence ≥ 0.67,cooldown
+2024-10-16,NVDA,BUY,0.629171,Sector Tech at max 3 positions,sector_limit
+2024-10-16,UNH,BUY,0.622793,Sector Health at max 3 positions,sector_limit
+2024-10-16,WMT,BUY,0.622793,Already holding position,backtest
+2024-10-16,META,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-10-16,LLY,BUY,0.613609,Already holding position,backtest
+2024-10-16,GILD,BUY,0.613609,Sector Health at max 3 positions,sector_limit
+2024-10-16,PFE,BUY,0.604343,Sector Health at max 3 positions,sector_limit
+2024-10-16,HD,BUY,0.604343,Sector Consumer at max 3 positions,sector_limit
+2024-10-17,CAT,BUY,0.640894,Already holding position,backtest
+2024-10-17,NFLX,BUY,0.629171,Sector Tech at max 3 positions,sector_limit
+2024-10-17,META,BUY,0.622793,Sector Tech at max 3 positions,sector_limit
+2024-10-17,CRM,BUY,0.622793,Already holding position,backtest
+2024-10-17,GILD,BUY,0.622793,Sector Health at max 3 positions,sector_limit
+2024-10-17,ISRG,BUY,0.622793,Sector Health at max 3 positions,sector_limit
+2024-10-17,ABBV,BUY,0.613609,Already holding position,backtest
+2024-10-17,WMT,BUY,0.604343,Already holding position,backtest
+2024-10-18,HD,BUY,0.640894,Sector Consumer at max 3 positions,sector_limit
+2024-10-18,CRM,BUY,0.604343,In cooldown until 2024-10-24; need confidence ≥ 0.74,cooldown
+2024-10-18,COST,BUY,0.604343,Already holding position,backtest
+2024-10-18,CVX,BUY,0.602348,Already holding position,backtest
+2024-10-21,QQQ,BUY,0.640894,Already holding position,backtest
+2024-10-21,GE,BUY,0.640894,Already holding position,backtest
+2024-10-21,ISRG,BUY,0.630155,Sector Health at max 3 positions,sector_limit
+2024-10-21,MS,BUY,0.625602,Sector Finance at max 3 positions,sector_limit
+2024-10-21,AAPL,BUY,0.622793,Sector Tech at max 3 positions,sector_limit
+2024-10-21,AMZN,BUY,0.603102,Already holding position,backtest
+2024-10-22,AVGO,BUY,0.656499,Sector Tech at max 3 positions,sector_limit
+2024-10-22,ISRG,BUY,0.635761,Sector Health at max 3 positions,sector_limit
+2024-10-22,QQQ,BUY,0.635761,Already holding position,backtest
+2024-10-22,AAPL,BUY,0.63189,Sector Tech at max 3 positions,sector_limit
+2024-10-22,SPY,BUY,0.613609,Already holding position,backtest
+2024-10-22,ORCL,BUY,0.604343,Already holding position,backtest
+2024-10-22,BRK-B,BUY,0.604343,Sector Finance at max 3 positions,sector_limit
+2024-10-23,TMO,BUY,0.674172,Already holding position,backtest
+2024-10-23,TSLA,BUY,0.63189,Sector Tech at max 3 positions,sector_limit
+2024-10-23,CVX,BUY,0.613609,In cooldown until 2024-10-28; need confidence ≥ 0.70,cooldown
+2024-10-23,AXP,BUY,0.613609,Sector Finance at max 3 positions,sector_limit
+2024-10-23,AAPL,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-10-23,SPY,BUY,0.604343,Already holding position,backtest
+2024-10-23,NFLX,BUY,0.604343,Sector Tech at max 3 positions,sector_limit
+2024-10-23,TXN,BUY,0.602348,Sector Tech at max 3 positions,sector_limit
+2024-10-23,META,BUY,0.600989,Already holding position,backtest
+2024-10-23,LLY,BUY,0.600179,Sector Health at max 3 positions,sector_limit
+2024-10-24,LLY,BUY,0.632552,Sector Health at max 3 positions,sector_limit
+2024-10-24,ABBV,BUY,0.63189,Already holding position,backtest
+2024-10-24,META,BUY,0.613609,Already holding position,backtest
+2024-10-24,AMZN,BUY,0.605098,Already holding position,backtest
+2024-10-24,JPM,BUY,0.604343,Already holding position,backtest
+2024-10-24,ISRG,BUY,0.604343,Sector Health at max 3 positions,sector_limit
+2024-10-24,GILD,BUY,0.604343,Sector Health at max 3 positions,sector_limit
+2024-10-25,COST,BUY,0.668582,Already holding position,backtest
+2024-10-25,PEP,BUY,0.619864,Already holding position,backtest
+2024-10-25,AVGO,BUY,0.617523,Sector Tech at max 3 positions,sector_limit
+2024-10-25,AMZN,BUY,0.606768,Already holding position,backtest
+2024-10-25,ORCL,BUY,0.604343,In cooldown until 2024-10-31; need confidence ≥ 0.67,cooldown
+2024-10-25,META,BUY,0.604343,Already holding position,backtest
+2024-10-25,WMT,BUY,0.604343,Already holding position,backtest
+2024-10-25,NFLX,BUY,0.604343,Sector Tech at max 3 positions,sector_limit
+2024-10-28,MSFT,BUY,0.688532,Already holding position,backtest
+2024-10-28,MS,BUY,0.658602,Sector Finance at max 3 positions,sector_limit
+2024-10-28,NFLX,BUY,0.6498,Sector Tech at max 3 positions,sector_limit
+2024-10-28,ORCL,BUY,0.63189,In cooldown until 2024-10-31; need confidence ≥ 0.67,cooldown
+2024-10-28,AVGO,BUY,0.621831,Sector Tech at max 3 positions,sector_limit
+2024-10-28,CRM,BUY,0.604343,Sector Tech at max 3 positions,sector_limit
+2024-10-28,LLY,BUY,0.602348,Sector Health at max 3 positions,sector_limit
+2024-10-29,ORCL,BUY,0.640894,In cooldown until 2024-10-31; need confidence ≥ 0.67,cooldown
+2024-10-29,AXP,BUY,0.63189,Sector Finance at max 3 positions,sector_limit
+2024-10-29,BAC,BUY,0.622793,Sector Finance at max 3 positions,sector_limit
+2024-10-29,WFC,BUY,0.622793,Already holding position,backtest
+2024-10-29,TXN,BUY,0.619864,Sector Tech at max 3 positions,sector_limit
+2024-10-29,GOOGL,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-10-29,BRK-B,BUY,0.613609,Sector Finance at max 3 positions,sector_limit
+2024-10-29,CVX,BUY,0.613609,Already holding position,backtest
+2024-10-29,AMGN,BUY,0.606289,Sector Health at max 3 positions,sector_limit
+2024-10-29,V,BUY,0.603762,Sector Finance at max 3 positions,sector_limit
+2024-10-30,NVDA,BUY,0.698574,Sector Tech at max 3 positions,sector_limit
+2024-10-30,MSFT,BUY,0.683443,Already holding position,backtest
+2024-10-30,ORCL,BUY,0.622793,In cooldown until 2024-10-31; need confidence ≥ 0.67,cooldown
+2024-10-30,CSCO,BUY,0.622793,Sector Tech at max 3 positions,sector_limit
+2024-10-30,GILD,BUY,0.622793,Sector Health at max 3 positions,sector_limit
+2024-10-30,PFE,BUY,0.621231,Sector Health at max 3 positions,sector_limit
+2024-10-30,COST,BUY,0.619864,Already holding position,backtest
+2024-10-30,NFLX,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-10-30,PEP,BUY,0.606768,In cooldown until 2024-11-01; need confidence ≥ 0.65,cooldown
+2024-10-30,TXN,BUY,0.603762,Sector Tech at max 3 positions,sector_limit
+2024-10-31,WMT,BUY,0.6498,In cooldown until 2024-11-04; need confidence ≥ 0.65,cooldown
+2024-10-31,MA,BUY,0.622793,Already holding position,backtest
+2024-10-31,WFC,BUY,0.622793,In cooldown until 2024-11-05; need confidence ≥ 0.65,cooldown
+2024-10-31,PEP,BUY,0.619864,In cooldown until 2024-11-01; need confidence ≥ 0.65,cooldown
+2024-10-31,AMGN,BUY,0.613609,Sector Health at max 3 positions,sector_limit
+2024-10-31,COST,BUY,0.610267,Already holding position,backtest
+2024-10-31,JPM,BUY,0.604343,Already holding position,backtest
+2024-10-31,MS,BUY,0.604343,Sector Finance at max 3 positions,sector_limit
+2024-10-31,AXP,BUY,0.604343,Sector Finance at max 3 positions,sector_limit
+2024-10-31,CVX,BUY,0.602348,Already holding position,backtest
+2024-11-01,WMT,BUY,0.6498,In cooldown until 2024-11-04; need confidence ≥ 0.65,cooldown
+2024-11-01,CVX,BUY,0.627766,Already holding position,backtest
+2024-11-01,SPY,BUY,0.610468,Already holding position,backtest
+2024-11-04,MS,BUY,0.6498,Sector Finance at max 3 positions,sector_limit
+2024-11-04,BAC,BUY,0.640894,Sector Finance at max 3 positions,sector_limit
+2024-11-04,NVDA,BUY,0.629171,Sector Tech at max 3 positions,sector_limit
+2024-11-04,BRK-B,BUY,0.619864,Sector Finance at max 3 positions,sector_limit
+2024-11-04,XOM,BUY,0.617013,Already holding position,backtest
+2024-11-04,SPY,BUY,0.613609,Already holding position,backtest
+2024-11-04,WFC,BUY,0.610468,In cooldown until 2024-11-05; need confidence ≥ 0.65,cooldown
+2024-11-04,PG,BUY,0.60756,Already holding position,backtest
+2024-11-04,AVGO,BUY,0.600179,Sector Tech at max 3 positions,sector_limit
+2024-11-05,SPY,BUY,0.640894,Already holding position,backtest
+2024-11-05,ABBV,BUY,0.63189,Sector Health at max 3 positions,sector_limit
+2024-11-05,QQQ,BUY,0.629171,Already holding position,backtest
+2024-11-05,PEP,BUY,0.625602,Already holding position,backtest
+2024-11-05,CVX,BUY,0.613609,Already holding position,backtest
+2024-11-05,V,BUY,0.613609,Already holding position,backtest
+2024-11-05,PFE,BUY,0.609118,Sector Health at max 3 positions,sector_limit
+2024-11-05,AAPL,BUY,0.604343,Already holding position,backtest
+2024-11-05,PYPL,BUY,0.604343,Sector Tech at max 3 positions,sector_limit
+2024-11-05,AXP,BUY,0.604343,Sector Finance at max 3 positions,sector_limit
+2024-11-05,BRK-B,BUY,0.604343,Sector Finance at max 3 positions,sector_limit
+2024-11-05,TMO,BUY,0.600989,Sector Health at max 3 positions,sector_limit
+2024-11-06,BRK-B,BUY,0.658602,Sector Finance at max 3 positions,sector_limit
+2024-11-06,PYPL,BUY,0.644468,Sector Tech at max 3 positions,sector_limit
+2024-11-06,XOM,BUY,0.626331,Already holding position,backtest
+2024-11-06,UNH,BUY,0.622532,In cooldown until 2024-11-12; need confidence ≥ 0.67,cooldown
+2024-11-06,PG,BUY,0.620713,Already holding position,backtest
+2024-11-06,DIS,BUY,0.606768,Already holding position,backtest
+2024-11-06,QQQ,BUY,0.604343,Already holding position,backtest
+2024-11-06,GILD,BUY,0.604343,Sector Health at max 3 positions,sector_limit
+2024-11-07,ABBV,BUY,0.6498,Already holding position,backtest
+2024-11-07,PEP,BUY,0.613609,Already holding position,backtest
+2024-11-07,DIS,BUY,0.610267,Already holding position,backtest
+2024-11-07,PG,BUY,0.602348,Already holding position,backtest
+2024-11-08,ISRG,BUY,0.684344,Already holding position,backtest
+2024-11-08,BAC,BUY,0.640894,Sector Finance at max 3 positions,sector_limit
+2024-11-08,PEP,BUY,0.64067,Already holding position,backtest
+2024-11-08,TMO,BUY,0.640276,Sector Health at max 3 positions,sector_limit
+2024-11-08,DIS,BUY,0.628093,Already holding position,backtest
+2024-11-08,QQQ,BUY,0.622793,Already holding position,backtest
+2024-11-08,CSCO,BUY,0.622793,Sector Tech at max 3 positions,sector_limit
+2024-11-08,SPY,BUY,0.613609,In cooldown until 2024-11-14; need confidence ≥ 0.66,cooldown
+2024-11-08,PFE,BUY,0.613609,Sector Health at max 3 positions,sector_limit
+2024-11-08,V,BUY,0.604343,Already holding position,backtest
+2024-11-11,TMO,BUY,0.660619,Sector Health at max 3 positions,sector_limit
+2024-11-11,MA,BUY,0.640894,In cooldown until 2024-11-15; need confidence ≥ 0.69,cooldown
+2024-11-12,ORCL,BUY,0.641708,Sector Tech at max 3 positions,sector_limit
+2024-11-12,ISRG,BUY,0.640894,Already holding position,backtest
+2024-11-12,PFE,BUY,0.629171,Sector Health at max 3 positions,sector_limit
+2024-11-12,CAT,BUY,0.622793,Already holding position,backtest
+2024-11-12,MA,BUY,0.613609,In cooldown until 2024-11-15; need confidence ≥ 0.69,cooldown
+2024-11-12,AMGN,BUY,0.613609,Sector Health at max 3 positions,sector_limit
+2024-11-12,BRK-B,BUY,0.613609,Already holding position,backtest
+2024-11-12,GOOGL,BUY,0.606768,Sector Tech at max 3 positions,sector_limit
+2024-11-12,BAC,BUY,0.604343,Sector Finance at max 3 positions,sector_limit
+2024-11-13,ISRG,BUY,0.63189,Already holding position,backtest
+2024-11-13,GILD,BUY,0.620261,Sector Health at max 3 positions,sector_limit
+2024-11-13,SPY,BUY,0.613609,In cooldown until 2024-11-14; need confidence ≥ 0.66,cooldown
+2024-11-14,JNJ,BUY,0.619864,Already holding position,backtest
+2024-11-14,META,BUY,0.604343,Sector Tech at max 3 positions,sector_limit
+2024-11-15,AVGO,BUY,0.641708,Sector Tech at max 3 positions,sector_limit
+2024-11-15,META,BUY,0.633021,Sector Tech at max 3 positions,sector_limit
+2024-11-15,GE,BUY,0.63189,Already holding position,backtest
+2024-11-15,GS,BUY,0.613609,Sector Finance at max 3 positions,sector_limit
+2024-11-15,CVX,BUY,0.607188,In cooldown until 2024-11-21; need confidence ≥ 0.77,cooldown
+2024-11-15,PYPL,BUY,0.604343,Already holding position,backtest
+2024-11-15,V,BUY,0.604343,Already holding position,backtest
+2024-11-18,QQQ,BUY,0.65201,Already holding position,backtest
+2024-11-18,GS,BUY,0.640894,Sector Finance at max 3 positions,sector_limit
+2024-11-18,CSCO,BUY,0.622793,Sector Tech at max 3 positions,sector_limit
+2024-11-18,TXN,BUY,0.621231,Sector Tech at max 3 positions,sector_limit
+2024-11-18,V,BUY,0.604343,Already holding position,backtest
+2024-11-19,CRM,BUY,0.640894,Sector Tech at max 3 positions,sector_limit
+2024-11-19,AAPL,BUY,0.633021,Already holding position,backtest
+2024-11-19,JNJ,BUY,0.619195,In cooldown until 2024-11-22; need confidence ≥ 0.66,cooldown
+2024-11-19,CAT,BUY,0.613609,Already holding position,backtest
+2024-11-19,V,BUY,0.604343,In cooldown until 2024-11-25; need confidence ≥ 0.65,cooldown
+2024-11-20,COST,BUY,0.667297,Sector Consumer at max 3 positions,sector_limit
+2024-11-20,GE,BUY,0.640894,In cooldown until 2024-11-26; need confidence ≥ 0.65,cooldown
+2024-11-20,TXN,BUY,0.625602,Sector Tech at max 3 positions,sector_limit
+2024-11-20,GS,BUY,0.613609,Already holding position,backtest
+2024-11-20,CSCO,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-11-20,CRM,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-11-20,META,BUY,0.604343,Sector Tech at max 3 positions,sector_limit
+2024-11-20,CAT,BUY,0.604343,Already holding position,backtest
+2024-11-20,AMZN,BUY,0.603762,Sector Tech at max 3 positions,sector_limit
+2024-11-21,JNJ,BUY,0.65201,In cooldown until 2024-11-22; need confidence ≥ 0.66,cooldown
+2024-11-21,PYPL,BUY,0.6498,Already holding position,backtest
+2024-11-21,AMZN,BUY,0.619864,Sector Tech at max 3 positions,sector_limit
+2024-11-21,AAPL,BUY,0.618656,In cooldown until 2024-11-26; need confidence ≥ 0.67,cooldown
+2024-11-21,ISRG,BUY,0.613609,Sector Health at max 3 positions,sector_limit
+2024-11-22,DIS,BUY,0.641708,Already holding position,backtest
+2024-11-22,NVDA,BUY,0.634031,Sector Tech at max 3 positions,sector_limit
+2024-11-22,XOM,BUY,0.633021,In cooldown until 2024-11-27; need confidence ≥ 0.65,cooldown
+2024-11-22,V,BUY,0.622793,In cooldown until 2024-11-25; need confidence ≥ 0.65,cooldown
+2024-11-22,GE,BUY,0.613609,In cooldown until 2024-11-26; need confidence ≥ 0.65,cooldown
+2024-11-22,PG,BUY,0.600989,In cooldown until 2024-11-27; need confidence ≥ 0.69,cooldown
+2024-11-25,AVGO,BUY,0.6343,Sector Tech at max 3 positions,sector_limit
+2024-11-25,UNH,BUY,0.623364,Already holding position,backtest
+2024-11-25,HD,BUY,0.622793,Already holding position,backtest
+2024-11-25,NVDA,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-11-25,CAT,BUY,0.613609,In cooldown until 2024-11-27; need confidence ≥ 0.67,cooldown
+2024-11-25,GOOGL,BUY,0.613609,Already holding position,backtest
+2024-11-25,BRK-B,BUY,0.604343,Already holding position,backtest
+2024-11-25,MSFT,BUY,0.602348,Sector Tech at max 3 positions,sector_limit
+2024-11-26,CSCO,BUY,0.63189,Sector Tech at max 3 positions,sector_limit
+2024-11-26,TXN,BUY,0.63189,Sector Tech at max 3 positions,sector_limit
+2024-11-26,COST,BUY,0.63189,Already holding position,backtest
+2024-11-26,XOM,BUY,0.63189,In cooldown until 2024-11-27; need confidence ≥ 0.65,cooldown
+2024-11-26,META,BUY,0.622793,Sector Tech at max 3 positions,sector_limit
+2024-11-26,PYPL,BUY,0.604343,Already holding position,backtest
+2024-11-26,DIS,BUY,0.604343,Already holding position,backtest
+2024-11-27,BRK-B,BUY,0.63189,Already holding position,backtest
+2024-11-27,COST,BUY,0.613609,Already holding position,backtest
+2024-11-29,AAPL,BUY,0.63189,Sector Tech at max 3 positions,sector_limit
+2024-11-29,PYPL,BUY,0.613609,In cooldown until 2024-12-04; need confidence ≥ 0.67,cooldown
+2024-11-29,META,BUY,0.604343,Sector Tech at max 3 positions,sector_limit
+2024-12-02,MSFT,BUY,0.638809,Sector Tech at max 3 positions,sector_limit
+2024-12-02,NVDA,BUY,0.623364,Sector Tech at max 3 positions,sector_limit
+2024-12-02,HD,BUY,0.622793,Already holding position,backtest
+2024-12-02,MS,BUY,0.622793,Sector Finance at max 3 positions,sector_limit
+2024-12-02,ORCL,BUY,0.617523,Already holding position,backtest
+2024-12-02,META,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-12-02,WMT,BUY,0.613609,Sector Consumer at max 3 positions,sector_limit
+2024-12-02,JPM,BUY,0.604343,Sector Finance at max 3 positions,sector_limit
+2024-12-02,PG,BUY,0.604343,Sector Consumer at max 3 positions,sector_limit
+2024-12-03,MU,BUY,0.674172,Sector Tech at max 3 positions,sector_limit
+2024-12-03,BAC,BUY,0.6498,Already holding position,backtest
+2024-12-03,GE,BUY,0.626331,Already holding position,backtest
+2024-12-03,HD,BUY,0.622793,Already holding position,backtest
+2024-12-03,PG,BUY,0.610039,Sector Consumer at max 3 positions,sector_limit
+2024-12-03,ORCL,BUY,0.605098,Already holding position,backtest
+2024-12-03,JPM,BUY,0.604343,Sector Finance at max 3 positions,sector_limit
+2024-12-04,MSFT,BUY,0.637187,Sector Tech at max 3 positions,sector_limit
+2024-12-04,GOOGL,BUY,0.600179,Already holding position,backtest
+2024-12-05,NVDA,BUY,0.674172,Sector Tech at max 3 positions,sector_limit
+2024-12-05,CVX,BUY,0.649388,Already holding position,backtest
+2024-12-05,AVGO,BUY,0.622793,Sector Tech at max 3 positions,sector_limit
+2024-12-05,GS,BUY,0.622793,Already holding position,backtest
+2024-12-05,GOOGL,BUY,0.603102,Already holding position,backtest
+2024-12-06,GS,BUY,0.667297,Already holding position,backtest
+2024-12-06,AXP,BUY,0.622793,Sector Finance at max 3 positions,sector_limit
+2024-12-06,GE,BUY,0.621231,Already holding position,backtest
+2024-12-06,MS,BUY,0.613609,Sector Finance at max 3 positions,sector_limit
+2024-12-06,GILD,BUY,0.604343,In cooldown until 2024-12-12; need confidence ≥ 0.71,cooldown
+2024-12-09,NFLX,BUY,0.641708,Already holding position,backtest
+2024-12-09,PG,BUY,0.638809,Sector Consumer at max 3 positions,sector_limit
+2024-12-09,CVX,BUY,0.629171,Already holding position,backtest
+2024-12-09,CAT,BUY,0.622793,Already holding position,backtest
+2024-12-09,SPY,BUY,0.613609,Already holding position,backtest
+2024-12-09,DIS,BUY,0.613609,Already holding position,backtest
+2024-12-09,COST,BUY,0.604343,Already holding position,backtest
+2024-12-09,AXP,BUY,0.604343,Sector Finance at max 3 positions,sector_limit
+2024-12-09,CSCO,BUY,0.604343,Sector Tech at max 3 positions,sector_limit
+2024-12-09,GE,BUY,0.600989,Already holding position,backtest
+2024-12-10,MU,BUY,0.658602,Sector Tech at max 3 positions,sector_limit
+2024-12-10,META,BUY,0.63189,Sector Tech at max 3 positions,sector_limit
+2024-12-10,BA,BUY,0.618212,Sector Industrial at max 3 positions,sector_limit
+2024-12-10,MSFT,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-12-10,QCOM,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-12-10,GILD,BUY,0.613609,In cooldown until 2024-12-12; need confidence ≥ 0.71,cooldown
+2024-12-10,MS,BUY,0.604343,Sector Finance at max 3 positions,sector_limit
+2024-12-10,PG,BUY,0.604343,Sector Consumer at max 3 positions,sector_limit
+2024-12-11,MS,BUY,0.6498,Sector Finance at max 3 positions,sector_limit
+2024-12-11,HD,BUY,0.613609,Sector Consumer at max 3 positions,sector_limit
+2024-12-11,BA,BUY,0.608187,Sector Industrial at max 3 positions,sector_limit
+2024-12-11,GS,BUY,0.604343,In cooldown until 2024-12-16; need confidence ≥ 0.67,cooldown
+2024-12-11,QQQ,BUY,0.604343,Already holding position,backtest
+2024-12-11,MSFT,BUY,0.604343,Sector Tech at max 3 positions,sector_limit
+2024-12-12,NFLX,BUY,0.65201,Already holding position,backtest
+2024-12-12,TXN,BUY,0.635761,Already holding position,backtest
+2024-12-12,MSFT,BUY,0.63189,Sector Tech at max 3 positions,sector_limit
+2024-12-12,MU,BUY,0.619864,Already holding position,backtest
+2024-12-12,WFC,BUY,0.619195,Already holding position,backtest
+2024-12-12,GS,BUY,0.604343,In cooldown until 2024-12-16; need confidence ≥ 0.67,cooldown
+2024-12-12,XOM,BUY,0.604343,Already holding position,backtest
+2024-12-13,XOM,BUY,0.629171,Already holding position,backtest
+2024-12-13,QCOM,BUY,0.625602,Sector Tech at max 3 positions,sector_limit
+2024-12-13,DIS,BUY,0.622793,In cooldown until 2024-12-18; need confidence ≥ 0.74,cooldown
+2024-12-13,BAC,BUY,0.622793,Already holding position,backtest
+2024-12-13,WFC,BUY,0.608697,Already holding position,backtest
+2024-12-13,MU,BUY,0.605738,Already holding position,backtest
+2024-12-13,NFLX,BUY,0.604343,Already holding position,backtest
+2024-12-16,TXN,BUY,0.623364,Already holding position,backtest
+2024-12-16,QQQ,BUY,0.604343,Already holding position,backtest
+2024-12-16,CSCO,BUY,0.604343,Sector Tech at max 3 positions,sector_limit
+2024-12-17,TXN,BUY,0.635761,Already holding position,backtest
+2024-12-18,BAC,BUY,0.622793,Already holding position,backtest
+2024-12-18,CVX,BUY,0.60756,In cooldown until 2024-12-20; need confidence ≥ 0.68,cooldown
+2024-12-18,V,BUY,0.604343,Already holding position,backtest
+2024-12-18,QQQ,BUY,0.604343,Already holding position,backtest
+2024-12-18,AXP,BUY,0.604343,Sector Finance at max 3 positions,sector_limit
+2024-12-18,MA,BUY,0.604343,Sector Finance at max 3 positions,sector_limit
+2024-12-19,GOOGL,BUY,0.65201,Sector Tech at max 3 positions,sector_limit
+2024-12-19,HD,BUY,0.642571,Already holding position,backtest
+2024-12-19,PYPL,BUY,0.625602,Sector Tech at max 3 positions,sector_limit
+2024-12-19,GILD,BUY,0.622793,Already holding position,backtest
+2024-12-19,BRK-B,BUY,0.613609,Sector Finance at max 3 positions,sector_limit
+2024-12-19,CVX,BUY,0.60756,In cooldown until 2024-12-20; need confidence ≥ 0.68,cooldown
+2024-12-19,QQQ,BUY,0.604343,Already holding position,backtest
+2024-12-19,MSFT,BUY,0.600989,Sector Tech at max 3 positions,sector_limit
+2024-12-20,TXN,BUY,0.674172,Already holding position,backtest
+2024-12-20,GOOGL,BUY,0.63364,Sector Tech at max 3 positions,sector_limit
+2024-12-20,HD,BUY,0.626331,Already holding position,backtest
+2024-12-20,AMZN,BUY,0.613609,Sector Tech at max 3 positions,sector_limit
+2024-12-23,BRK-B,BUY,0.65201,Already holding position,backtest
+2024-12-23,QQQ,BUY,0.613609,In cooldown until 2024-12-30; need confidence ≥ 0.66,cooldown
+2024-12-24,CRM,BUY,0.609777,Sector Tech at max 3 positions,sector_limit
+2024-12-26,TXN,BUY,0.682047,In cooldown until 2025-01-02; need confidence ≥ 0.76,cooldown
+2024-12-26,BAC,BUY,0.63189,In cooldown until 2024-12-27; need confidence ≥ 0.71,cooldown
+2024-12-26,AXP,BUY,0.622793,Sector Finance at max 3 positions,sector_limit
+2024-12-26,QQQ,BUY,0.604343,In cooldown until 2024-12-30; need confidence ≥ 0.66,cooldown
+2024-12-27,CRM,BUY,0.63189,Sector Tech at max 3 positions,sector_limit
+2024-12-27,GILD,BUY,0.613609,Already holding position,backtest
+2024-12-27,BRK-B,BUY,0.609474,Already holding position,backtest
+2024-12-27,GOOGL,BUY,0.604343,Sector Tech at max 3 positions,sector_limit
+2024-12-27,CSCO,BUY,0.604343,Sector Tech at max 3 positions,sector_limit
+2024-12-30,BAC,BUY,0.63189,Sector Finance at max 3 positions,sector_limit
+2024-12-30,AMZN,BUY,0.604343,Sector Tech at max 3 positions,sector_limit
+2024-12-30,PYPL,BUY,0.604343,Sector Tech at max 3 positions,sector_limit
+2024-12-30,MS,BUY,0.604343,Sector Finance at max 3 positions,sector_limit

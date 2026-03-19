@@ -9,6 +9,13 @@ venv/
 data/*.csv
 data/*.npz
 data/*.pkl
+data/*.parquet
+
+# Results (generated outputs — regenerate, don't track)
+results/*.csv
+results/*.tsv
+results/*.txt
+results/*.json
 
 # Models (large files)
 models/*.keras
@@ -23,6 +30,15 @@ models/*.pkl
 .DS_Store
 Thumbs.db
 
-# TensorFlow
+# TensorFlow (legacy, no longer used)
 *.tfevents.*
 logs/
+
+# Lock file is tracked; this comment is for clarity
+# requirements.lock.txt — tracked intentionally
+ 
+# Prevent results from reappearing under data/
+data/results/
+
+# Claude worktrees
+.claude/

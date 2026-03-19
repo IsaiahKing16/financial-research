@@ -92,7 +92,8 @@ class CrossValidator:
         Returns:
             DataFrame where each column is a config's signal array
         """
-        assert self._result is not None, "Call run() first"
+        if self._result is None:
+            raise RuntimeError("Call run() before accessing results.")
 
         data = {}
         for i, (config, pred) in enumerate(
@@ -123,7 +124,8 @@ class CrossValidator:
         Returns:
             DataFrame of flagged rows with spread and per-model probabilities
         """
-        assert self._result is not None, "Call run() first"
+        if self._result is None:
+            raise RuntimeError("Call run() before accessing results.")
 
         n_queries = len(self._result.predictions[0].calibrated_probabilities)
         rows = []
@@ -167,7 +169,8 @@ class CrossValidator:
         Returns:
             DataFrame with Ticker, ConsensusSignal, AgreementRatio, AvgProbability
         """
-        assert self._result is not None, "Call run() first"
+        if self._result is None:
+            raise RuntimeError("Call run() before accessing results.")
 
         n_queries = len(self._result.predictions[0].calibrated_probabilities)
         n_models = len(self._result.predictions)

@@ -27,7 +27,11 @@ import pandas as pd
 
 from pattern_engine.config import EngineConfig, WALKFORWARD_FOLDS
 from pattern_engine.walkforward import WalkForwardRunner
-from pattern_engine.experiment_logging import ExperimentLogger
+from pattern_engine.experiment_logging import ExperimentLogger, _config_hash
+from pattern_engine.manifest import (
+    RunManifest, generate_run_id, _get_git_sha,
+    load_prior_context,
+)
 from pattern_engine.reliability import (
     atomic_write_json, safe_read_json, LockFile, ProgressLog,
 )
@@ -102,43 +106,106 @@ class OvernightRunner:
 
             mode_label = "bayesian" if self.bayesian_mode else "static"
             phase_count = self.n_trials if self.bayesian_mode else len(self.phases)
+
+            # Create run manifest for provenance tracking
+            self._run_id = generate_run_id()
+            self._manifest = RunManifest(
+                run_id=self._run_id,
+                mode=mode_label,
+                started_at=datetime.now().isoformat(),
+                git_sha=_get_git_sha(),
+                config_hash=_config_hash(self.phases[0]) if self.phases else "",
+            )
+
+            # Load prior run context for proactive memory injection
+            prior = load_prior_context(str(self._results_dir / "runs"))
+            if prior["best_bss"] is not None and verbose:
+                print(f"  Prior context: best BSS={prior['best_bss']:+.5f}, "
+                      f"{len(prior['recent_manifests'])} recent runs")
             self._log.info(
                 f"Overnight run started: {phase_count} {mode_label} phases, "
-                f"{self.max_hours}h budget, PID={lock._pid}"
+                f"{self.max_hours}h budget, PID={lock._pid}, "
+                f"run_id={self._run_id}"
             )
 
             # Register atexit to log clean shutdown
             atexit.register(self._log.info, "Process exiting (atexit)")
 
             if self.bayesian_mode:
-                return self._run_bayesian(full_db, verbose)
-            return self._run_phases(full_db, verbose)
+                results = self._run_bayesian(full_db, verbose)
+            else:
+                results = self._run_phases(full_db, verbose)
+
+            # Finalize and save manifest
+            self._manifest.ended_at = datetime.now().isoformat()
+            self._manifest.artifact_paths = {
+                "checkpoint": str(self.checkpoint_path),
+                "log": str(self._results_dir / "overnight.log"),
+            }
+            self._manifest.save(str(self._results_dir / "runs"))
+            if verbose:
+                print(f"  Run manifest saved: {self._run_id}")
+
+            return results
+
+    # Maximum retry attempts for failed phases before quarantine
+    MAX_PHASE_RETRIES = 2
 
     def _run_phases(self, full_db: pd.DataFrame, verbose: int) -> list[dict]:
-        """Core phase loop with checkpointing and error isolation."""
+        """Core phase loop with checkpointing and error isolation.
+
+        Checkpoint semantics (fix for P0-1):
+          - Only 'completed' phases are skipped on resume.
+          - 'failed' phases are retried up to MAX_PHASE_RETRIES.
+          - 'running' phases (from a crashed process) are retried.
+          - Phase health: all-folds-failed → 'failed', partial → 'partial'.
+        """
         start_time = time.time()
         max_seconds = self.max_hours * 3600
+        deadline_ts = start_time + max_seconds
         results = []
 
         checkpoint = safe_read_json(self.checkpoint_path)
-        completed = set(checkpoint.get("completed_phase_ids", []))
-        # Backward compat: old checkpoint used "completed_phases" int count
-        if "completed_phases" in checkpoint and not completed:
-            completed = {f"p{n:02d}" for n in range(checkpoint["completed_phases"])}
+        phase_statuses = checkpoint.get("phases", {})
+
+        # Backward compat: migrate old completed_phase_ids → new format
+        if "completed_phase_ids" in checkpoint and not phase_statuses:
+            for pid in checkpoint["completed_phase_ids"]:
+                phase_statuses[pid] = {"status": "completed", "attempts": 1}
+        if "completed_phases" in checkpoint and not phase_statuses:
+            for n in range(checkpoint["completed_phases"]):
+                phase_statuses[f"p{n:02d}"] = {"status": "completed", "attempts": 1}
 
         for i, config in enumerate(self.phases):
             phase_id = f"p{i:02d}"
+            phase_info = phase_statuses.get(phase_id, {})
+            status = phase_info.get("status", "pending")
+            attempts = phase_info.get("attempts", 0)
 
-            if phase_id in completed:
+            # Skip completed phases
+            if status == "completed":
                 if verbose:
                     print(f"  Phase {phase_id}: already completed (checkpoint)")
                 self._log.info(f"Phase {phase_id}: skipped (checkpoint)")
                 continue
 
+            # Skip quarantined (exhausted retries) phases
+            if status == "failed" and attempts >= self.MAX_PHASE_RETRIES:
+                if verbose:
+                    print(f"  Phase {phase_id}: quarantined after {attempts} attempts")
+                self._log.info(f"Phase {phase_id}: quarantined ({attempts} attempts)")
+                continue
+
+            # Retry failed or running (crashed) phases
+            if status in ("failed", "running") and verbose:
+                print(f"  Phase {phase_id}: retrying (prev status={status}, "
+                      f"attempt {attempts + 1}/{self.MAX_PHASE_RETRIES})")
+
             elapsed = time.time() - start_time
             if elapsed > max_seconds:
                 msg = (f"Time budget exhausted ({self.max_hours}h). "
-                       f"Completed {len(completed)}/{len(self.phases)} phases.")
+                       f"Completed {sum(1 for p in phase_statuses.values() if p.get('status') == 'completed')}"
+                       f"/{len(self.phases)} phases.")
                 if verbose:
                     print(f"\n  {msg}")
                 self._log.warn(msg)
@@ -160,25 +227,54 @@ class OvernightRunner:
             self._log.phase_start(phase_id, config_summary)
             phase_start = time.time()
 
+            # Mark as running before execution
+            phase_statuses[phase_id] = {
+                "status": "running",
+                "attempts": attempts + 1,
+                "started_at": datetime.now().isoformat(),
+            }
+            self._save_checkpoint(phase_statuses)
+
             runner = WalkForwardRunner(config, self.folds, self.logger)
             try:
-                fold_metrics = runner.run(full_db, experiment_name=tag, verbose=verbose)
+                fold_metrics = runner.run(
+                    full_db, experiment_name=tag, verbose=verbose,
+                    deadline_ts=deadline_ts,
+                )
+
+                # Evaluate phase health based on fold outcomes (fix for P0-5)
+                phase_health = self._evaluate_phase_health(fold_metrics)
+
                 phase_result = {
                     "phase": i,
                     "phase_id": phase_id,
                     "config": config,
                     "fold_metrics": fold_metrics,
+                    "health": phase_health,
                 }
 
                 # Auto integrity check after each successful phase
-                if self.integrity_check_enabled:
+                if self.integrity_check_enabled and phase_health != "failed":
                     phase_result["integrity"] = self._run_integrity_check(
                         config, full_db, verbose
                     )
 
                 results.append(phase_result)
                 duration = time.time() - phase_start
-                self._log.phase_end(phase_id, duration, "OK")
+                self._log.phase_end(phase_id, duration, phase_health.upper())
+
+                # Checkpoint with accurate status
+                phase_statuses[phase_id] = {
+                    "status": phase_health,  # "completed" or "partial"
+                    "attempts": attempts + 1,
+                    "ended_at": datetime.now().isoformat(),
+                }
+
+                # If all folds failed, treat as phase failure
+                if phase_health == "failed":
+                    phase_statuses[phase_id]["status"] = "failed"
+                    if verbose:
+                        print(f"  PHASE {i + 1}: all folds failed — marked as failed")
 
             except Exception as e:
                 duration = time.time() - phase_start
@@ -192,19 +288,75 @@ class OvernightRunner:
                     "error": str(e),
                 })
 
-            # Always checkpoint, even on failure
-            completed.add(phase_id)
-            self._save_checkpoint(completed)
+                # Mark as failed — retryable on next run
+                phase_statuses[phase_id] = {
+                    "status": "failed",
+                    "attempts": attempts + 1,
+                    "error": str(e),
+                    "ended_at": datetime.now().isoformat(),
+                }
+
+            self._save_checkpoint(phase_statuses)
 
         if verbose:
             total_elapsed = (time.time() - start_time) / 60
+            completed_count = sum(
+                1 for p in phase_statuses.values()
+                if p.get("status") == "completed"
+            )
             print(f"\n  Overnight run complete: {total_elapsed:.1f} min total, "
-                  f"{len(results)} phases executed")
+                  f"{len(results)} phases executed, "
+                  f"{completed_count} completed")
 
         self._log.info(f"Run complete: {len(results)} phases in "
                        f"{(time.time() - start_time) / 60:.1f} min")
 
+        # Update manifest with run statistics
+        if hasattr(self, "_manifest"):
+            self._manifest.elapsed_minutes = round(
+                (time.time() - start_time) / 60, 1
+            )
+            self._manifest.phases_completed = sum(
+                1 for p in phase_statuses.values()
+                if p.get("status") == "completed"
+            )
+            self._manifest.phases_failed = sum(
+                1 for p in phase_statuses.values()
+                if p.get("status") == "failed"
+            )
+            self._manifest.phases_partial = sum(
+                1 for p in phase_statuses.values()
+                if p.get("status") == "partial"
+            )
+            # Extract best BSS from results
+            all_bss = []
+            for r in results:
+                for fm in r.get("fold_metrics", []):
+                    bss = fm.get("brier_skill_score")
+                    if bss is not None:
+                        all_bss.append(bss)
+            if all_bss:
+                self._manifest.best_bss = max(all_bss)
+
         return results
+
+    @staticmethod
+    def _evaluate_phase_health(fold_metrics: list[dict]) -> str:
+        """Classify phase outcome based on fold results.
+
+        Returns:
+            "completed" — all folds succeeded
+            "partial"   — some folds succeeded, some failed
+            "failed"    — all folds failed or no folds ran
+        """
+        if not fold_metrics:
+            return "failed"
+        succeeded = sum(1 for m in fold_metrics if "error" not in m)
+        if succeeded == len(fold_metrics):
+            return "completed"
+        elif succeeded > 0:
+            return "partial"
+        return "failed"
 
     def _run_bayesian(self, full_db: pd.DataFrame, verbose: int) -> list[dict]:
         """Run Bayesian optimization via BayesianSweepRunner.
@@ -277,10 +429,15 @@ class OvernightRunner:
                 phases.append(EngineConfig(max_distance=d, calibration_method=m))
         return phases
 
-    def _save_checkpoint(self, completed: set) -> None:
-        """Atomically write checkpoint to disk."""
+    def _save_checkpoint(self, phase_statuses: dict) -> None:
+        """Atomically write checkpoint to disk.
+
+        Args:
+            phase_statuses: dict mapping phase_id → status info dict
+                Each value has: status, attempts, started_at/ended_at, error
+        """
         atomic_write_json(self.checkpoint_path, {
-            "completed_phase_ids": sorted(completed),
+            "phases": phase_statuses,
             "timestamp": datetime.now().isoformat(),
             "total_phases": len(self.phases),
         })

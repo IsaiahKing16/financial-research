@@ -192,3 +192,35 @@ HANDOFF to [Agent Name]:
 
 *AGENTS.md v1.0 — March 19, 2026*
 *This file is read by ALL agents at the start of each session. Keep it current.*
+
+---
+
+## Cursor Cloud specific instructions
+
+### Environment
+
+- **Python 3.12** is required. The VM ships with Python 3.12.3 at `/usr/bin/python3`.
+- The update script creates a venv at `/workspace/venv` and installs both `requirements.txt` and `requirements-dev.txt`. Activate with `source venv/bin/activate`.
+- `python3.12-venv` must be installed via apt if missing (the update script handles venv creation).
+
+### Running tests
+
+- `source venv/bin/activate && python -m pytest tests/ -v` — runs all 388 tests (~2.5 min on cloud VM).
+- All tests use synthetic data from `tests/conftest.py` fixtures; no network access or data files needed.
+- CI targets Windows (`windows-latest`), but the full suite also passes on Linux.
+
+### Running the engine
+
+- Entry points are run as Python modules: `python -m pattern_engine.live`, `python -m pattern_engine.overnight`, etc.
+- The live/overnight runners require market data (downloaded via yfinance); for dev/testing, use synthetic data as the test fixtures demonstrate.
+
+### Lint
+
+- No linter (flake8/ruff/mypy/pylint) is currently configured. Only `py_compile` checks are feasible.
+
+### Gotchas
+
+- `predict()` returns a `PredictionResult` object (not a DataFrame). Access `.signals`, `.calibrated_probabilities`, `.n_matches`, `.buy_count`, `.sell_count`, `.hold_count`, `.avg_matches`.
+- `EngineConfig` uses `top_k` (not `k`) and `projection_horizon` (not `forward_horizon`).
+- `EngineConfig` is a frozen dataclass containing a dict field (`feature_weights`) — use `repr()` instead of `hash()`.
+- The `data/` directory is gitignored and empty in fresh clones; tests do not need it.

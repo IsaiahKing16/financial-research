@@ -26,3 +26,5 @@ Thumbs.db
 # TensorFlow
 *.tfevents.*
 logs/
+.claude/ 
+data\results\ 

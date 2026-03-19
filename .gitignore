@@ -37,5 +37,8 @@ logs/
 # Lock file is tracked; this comment is for clarity
 # requirements.lock.txt — tracked intentionally
  
-# Claude worktrees 
-.claude/ 
+# Prevent results from reappearing under data/
+data/results/
+
+# Claude worktrees
+.claude/

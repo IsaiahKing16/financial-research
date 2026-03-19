@@ -13,14 +13,15 @@ analogue matching on return fingerprints to generate probabilistic BUY/SELL/HOLD
 signals across a 52-ticker universe.
 
 The project has three codebases:
-1. **`pattern_engine/`** — Python package (21 modules, 331 tests all passing)
+1. **`pattern_engine/`** — Python package (21 modules, 388 tests all passing)
 2. **`trading_system/`** — Four-layer trading system built on FPPE signals (Phase 1 complete)
 3. **`pattern-engine-v2.1.jsx`** — Standalone React demo (claude.ai artifact, no HTTP calls)
 
 **Key design documents (always reference before modifying related code):**
-- `FPPE_TRADING_SYSTEM_DESIGN.md` v0.3 — Architecture spec for all four trading layers
-- `PHASE1_FILE_REVIEW.md` — Structural stability review; all Phase 1 bugs documented and fixed
-- `CANDLESTICK_CATEGORIZATION_DESIGN.md` v0.2 — Future K-NN pre-filtering module (Phase 6)
+- `docs/FPPE_TRADING_SYSTEM_DESIGN.md` v0.3 — Architecture spec for all four trading layers
+- `docs/PHASE1_FILE_REVIEW.md` — Structural stability review; all Phase 1 bugs documented and fixed
+- `docs/CANDLESTICK_CATEGORIZATION_DESIGN.md` v0.2 — Future K-NN pre-filtering module (Phase 6)
+- `docs/PHASE2_SYSTEM_DESIGN.md` — Phase 2 system design
 
 **Do NOT modify `prepare.py` or this file unless explicitly asked.**
 
@@ -92,8 +93,8 @@ trading_system/                    # 4 modules, 88 tests, Phase 1 backtest compl
 └── run_phase1.py                  # Phase 1 entry point (equal-weight, cached signals)
 ```
 
-**Trading system design reference:** `FPPE_TRADING_SYSTEM_DESIGN.md` v0.3
-**Phase 1 bug audit:** `PHASE1_FILE_REVIEW.md` — 9 findings, all fixed
+**Trading system design reference:** `docs/FPPE_TRADING_SYSTEM_DESIGN.md` v0.3
+**Phase 1 bug audit:** `docs/PHASE1_FILE_REVIEW.md` — 9 findings, all fixed
 
 ### Legacy Files (reference only — do not modify)
 
@@ -301,8 +302,8 @@ BSS < 0    = worse than base rate
 ## 7. PHASE 1 TRADING SYSTEM RESULTS
 
 **Status:** Complete. All Phase 1 bugs fixed. Phase 2 (risk_engine.py) is next.
-**Full specification:** `FPPE_TRADING_SYSTEM_DESIGN.md` v0.3
-**Structural audit:** `PHASE1_FILE_REVIEW.md` — 9 findings (3 critical, 5 significant, 1 deferred)
+**Full specification:** `docs/FPPE_TRADING_SYSTEM_DESIGN.md` v0.3
+**Structural audit:** `docs/PHASE1_FILE_REVIEW.md` — 9 findings (3 critical, 5 significant, 1 deferred)
 
 ### 7.1 Phase 1 Configuration
 
@@ -344,7 +345,7 @@ BSS < 0    = worse than base rate
 
 ### 7.4 Phase 1 Bugs Fixed
 
-All findings from `PHASE1_FILE_REVIEW.md`:
+All findings from `docs/PHASE1_FILE_REVIEW.md`:
 
 | ID | File | Finding | Status |
 |----|------|---------|--------|
@@ -466,7 +467,7 @@ For unattended 6+ hour overnight runs:
 22. **engine.py cal_frac no-op** — `cal_frac` declared in EngineConfig with comment "Platt cal_frac=0.76 best" but never used in any code path. Bayesian sweep wasted trials optimizing a ghost parameter. Fix: implemented chronological calibration split (earlier `1-cal_frac` → NN index, later `cal_frac` → calibration query) eliminating temporal adjacency leakage.
 23. **assert → RuntimeError** (`engine.py`, `matching.py`) — `assert self._fitted` is stripped under `-O` (optimized execution). Public API guards must raise `RuntimeError`. Fix applied to both modules; tests updated accordingly.
 
-### trading_system/ bugs (documented in PHASE1_FILE_REVIEW.md)
+### trading_system/ bugs (documented in docs/PHASE1_FILE_REVIEW.md)
 
 24. **C1: DIS sector misclassification** — Disney classified as Industrial; corrected to Consumer. Sector concentration enforcement was silently incorrect.
 25. **C2: validate() missing SignalConfig checks** — confidence_threshold=0.30 passed validation. Added bounds checks for confidence_threshold, min_matches, max_holding_days.
@@ -564,7 +565,7 @@ but marked superseded.
 ### 12.2 Trading System (`trading_system/`)
 4 modules, 88 tests, all passing. Phase 1 (equal-weight backtest) complete.
 - Annualized return 22.3%, Sharpe 1.82, Max DD 6.9% on 2024 validation year
-- All 9 Phase 1 bugs fixed and documented in `PHASE1_FILE_REVIEW.md`
+- All 9 Phase 1 bugs fixed and documented in `docs/PHASE1_FILE_REVIEW.md`
 - `config.py`: 7 frozen sub-configs, 3 risk profiles, full validate() coverage
 - `backtest_engine.py`: Correct P&L (no double-counting), corrected final_equity(), calendar-aware cooldowns
 
@@ -572,9 +573,11 @@ but marked superseded.
 
 | Document | Version | Status | Purpose |
 |----------|---------|--------|---------|
-| `FPPE_TRADING_SYSTEM_DESIGN.md` | v0.3 | Active | Architecture spec for all 4 trading layers |
-| `PHASE1_FILE_REVIEW.md` | — | Complete | Structural audit; all Phase 1 findings and fixes |
-| `CANDLESTICK_CATEGORIZATION_DESIGN.md` | v0.2 | Design phase | Future K-NN pre-filtering module (Phase 6) |
+| `docs/FPPE_TRADING_SYSTEM_DESIGN.md` | v0.3 | Active | Architecture spec for all 4 trading layers |
+| `docs/PHASE1_FILE_REVIEW.md` | — | Complete | Structural audit; all Phase 1 findings and fixes |
+| `docs/CANDLESTICK_CATEGORIZATION_DESIGN.md` | v0.2 | Design phase | Future K-NN pre-filtering module (Phase 6) |
+| `docs/PHASE2_SYSTEM_DESIGN.md` | — | Active | Phase 2 system design |
+| `docs/TECH_DEBT_AUDIT.md` | — | Complete | Tech debt audit |
 
 ### 12.4 React Frontend Demo (`pattern-engine-v2.1.jsx`)
 Standalone React artifact for claude.ai (~1500 lines). No HTTP calls — all backend
@@ -624,9 +627,9 @@ Professional DOCX report (~20 pages, 4 sections):
 - [x] trading_system/backtest_engine.py — P&L (no double-count), D1/D2 fixes, all bugs patched
 - [x] 88 trading_system tests (test_trading_config, test_signal_adapter, test_backtest_engine)
 - [x] Phase 1 results: 22.3% annual, Sharpe 1.82, Max DD 6.9% (beats SPY risk-adjusted)
-- [x] FPPE_TRADING_SYSTEM_DESIGN.md v0.3
-- [x] PHASE1_FILE_REVIEW.md — structural audit complete
-- [x] CANDLESTICK_CATEGORIZATION_DESIGN.md v0.2 — future scaling module designed
+- [x] docs/FPPE_TRADING_SYSTEM_DESIGN.md v0.3
+- [x] docs/PHASE1_FILE_REVIEW.md — structural audit complete
+- [x] docs/CANDLESTICK_CATEGORIZATION_DESIGN.md v0.2 — future scaling module designed
 
 ### Phase 2 — Risk Engine (Next)
 - [ ] `trading_system/risk_engine.py` — ATR stop-losses, volatility-based position sizing

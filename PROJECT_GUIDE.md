@@ -1,5 +1,5 @@
 # PROJECT_GUIDE.md — Multi-AI Collaboration Reference
-# Last Updated: 2026-03-18
+# Last Updated: 2026-03-18 (v2.2 + manifest system)
 # Owner: Sleep (Isaia)
 # Primary AI: Claude (Anthropic) | Supporting: Gemini, ChatGPT
 
@@ -13,10 +13,11 @@ analogue matching on return fingerprints to generate probabilistic BUY/SELL/HOLD
 signals across a 52-ticker universe.
 
 The project has two codebases:
-1. **`pattern_engine/`** — Python package (21 modules, 242 tests, all passing)
+1. **`pattern_engine/`** — Python package (22 modules, 294 tests, all passing) — **v2.2**
 2. **`pattern-engine-v2.1.jsx`** — Standalone React demo (claude.ai artifact, no HTTP calls)
+3. **`archive/`** — Legacy Phase 1 files (strategy*.py, prepare.py, etc.)
 
-**Do NOT modify `prepare.py` or this file unless explicitly asked.**
+**Do NOT modify this file unless explicitly asked.**
 
 **When starting any AI session, provide:**
 1. This file (PROJECT_GUIDE.md)
@@ -48,10 +49,10 @@ The three-filter signal gate keeps trade volume manageable at any universe size.
 
 ## 2. SYSTEM ARCHITECTURE
 
-### Package Structure (v2.1)
+### Package Structure (v2.2)
 
 ```
-pattern_engine/                    # 21 modules, version 2.1.0
+pattern_engine/                    # 22 modules, version 2.2.0
 ├── __init__.py                    # Public API: PatternEngine, EngineConfig, CrossValidator
 ├── config.py                      # EngineConfig frozen dataclass (all proven defaults)
 ├── features.py                    # FeatureSet/FeatureRegistry (7 pluggable sets + hybrid)
@@ -64,25 +65,24 @@ pattern_engine/                    # 21 modules, version 2.1.0
 ├── candlestick.py                 # Continuous multi-timeframe encoding (1d/3d/5d)
 ├── sector.py                      # Cross-asset sector features (vectorized)
 ├── engine.py                      # PatternEngine class (fit/predict/evaluate/save/load)
-├── schema.py                      # NEW v2.1: Native DataFrame validation at boundaries
+├── schema.py                      # Native DataFrame validation at boundaries
 ├── cross_validation.py            # Cross-model validation & integrity checking
 ├── data.py                        # DataLoader pipeline (yfinance → features → parquet)
-├── experiment_logging.py          # TSV experiment logger with config provenance
-├── walkforward.py                 # 6-fold walk-forward with optional cross-validation
-├── sweep.py                       # Grid sweep + NEW Bayesian (Optuna TPE) sweep
+├── experiment_logging.py          # TSV experiment logger with full-config SHA-256 hashing
+├── walkforward.py                 # 6-fold walk-forward with deadline support
+├── sweep.py                       # Grid sweep + Bayesian (Optuna TPE) sweep
 ├── live.py                        # Production EOD signal generator with consensus mode
-├── overnight.py                   # Multi-phase runner (static + Bayesian modes)
-└── reliability.py                 # Atomic writes, lock files, progress logging
+├── overnight.py                   # Multi-phase runner with checkpoint state machine
+├── reliability.py                 # Atomic writes, lock files, fsync'd progress logging
+└── manifest.py                    # NEW v2.2: Run manifests, data versioning, prior-run memory
 ```
 
-### Legacy Files (reference only — do not modify)
+### Legacy Files (moved to archive/ — do not modify)
 
-| File | Purpose |
-|------|---------|
-| `strategy.py` | Original monolithic engine (2,498 lines) — superseded by pattern_engine/ |
-| `strategy_overnight.py` | Original overnight runner — superseded by overnight.py |
-| `strategyv1.py` through `strategyv4.py` | Historical iterations |
-| `prepare.py` | Data pipeline (downloads OHLCV, builds analogue DB) — **human-only** |
+All Phase 1 files are now in `archive/`:
+- `strategy.py`, `strategyv1-v4.py`, `strategy_overnight.py`
+- `prepare.py`, `oldstrategy.py`, `oldstrategy1.py`
+- `dedup.py`, `diagnose_distances.py`, `quick_sweep.py`, `test_strategy.py`
 
 ### Hardware
 - CPU: AMD Ryzen 9 5900X (12-core, 24 threads, 3.70 GHz)
@@ -220,9 +220,12 @@ Fallback chain when insufficient matches: octet (8) → multi (4) → binary (2)
 ### Calibration Double-Pass
 The calibrator trains on training data querying itself (not val data):
 1. Build K-NN index from training data
-2. Query training data against itself (cal_frac=0.76 holdout)
+2. Query training data against itself
 3. Fit Platt sigmoid on self-query frequencies + known outcomes
 4. No look-ahead bias — calibrator sees same distribution as inference
+
+**Note:** `cal_frac` was removed in v2.2 (was a no-op — never used by engine.fit()).
+If calibration holdout is needed in future, implement proper train/cal split in engine.py first.
 
 ### Locked Hyperparameters
 ```python
@@ -235,7 +238,6 @@ confidence_threshold = 0.65          # Best accuracy trade-off (sweep 1)
 agreement_spread = 0.10              # Minimum directional agreement
 min_matches = 10                     # Minimum analogues required
 calibration_method = "platt"         # Generalises best across folds
-cal_frac = 0.76                      # Best calibration holdout
 regime_filter = True                 # Binary mode (Bull/Bear)
 regime_mode = "binary"               # Proven default
 nn_jobs = 1                          # Prevents Win/Py3.12 joblib deadlock
@@ -274,7 +276,7 @@ BSS < 0    = worse than base rate
 - 2024 fold = positive BSS — genuine predictive skill on unseen data
 - 2022 bear market = worst fold (regime shift, fewer bear training analogues)
 - Expanding window means later folds have more training data → better performance
-- 242 automated tests all passing
+- 294 automated tests all passing
 
 ---
 
@@ -292,9 +294,8 @@ promising areas.
 | max_distance | Float | [0.8, 2.0] |
 | top_k | Integer | [20, 100] |
 | calibration_method | Categorical | {platt, isotonic} |
-| cal_frac | Float | [0.5, 0.95] |
 | confidence_threshold | Float | [0.55, 0.80] |
-| regime_mode | Categorical | {binary, multi, octet, off} |
+| regime_mode | Categorical | {binary, multi} |
 
 **Key features:**
 - **MedianPruner**: Kills unpromising trials after 2 folds if BSS < median (40-60% compute savings)
@@ -383,7 +384,7 @@ pip install -r requirements.txt  # includes optuna
 ```cmd
 python -m pytest tests/ -v
 ```
-All **242 tests** must pass (15 test files).
+All **294 tests** must pass (17 test files).
 
 ### Key Entry Points
 
@@ -393,7 +394,7 @@ All **242 tests** must pass (15 test files).
 | `python -m pattern_engine.overnight` | 6-hour overnight runner |
 | `python -m pytest tests/ -v` | Full test suite |
 | `python -m pattern_engine.walkforward` | Walk-forward validation |
-| `python quick_sweep.py` | Quick parameter sweep |
+| (see sweep.py API below) | Quick parameter sweep |
 
 ### Bayesian Optimization
 ```python
@@ -419,7 +420,6 @@ print(results.sort_values("mean_bss", ascending=False).head(10))
 | Distance weighting | "uniform" | Beats inverse (sweep 1) |
 | Feature set | returns_only (8) | Full 16-feature 3.5× worse |
 | Calibration method | Platt | Generalises best across folds |
-| cal_frac | 0.76 | Zero-crossing point for positive BSS |
 | max_distance | 1.1019 | Quantile-calibrated, AvgK ~42 |
 | top_k | 50 | Neighbourhood ceiling |
 | confidence_threshold | 0.65 | Best accuracy trade-off |
@@ -448,9 +448,9 @@ print(results.sort_values("mean_bss", ascending=False).head(10))
 ## 12. DELIVERABLES PRODUCED
 
 ### 12.1 Python Package (`pattern_engine/`)
-21 modules, 242 tests, all passing. Fully modular replacement of monolithic strategy.py.
-Merged to main branch 2026-03-18. Legacy files (strategy.py, strategyv1-v4.py) preserved
-but marked superseded.
+22 modules, 294 tests, all passing. Fully modular replacement of monolithic strategy.py.
+Merged to main branch 2026-03-18. Legacy files moved to `archive/` directory.
+v2.2 code review fixes applied 2026-03-18. Manifest system added 2026-03-18.
 
 ### 12.2 React Frontend Demo (`pattern-engine-v2.1.jsx`)
 Standalone React artifact for claude.ai (~1500 lines). No HTTP calls — all backend
@@ -475,7 +475,7 @@ Professional DOCX report (~20 pages, 4 sections):
 
 ## 13. ROADMAP
 
-### v2.1 — Current (Complete)
+### v2.1 — Complete
 - [x] Modular pattern_engine package (21 modules)
 - [x] K-NN analogue matching with weighted Euclidean distance
 - [x] 8-state regime detection with fallback chain
@@ -486,12 +486,37 @@ Professional DOCX report (~20 pages, 4 sections):
 - [x] Native schema validation at fit/predict boundaries
 - [x] SQLite-persistent study state for cross-session resume
 - [x] Reliability infrastructure (atomic writes, lock files, checkpoints)
-- [x] 242 tests all passing (15 test files)
 - [x] React frontend demo (JSX)
 - [x] Professional project report (DOCX)
 - [x] Merged modular package to main (superseding strategy.py)
 - [x] Overnight/session feature sets (research-driven, pluggable)
 - [x] Research integration: 24/7 equities overnight drift analysis
+
+### v2.2 — Current (Complete)
+Cross-AI code review fixes (Gemini + ChatGPT reviewed, Claude implemented):
+- [x] P0-1: Overnight checkpoint state machine (failed phases retryable, not permanently skipped)
+- [x] P0-2: Full-config SHA-256 hashing for experiment deduplication (was only 8/20+ fields)
+- [x] P0-3: Removed cal_frac no-op parameter (was optimized by Optuna but never used)
+- [x] P0-4: Deadline propagation from overnight runner into walkforward folds
+- [x] P0-5: Phase health evaluation (completed/partial/failed based on fold outcomes)
+- [x] P1-6: ProgressLog._write() now calls os.fsync() for crash durability
+- [x] P1-8: DataLoader guards against empty universe with RuntimeError
+- [x] P1-9: All public assert statements replaced with RuntimeError/ValueError
+- [x] README rewritten for pattern_engine architecture (was describing Phase 1 Conv1D/LSTM)
+- [x] 13 legacy files moved to archive/
+- [x] Run manifest system (manifest.py): immutable provenance per run
+- [x] Data version fingerprinting for cache staleness detection
+- [x] Prior-run context loading for proactive memory injection
+- [x] 294 tests all passing (17 test files)
+
+### v2.3 — Agentic Village Phase 1 (Next — see Section 17)
+Based on "Agentic Village" research. Smallest useful implementation:
+- [ ] Integrate data version fingerprinting into DataLoader.build_database()
+- [ ] Create risk_gate.py: pre-signal governance checks before live emission
+- [ ] Add SignalEvidence structured output to live.py
+- [ ] Extend cross_validation.py into synthesis layer (ensemble weighting)
+- [ ] Auto-warm Bayesian sweeps from prior best configs via manifests
+- [ ] Add run_id and data_version columns to experiments.tsv
 
 ### v3.0 — Neural Hybrid (Target: Q3-Q4 2026)
 - [ ] CONV_LSTM trained on price windows → 16-dim latent embeddings
@@ -606,3 +631,117 @@ Usage: `EngineConfig(feature_set="returns_overnight")` — default `returns_only
 ### Status
 Features implemented and tested (24 new tests). Walk-forward validation pending.
 These are opt-in experimental features — default `returns_only` set is LOCKED.
+
+---
+
+## 17. AGENTIC VILLAGE ARCHITECTURE REFERENCE
+
+### Source
+"Collaborative AI Architecture Research Report" (March 2026) — enterprise multi-agent
+orchestration patterns distilled for single-developer quant research context.
+
+### Core Principle: Structured State Over Free-Text Handoffs
+
+The key insight: when multiple AI agents (or overnight automation sessions) collaborate on
+a codebase, **structured artifacts** (JSON manifests, typed configs, schema-validated DataFrames)
+dramatically outperform free-text summaries for continuity and correctness. This is why FPPE v2.2
+introduced `RunManifest` as a dataclass → JSON rather than appending to a log file.
+
+### Architecture Pattern: Blackboard
+
+FPPE uses a simplified **blackboard architecture** where shared state lives in well-defined
+files rather than a message bus:
+
+| Blackboard Artifact | File Location | Schema |
+|---------------------|---------------|--------|
+| Run manifests | `data/runs/<run_id>/manifest.json` | `RunManifest` dataclass |
+| Data version | `data/processed/data_version.json` | `{version, tickers, n_features, created_at}` |
+| Experiment log | `data/results/experiments.tsv` | 20+ columns, TSV with header |
+| Checkpoints | `data/runs/<run_id>/checkpoint.json` | `{phase_statuses: {name: {status, attempts, ...}}}` |
+| Config | `EngineConfig` frozen dataclass | 20+ typed fields, hashable |
+
+### File-Level Mapping (What Research Concepts → FPPE Modules)
+
+| Research Concept | FPPE Implementation | Module |
+|-----------------|---------------------|--------|
+| Shared memory / blackboard | Run manifests + experiment TSV | `manifest.py`, `experiment_logging.py` |
+| Private agent memory | Per-run checkpoint state | `overnight.py` |
+| Proactive context injection | `load_prior_context()` at run start | `manifest.py` |
+| Dependency-aware cache invalidation | `compute_data_version()` + `check_data_staleness()` | `manifest.py` |
+| Structured evidence | `SignalEvidence` (planned) | `live.py` (v2.3) |
+| Pre-action governance | `risk_gate.py` (planned) | New module (v2.3) |
+| Synthesis / ensemble layer | Weighted fold combination (planned) | `cross_validation.py` (v2.3) |
+| Config warm-start | Auto-seed Bayesian sweeps from prior best (planned) | `sweep.py` (v2.3) |
+
+### Shared Memory Schema
+
+Every run writes a `RunManifest` with these fields:
+
+```
+run_id          : str   — YYYYMMDD_HHMMSS_<6hex>
+mode            : str   — "static" | "bayesian" | "walkforward" | "live"
+started_at      : str   — ISO 8601 timestamp
+ended_at        : str   — ISO 8601 timestamp
+git_sha         : str   — Short commit hash for provenance
+data_version    : str   — 12-char SHA-256 of ticker universe + features
+config_hash     : str   — 16-char SHA-256 of full EngineConfig
+phases_completed: int   — Count of phases with all folds succeeding
+phases_failed   : int   — Count of phases with all folds failing
+phases_partial  : int   — Count of phases with mixed fold outcomes
+best_bss        : float — Best Brier Skill Score achieved
+total_folds     : int   — Total walk-forward folds executed
+elapsed_minutes : float — Wall-clock runtime
+artifact_paths  : dict  — Paths to saved models, plots, reports
+notes           : str   — Free-text annotation
+```
+
+### Proactive Context Flow
+
+```
+overnight_runner.run()
+  ├── load_prior_context(runs_dir)          # Read shared memory
+  │     ├── Find N most recent manifests
+  │     ├── Extract best_bss, best_config_hash
+  │     ├── Identify failed_runs for quarantine
+  │     └── Return structured context dict
+  ├── check_data_staleness(current_version) # Cache validation
+  │     ├── Compare vs data/processed/data_version.json
+  │     └── Return {stale: bool, reason: str}
+  ├── [Execute phases with checkpoint state machine]
+  └── manifest.save(runs_dir)               # Write to shared memory
+```
+
+### Deferred Items (Research → Not Yet Needed)
+
+These research concepts were evaluated and intentionally deferred:
+
+| Concept | Reason for Deferral |
+|---------|---------------------|
+| Service mesh / MCP protocol | Single-process; no inter-service communication needed |
+| A2A (Agent-to-Agent) protocol | Single developer; Claude Code sessions are sequential |
+| GPU orchestration / CUDA scheduling | K-NN is CPU-bound; no neural training yet |
+| LLM debate / multi-model consensus | One model (Claude) is sufficient for code generation |
+| Vector DB for agent memory | File-based manifests scale to thousands of runs |
+| Real-time event bus | Overnight batch processing; no streaming requirements |
+| Kubernetes / container orchestration | Runs on single machine, <10min per overnight cycle |
+
+### Implementation Phases
+
+**Phase 1 (v2.2 — COMPLETE):**
+- `manifest.py`: RunManifest, generate_run_id, compute_data_version, load_prior_context, check_data_staleness, save_data_version
+- `overnight.py`: Checkpoint state machine, manifest integration, prior context loading
+- `test_manifest.py`: 15 tests for manifest system
+- `test_review_fixes.py`: 37 tests for all v2.2 fixes
+
+**Phase 2 (v2.3 — PLANNED):**
+- Integrate `compute_data_version()` into `DataLoader.build_database()` flow
+- Create `risk_gate.py` for pre-signal governance checks
+- Add `SignalEvidence` structured output replacing raw dicts in `live.py`
+- Extend `cross_validation.py` synthesis layer for ensemble weighting
+- Auto-warm Bayesian sweeps from prior best configs
+- Add `run_id` and `data_version` columns to experiments.tsv
+
+**Phase 3 (v3.0+ — FUTURE):**
+- Neural hybrid features would benefit from structured caching
+- Multi-model consensus if ensemble strategy proves viable
+- Vector DB migration if manifest count exceeds ~10K runs

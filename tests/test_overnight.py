@@ -143,9 +143,11 @@ class TestOvernightRunner:
             # Checkpoint should contain p01 (success) but NOT p00 (failure)
             with open(cp) as f:
                 checkpoint = json.load(f)
-            completed = checkpoint["completed_phase_ids"]
-            assert "p01" in completed, "Successful phase must be checkpointed"
-            assert "p00" not in completed, "Failed phase must NOT be checkpointed"
+            phases = checkpoint["phases"]
+            assert "p01" in phases and phases["p01"]["status"] == "completed", \
+                "Successful phase must be checkpointed as completed"
+            assert "p00" not in phases or phases["p00"]["status"] != "completed", \
+                "Failed phase must NOT be checkpointed as completed"
 
     def test_bayesian_run(self, synthetic_db, two_folds):
         """Bayesian mode runs Optuna study."""

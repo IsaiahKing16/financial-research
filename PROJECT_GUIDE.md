@@ -295,7 +295,7 @@ BSS < 0    = worse than base rate
 - 2024 fold = positive BSS — genuine predictive skill on unseen data
 - 2022 bear market = worst fold (regime shift, fewer bear training analogues)
 - Expanding window means later folds have more training data → better performance
-- 331 automated tests all passing (243 pattern_engine + 88 trading_system)
+- 388 automated tests all passing (300 pattern_engine + 88 trading_system)
 
 ---
 
@@ -493,7 +493,7 @@ pip install -r requirements.txt  # includes optuna
 ```cmd
 python -m pytest tests/ -v
 ```
-All **331 tests** must pass (18 test files: 15 pattern_engine + 3 trading_system).
+All **388 tests** must pass (24 test files: 21 pattern_engine + 3 trading_system).
 
 ### Key Entry Points
 
@@ -558,7 +558,7 @@ print(results.sort_values("mean_bss", ascending=False).head(10))
 ## 12. DELIVERABLES PRODUCED
 
 ### 12.1 Python Package (`pattern_engine/`)
-21 modules, 243 tests, all passing. Fully modular replacement of monolithic strategy.py.
+21 modules, 300 tests, all passing. Fully modular replacement of monolithic strategy.py.
 Merged to main branch 2026-03-18. Legacy files (strategy.py, strategyv1-v4.py) preserved
 but marked superseded.
 

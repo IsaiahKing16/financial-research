@@ -179,17 +179,26 @@ class TestRiskEngineIntegration:
             })
         price_df = pd.DataFrame(rows)
 
-        signal_df = pd.DataFrame(
-            [
+        signal_rows = [
+            {
+                "date": pd.Timestamp(dates[22]),
+                "ticker": "AAPL",
+                "signal": "BUY",
+                "confidence": 0.90,
+                "sector": "Tech",
+            }
+        ]
+        for idx in range(23, 30):
+            signal_rows.append(
                 {
-                    "date": pd.Timestamp(dates[22]),
+                    "date": pd.Timestamp(dates[idx]),
                     "ticker": "AAPL",
-                    "signal": "BUY",
-                    "confidence": 0.90,
+                    "signal": "HOLD",
+                    "confidence": 0.50,
                     "sector": "Tech",
                 }
-            ]
-        )
+            )
+        signal_df = pd.DataFrame(signal_rows)
 
         engine = BacktestEngine(simple_config, use_risk_engine=True)
         results = engine.run(signal_df, price_df)

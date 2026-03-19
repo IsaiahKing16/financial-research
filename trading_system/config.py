@@ -8,6 +8,7 @@ why that value was chosen.
 Design doc reference: FPPE_TRADING_SYSTEM_DESIGN.md v0.3, Section 4.1
 """
 
+import dataclasses
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
@@ -50,7 +51,7 @@ SECTOR_MAP: Dict[str, str] = {
 ALL_TICKERS: List[str] = list(SECTOR_MAP.keys())
 
 
-@dataclass
+@dataclass(frozen=True)
 class CapitalConfig:
     """Capital and account parameters."""
     initial_capital: float = 10_000.0      # Paper trading baseline
@@ -58,7 +59,7 @@ class CapitalConfig:
     max_gross_exposure: float = 1.0        # v1: long-only, no leverage
 
 
-@dataclass
+@dataclass(frozen=True)
 class CostConfig:
     """Transaction cost model.
 
@@ -87,7 +88,7 @@ class CostConfig:
         return self.total_entry_bps + self.total_exit_bps
 
 
-@dataclass
+@dataclass(frozen=True)
 class PositionLimitsConfig:
     """Position sizing constraints.
 
@@ -101,7 +102,7 @@ class PositionLimitsConfig:
     max_positions_per_sector: int = 3      # Even within the 30% limit
 
 
-@dataclass
+@dataclass(frozen=True)
 class SignalConfig:
     """Signal filtering parameters applied before the backtest engine.
 
@@ -120,7 +121,7 @@ class SignalConfig:
     min_agreement: float = 0.10           # Minimum agreement spread (|prob - 0.5| × 2)
 
 
-@dataclass
+@dataclass(frozen=True)
 class TradeManagementConfig:
     """Rules governing trade lifecycle.
 
@@ -144,7 +145,7 @@ class TradeManagementConfig:
     allow_same_day_churn: bool = False     # Cannot exit and re-enter same ticker same day
 
 
-@dataclass
+@dataclass(frozen=True)
 class RiskConfig:
     """Risk management parameters.
 
@@ -160,7 +161,7 @@ class RiskConfig:
     drawdown_halt_threshold: float = 0.20  # Halt all new trades at 20% drawdown
 
 
-@dataclass
+@dataclass(frozen=True)
 class EvaluationConfig:
     """Performance evaluation windows and thresholds."""
     rolling_windows: List[int] = field(
@@ -170,9 +171,17 @@ class EvaluationConfig:
     baseline_random_iterations: int = 100  # Monte Carlo iterations for random baseline
 
 
-@dataclass
+@dataclass(frozen=True)
 class TradingConfig:
     """Master configuration container. All sub-configs in one place.
+
+    frozen=True enforces immutability: all field modifications must go through
+    dataclasses.replace(), preventing accidental in-place mutations after
+    construction (e.g. in test fixtures or multi-threaded signal processing).
+
+    NOTE: sector_map is a Dict field, so hash(TradingConfig) raises TypeError
+    (same limitation as EngineConfig in pattern_engine — see CLAUDE.md gotchas).
+    Use repr() for identity comparisons.
 
     Usage:
         config = TradingConfig()
@@ -296,22 +305,51 @@ class TradingConfig:
             return cls()
 
         elif profile == "moderate":
-            cfg = cls()
-            cfg.signals.confidence_threshold = 0.63    # 530 BUY signals, 14.4% annual
-            cfg.trade_management.max_holding_days = 12
-            cfg.position_limits.max_position_pct = 0.08
-            cfg.risk.drawdown_halt_threshold = 0.18
-            cfg.risk.drawdown_brake_threshold = 0.12
-            return cfg
+            # Use dataclasses.replace() on each sub-config so all other fields
+            # keep their defaults.  Direct field assignment is not possible on
+            # frozen dataclasses; this is the correct mutation pattern.
+            default = cls()
+            return cls(
+                signals=dataclasses.replace(
+                    default.signals,
+                    confidence_threshold=0.63,   # 530 BUY signals, 14.4% annual
+                ),
+                trade_management=dataclasses.replace(
+                    default.trade_management,
+                    max_holding_days=12,
+                ),
+                position_limits=dataclasses.replace(
+                    default.position_limits,
+                    max_position_pct=0.08,
+                ),
+                risk=dataclasses.replace(
+                    default.risk,
+                    drawdown_halt_threshold=0.18,
+                    drawdown_brake_threshold=0.12,
+                ),
+            )
 
         elif profile == "conservative":
-            cfg = cls()
-            cfg.signals.confidence_threshold = 0.68    # ~90 est. BUY signals, higher quality
-            cfg.trade_management.max_holding_days = 10  # Tighter, closer to FPPE horizon
-            cfg.position_limits.max_position_pct = 0.07
-            cfg.risk.drawdown_halt_threshold = 0.15
-            cfg.risk.drawdown_brake_threshold = 0.10
-            return cfg
+            default = cls()
+            return cls(
+                signals=dataclasses.replace(
+                    default.signals,
+                    confidence_threshold=0.68,   # ~90 est. BUY signals, higher quality
+                ),
+                trade_management=dataclasses.replace(
+                    default.trade_management,
+                    max_holding_days=10,         # Tighter, closer to FPPE horizon
+                ),
+                position_limits=dataclasses.replace(
+                    default.position_limits,
+                    max_position_pct=0.07,
+                ),
+                risk=dataclasses.replace(
+                    default.risk,
+                    drawdown_halt_threshold=0.15,
+                    drawdown_brake_threshold=0.10,
+                ),
+            )
 
         else:
             raise ValueError(

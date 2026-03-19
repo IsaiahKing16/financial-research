@@ -87,11 +87,17 @@ class PatternEngine:
     def fit(self, train_db: pd.DataFrame) -> "PatternEngine":
         """Fit all engine components on training data.
 
-        This encapsulates the calibration double-pass:
-        1. Fit scaler + NN index on training features
-        2. Fit regime labeler on training SPY rows
-        3. Run matching on train-as-query (calibration pass)
-        4. Fit calibrator on raw probabilities from that pass
+        Calibration uses a chronological split controlled by cal_frac:
+        1. Fit regime labeler on full train_db
+        2. Fit NN index on the earlier (1-cal_frac) portion of train_db
+        3. Run calibration query on the later cal_frac portion (held-out)
+           — these rows are never in the index they're queried against,
+           eliminating temporal leakage from adjacent-date cross-matches
+        4. Rebuild NN index on full train_db for inference
+        5. Fit calibrator on held-out probabilities
+
+        Fallback (cal_frac==1.0 or no Date column): train-as-query pass.
+        This has known temporal leakage; only same-ticker exclusion applies.
 
         CRITICAL: The calibration pass uses regime_filter=True (when enabled)
         to match the inference-time distribution. Mismatched distributions
@@ -110,6 +116,7 @@ class PatternEngine:
 
         self._train_db = train_db.copy()
         fcols = self._features.columns
+        horizon_binary = cfg.projection_horizon
 
         # Step 1: Fit regime labeler
         if cfg.regime_filter:
@@ -121,22 +128,49 @@ class PatternEngine:
         else:
             self._regime_labeler = None
 
-        # Step 2: Fit matcher (scaler + NN index)
+        # Step 2: Initial matcher fit (may be rebuilt below after cal split)
         self._matcher = Matcher(cfg)
         self._matcher.fit(train_db, fcols, regime_labeler=self._regime_labeler)
 
-        # Step 3: Calibration double-pass
-        # Run matching on train-as-query with identical filtering settings
+        # Step 3: Calibration pass
+        # When cal_frac < 1.0 and Date is available, use a chronological
+        # train/cal split so calibration rows are never in the NN index.
         if cfg.calibration_method != "none":
-            cal_probs, _, _, _, _, _ = self._matcher.query(
-                train_db, regime_labeler=self._regime_labeler, verbose=0
+            use_chrono_split = (
+                cfg.cal_frac < 1.0
+                and "Date" in train_db.columns
+                and len(train_db) >= 20
             )
 
-            # Get ground truth for training data
-            horizon_binary = cfg.projection_horizon
-            y_true = train_db[horizon_binary].values
+            if use_chrono_split:
+                train_sorted = train_db.sort_values("Date").reset_index(drop=True)
+                split_idx = max(10, int(len(train_sorted) * (1 - cfg.cal_frac)))
+                index_db = train_sorted.iloc[:split_idx]
+                cal_query_db = train_sorted.iloc[split_idx:]
 
-            # Fit calibrator
+                # Temporary matcher on the earlier portion only
+                cal_matcher = Matcher(cfg)
+                cal_matcher.fit(
+                    index_db, fcols, regime_labeler=self._regime_labeler
+                )
+                cal_probs, _, _, _, _, _ = cal_matcher.query(
+                    cal_query_db, regime_labeler=self._regime_labeler, verbose=0
+                )
+                y_true = cal_query_db[horizon_binary].values
+
+                # Rebuild final matcher on full train_db for inference
+                self._matcher = Matcher(cfg)
+                self._matcher.fit(
+                    train_db, fcols, regime_labeler=self._regime_labeler
+                )
+            else:
+                # Fallback: train-as-query (temporal leakage present;
+                # same-ticker exclusion applies but not date embargo)
+                cal_probs, _, _, _, _, _ = self._matcher.query(
+                    train_db, regime_labeler=self._regime_labeler, verbose=0
+                )
+                y_true = train_db[horizon_binary].values
+
             self._calibrator = make_calibrator(cfg.calibration_method)
             self._calibrator.fit(cal_probs, y_true)
         else:
@@ -155,7 +189,10 @@ class PatternEngine:
         Returns:
             PredictionResult with probabilities, signals, etc.
         """
-        assert self._fitted, "Call fit() first"
+        if not self._fitted:
+            raise RuntimeError(
+                "PatternEngine is not fitted. Call fit(train_db) first."
+            )
 
         # Schema validation at boundary
         validate_query_db(query_db, self.config.feature_set)
@@ -238,7 +275,10 @@ class PatternEngine:
         Uses temp+fsync+rename so a crash mid-write preserves the old file.
         Saves: config, scaler, NN index, calibrator, regime thresholds.
         """
-        assert self._fitted, "Call fit() first"
+        if not self._fitted:
+            raise RuntimeError(
+                "PatternEngine is not fitted. Call fit(train_db) first."
+            )
         import tempfile, os
 
         state = {

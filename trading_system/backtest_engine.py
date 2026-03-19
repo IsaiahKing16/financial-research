@@ -22,6 +22,8 @@ import numpy as np
 from dataclasses import dataclass, field
 from typing import List, Dict, Optional, Tuple
 from .config import TradingConfig, DEFAULT_CONFIG, SECTOR_MAP
+from .risk_engine import check_stop_loss, size_position
+from .risk_state import RiskState, StopLossEvent
 
 
 # ============================================================
@@ -41,6 +43,7 @@ class OpenPosition:
     position_pct: float            # % of equity at entry
     confidence_at_entry: float
     stop_loss_price: float         # Set by risk engine; 0 = no stop in Phase 1
+    atr_pct_at_entry: float = 0.0  # ATR% at entry for stop-loss audit records
     days_held: int = 0
 
 
@@ -110,8 +113,13 @@ class BacktestEngine:
         print(results.summary())
     """
 
-    def __init__(self, config: TradingConfig = None):
+    def __init__(
+        self,
+        config: TradingConfig = None,
+        use_risk_engine: bool = False,
+    ):
         self.config = config or DEFAULT_CONFIG
+        self.use_risk_engine = use_risk_engine
         self._validate_config()
 
     def _validate_config(self):
@@ -126,6 +134,7 @@ class BacktestEngine:
         signal_df: pd.DataFrame,
         price_df: pd.DataFrame,
         equal_weight_pct: float = 0.05,
+        use_risk_engine: Optional[bool] = None,
     ) -> "BacktestResults":
         """Run the full backtest simulation.
 
@@ -141,12 +150,19 @@ class BacktestEngine:
 
             equal_weight_pct: Position size as % of equity for Phase 1.
                 Default 5% (max 20 simultaneous positions at 100% exposure).
+                Ignored when use_risk_engine=True.
+
+            use_risk_engine: Optional override for this run call. If None,
+                uses BacktestEngine.use_risk_engine from construction.
 
         Returns:
             BacktestResults containing trade log, equity curve, and rejected signals.
         """
         # ── Validate inputs ──────────────────────────────────────────
         self._validate_inputs(signal_df, price_df)
+        risk_engine_enabled = (
+            self.use_risk_engine if use_risk_engine is None else use_risk_engine
+        )
 
         # ── Initialize state ─────────────────────────────────────────
         cash = self.config.capital.initial_capital
@@ -156,11 +172,25 @@ class BacktestEngine:
         trade_log: List[CompletedTrade] = []
         daily_records: List[DailyRecord] = []
         rejected_signals: List[RejectedSignal] = []
+        stop_loss_events: List[StopLossEvent] = []
         cooldowns: Dict[str, Dict] = {}  # ticker → {until_date, last_confidence}
         trade_counter = 0
+        risk_state = (
+            RiskState.initial(cash) if risk_engine_enabled else None
+        )
 
         # Build price lookup: (date, ticker) → {open, high, low, close}
         price_lookup = self._build_price_lookup(price_df)
+        price_history_by_ticker: Dict[str, pd.DataFrame] = {}
+        if risk_engine_enabled:
+            history_df = price_df.copy()
+            history_df["Date"] = pd.to_datetime(history_df["Date"])
+            for ticker, ticker_hist in history_df.groupby("Ticker", sort=False):
+                price_history_by_ticker[ticker] = (
+                    ticker_hist[["Date", "Open", "High", "Low", "Close"]]
+                    .sort_values("Date")
+                    .reset_index(drop=True)
+                )
 
         # Get sorted unique trading dates from signals
         signal_dates = sorted(signal_df["date"].unique())
@@ -179,9 +209,17 @@ class BacktestEngine:
         cumulative_cash_yield = 0.0
         cumulative_trading_pnl = 0.0
 
+        engine_mode = "Phase 2 (Risk Engine)" if risk_engine_enabled else "Phase 1 (Equal Weight)"
         print(f"\n{'='*60}")
-        print(f"  BACKTEST ENGINE — Phase 1 (Equal Weight)")
-        print(f"  Capital: ${cash:,.0f} | Position size: {equal_weight_pct:.0%}")
+        print(f"  BACKTEST ENGINE — {engine_mode}")
+        if risk_engine_enabled:
+            print(
+                f"  Capital: ${cash:,.0f} | "
+                f"ATR lookback: {cfg_risk.volatility_lookback} | "
+                f"Stop: {cfg_risk.stop_loss_atr_multiple:.1f}x ATR"
+            )
+        else:
+            print(f"  Capital: ${cash:,.0f} | Position size: {equal_weight_pct:.0%}")
         print(f"  Friction: {cfg_costs.round_trip_bps:.0f} bps round-trip")
         print(f"  Signals: {len(signal_df):,} rows over {len(signal_dates)} days")
         print(f"{'='*60}\n")
@@ -198,6 +236,7 @@ class BacktestEngine:
 
             # ── Step 1: Check exits on open positions ────────────────
             positions_to_close = []
+            stop_trigger_details: Dict[str, Dict[str, float]] = {}
 
             for ticker, pos in open_positions.items():
                 pos.days_held += 1
@@ -209,34 +248,67 @@ class BacktestEngine:
 
                 exit_reason = None
 
-                # Check max holding period
-                if pos.days_held >= cfg_trade.max_holding_days:
-                    exit_reason = "max_hold"
+                if risk_engine_enabled:
+                    # Phase 2: keep stop-loss as highest-priority exit reason
+                    # to preserve explicit stop-loss auditability.
+                    if pos.days_held >= cfg_trade.max_holding_days:
+                        exit_reason = "max_hold"
 
-                # Check stop-loss (evaluated on intraday low)
-                if pos.stop_loss_price > 0 and prices_today["low"] <= pos.stop_loss_price:
-                    exit_reason = "stop_loss"
+                    if check_stop_loss(prices_today["low"], pos.stop_loss_price):
+                        exit_reason = "stop_loss"
+                        stop_trigger_details[ticker] = {
+                            "trigger_low": prices_today["low"],
+                            "stop_price": pos.stop_loss_price,
+                        }
 
-                # Check for exit signal on held long position.
-                # SELL = explicit exit signal → close position.
-                # HOLD = "don't open new positions" but does NOT close existing ones.
-                # Only SELL triggers an exit from a signal. The original bug
-                # treated HOLD as an exit, causing every position to close after
-                # 1 day (since most tickers return to HOLD the next day).
-                day_signals = signal_df[
-                    (signal_df["date"] == current_date) &
-                    (signal_df["ticker"] == ticker)
-                ]
-                if len(day_signals) > 0:
-                    sig = day_signals.iloc[0]["signal"]
-                    if sig in ("SELL",):
-                        exit_reason = "signal"
+                    # Check for exit signal on held long position.
+                    # SELL = explicit exit signal → close position.
+                    # HOLD = "don't open new positions" but does NOT close existing ones.
+                    # Only SELL triggers an exit from a signal.
+                    day_signals = signal_df[
+                        (signal_df["date"] == current_date) &
+                        (signal_df["ticker"] == ticker)
+                    ]
+                    if len(day_signals) > 0:
+                        sig = day_signals.iloc[0]["signal"]
+                        if sig in ("SELL",) and exit_reason != "stop_loss":
+                            exit_reason = "signal"
 
-                # Check drawdown halt
-                if equity > 0:
-                    current_dd = 1.0 - (equity / peak_equity)
-                    if current_dd >= cfg_risk.drawdown_halt_threshold:
-                        exit_reason = "drawdown_halt"
+                    # Drawdown halt for forced exits only applies when no
+                    # higher-priority reason has already been selected.
+                    if exit_reason is None and equity > 0:
+                        current_dd = 1.0 - (equity / peak_equity)
+                        if current_dd >= cfg_risk.drawdown_halt_threshold:
+                            exit_reason = "drawdown_halt"
+                else:
+                    # Check max holding period
+                    if pos.days_held >= cfg_trade.max_holding_days:
+                        exit_reason = "max_hold"
+
+                    # Check stop-loss (evaluated on intraday low)
+                    if pos.stop_loss_price > 0 and prices_today["low"] <= pos.stop_loss_price:
+                        exit_reason = "stop_loss"
+
+                    # Check for exit signal on held long position.
+                    # SELL = explicit exit signal → close position.
+                    # HOLD = "don't open new positions" but does NOT close existing ones.
+                    # Only SELL triggers an exit from a signal. The original bug
+                    # treated HOLD as an exit, causing every position to close after
+                    # 1 day (since most tickers return to HOLD the next day).
+                    day_signals = signal_df[
+                        (signal_df["date"] == current_date) &
+                        (signal_df["ticker"] == ticker)
+                    ]
+                    if len(day_signals) > 0:
+                        sig = day_signals.iloc[0]["signal"]
+                        if sig in ("SELL",):
+                            exit_reason = "signal"
+
+                    # Check drawdown halt
+                    if equity > 0:
+                        current_dd = 1.0 - (equity / peak_equity)
+                        if current_dd >= cfg_risk.drawdown_halt_threshold:
+                            exit_reason = "drawdown_halt"
 
                 if exit_reason:
                     positions_to_close.append((ticker, exit_reason))
@@ -299,6 +371,21 @@ class BacktestEngine:
                 cash += proceeds
                 cumulative_trading_pnl += net_pnl
 
+                if exit_reason == "stop_loss" and ticker in stop_trigger_details:
+                    stop_details = stop_trigger_details[ticker]
+                    stop_loss_events.append(
+                        StopLossEvent(
+                            ticker=ticker,
+                            trigger_date=str(current_date.date()),
+                            stop_price=float(stop_details["stop_price"]),
+                            trigger_low=float(stop_details["trigger_low"]),
+                            entry_price=pos.entry_price,
+                            exit_price=raw_exit_price,
+                            gap_through=float(stop_details["trigger_low"]) < float(stop_details["stop_price"]),
+                            atr_at_entry=pos.atr_pct_at_entry,
+                        )
+                    )
+
                 # Set cooldown if exit was stop-loss or max-hold
                 if exit_reason in ("stop_loss", "max_hold"):
                     cooldown_days = (
@@ -313,6 +400,8 @@ class BacktestEngine:
                         "last_confidence": pos.confidence_at_entry,
                     }
 
+                if risk_engine_enabled and risk_state is not None:
+                    risk_state.remove_stop(ticker)
                 del open_positions[ticker]
 
             # ── Step 3: Process new BUY signals ──────────────────────
@@ -337,6 +426,151 @@ class BacktestEngine:
                         stacklevel=2
                     )
                     sector = "Unknown"
+
+                if risk_engine_enabled:
+                    # ── Phase 2 rejection checks before sizing ────────────────
+                    if ticker in open_positions:
+                        rejected_signals.append(RejectedSignal(
+                            date=current_date, ticker=ticker, signal="BUY",
+                            confidence=confidence,
+                            rejection_reason="Already holding position",
+                            rejection_layer="backtest",
+                        ))
+                        continue
+
+                    if ticker in cooldowns:
+                        cd = cooldowns[ticker]
+                        if current_date < cd["until_date"]:
+                            if confidence < cd["last_confidence"] + cfg_trade.reentry_confidence_margin:
+                                rejected_signals.append(RejectedSignal(
+                                    date=current_date, ticker=ticker, signal="BUY",
+                                    confidence=confidence,
+                                    rejection_reason=(
+                                        f"In cooldown until {cd['until_date'].date()}; "
+                                        f"need confidence ≥ {cd['last_confidence'] + cfg_trade.reentry_confidence_margin:.2f}"
+                                    ),
+                                    rejection_layer="cooldown",
+                                ))
+                                continue
+                        else:
+                            del cooldowns[ticker]
+
+                    sector_positions = sum(
+                        1 for p in open_positions.values() if p.sector == sector
+                    )
+                    if sector_positions >= cfg_pos.max_positions_per_sector:
+                        rejected_signals.append(RejectedSignal(
+                            date=current_date, ticker=ticker, signal="BUY",
+                            confidence=confidence,
+                            rejection_reason=f"Sector {sector} at max {cfg_pos.max_positions_per_sector} positions",
+                            rejection_layer="sector_limit",
+                        ))
+                        continue
+
+                    next_prices = price_lookup.get((next_date, ticker))
+                    if next_prices is None:
+                        rejected_signals.append(RejectedSignal(
+                            date=current_date, ticker=ticker, signal="BUY",
+                            confidence=confidence,
+                            rejection_reason="No price data for next trading day",
+                            rejection_layer="data",
+                        ))
+                        continue
+
+                    # Buy at next open with slippage (buying: price goes up)
+                    raw_entry_price = next_prices["open"]
+                    entry_price = raw_entry_price * (1 + cfg_costs.total_entry_bps / 10_000)
+
+                    history_rows = cfg_risk.volatility_lookback + 1
+                    price_history = self._get_ticker_history(
+                        price_history_by_ticker=price_history_by_ticker,
+                        ticker=ticker,
+                        as_of_date=current_date,
+                        n_rows=history_rows,
+                    )
+                    if price_history.empty:
+                        rejected_signals.append(RejectedSignal(
+                            date=current_date, ticker=ticker, signal="BUY",
+                            confidence=confidence,
+                            rejection_reason="Insufficient history: 0 rows",
+                            rejection_layer="risk_engine",
+                        ))
+                        continue
+
+                    decision = size_position(
+                        ticker=ticker,
+                        entry_price=entry_price,
+                        current_equity=equity,
+                        price_history=price_history,
+                        risk_state=risk_state if risk_state is not None else RiskState.initial(equity),
+                        config=cfg_risk,
+                        position_limits=cfg_pos,
+                        sector_map=self.config.sector_map,
+                        open_positions=open_positions,
+                        fractional_shares=self.config.capital.fractional_shares,
+                    )
+                    if not decision.approved:
+                        rejected_signals.append(RejectedSignal(
+                            date=current_date, ticker=ticker, signal="BUY",
+                            confidence=confidence,
+                            rejection_reason=decision.rejection_reason or "Risk engine rejected trade",
+                            rejection_layer="risk_engine",
+                        ))
+                        continue
+
+                    # Keep the existing backtest-level exposure/cash constraints.
+                    sector_exposure = sum(
+                        p.position_pct for p in open_positions.values() if p.sector == sector
+                    )
+                    if sector_exposure + decision.position_pct > cfg_pos.max_sector_pct:
+                        rejected_signals.append(RejectedSignal(
+                            date=current_date, ticker=ticker, signal="BUY",
+                            confidence=confidence,
+                            rejection_reason=f"Sector {sector} exposure would exceed {cfg_pos.max_sector_pct:.0%}",
+                            rejection_layer="sector_limit",
+                        ))
+                        continue
+
+                    current_exposure = sum(p.position_pct for p in open_positions.values())
+                    if current_exposure + decision.position_pct > self.config.capital.max_gross_exposure:
+                        rejected_signals.append(RejectedSignal(
+                            date=current_date, ticker=ticker, signal="BUY",
+                            confidence=confidence,
+                            rejection_reason=f"Gross exposure would exceed {self.config.capital.max_gross_exposure:.0%}",
+                            rejection_layer="exposure_limit",
+                        ))
+                        continue
+
+                    if cash < decision.dollar_amount:
+                        rejected_signals.append(RejectedSignal(
+                            date=current_date, ticker=ticker, signal="BUY",
+                            confidence=confidence,
+                            rejection_reason=f"Insufficient cash (${cash:,.0f} < ${decision.dollar_amount:,.0f})",
+                            rejection_layer="capital",
+                        ))
+                        continue
+
+                    # Deduct from cash
+                    cost = decision.shares * entry_price
+                    cash -= cost
+
+                    trade_counter += 1
+                    open_positions[ticker] = OpenPosition(
+                        trade_id=trade_counter,
+                        ticker=ticker,
+                        sector=sector,
+                        entry_date=next_date,
+                        raw_entry_price=raw_entry_price,
+                        entry_price=entry_price,
+                        shares=decision.shares,
+                        position_pct=decision.position_pct,
+                        confidence_at_entry=confidence,
+                        stop_loss_price=decision.stop_price,
+                        atr_pct_at_entry=decision.atr_pct,
+                    )
+                    if risk_state is not None:
+                        risk_state.register_stop(ticker, decision.stop_price)
+                    continue
 
                 # ── Rejection checks ─────────────────────────────────
 
@@ -503,6 +737,12 @@ class BacktestEngine:
             equity = cash + invested_value
             peak_equity = max(peak_equity, equity)
             drawdown = 1.0 - (equity / peak_equity) if peak_equity > 0 else 0.0
+            if risk_engine_enabled and risk_state is not None:
+                risk_state.update(
+                    current_equity=equity,
+                    brake_threshold=cfg_risk.drawdown_brake_threshold,
+                    halt_threshold=cfg_risk.drawdown_halt_threshold,
+                )
 
             cum_return = (equity / self.config.capital.initial_capital) - 1.0
             prev_equity = daily_records[-1].equity if daily_records else self.config.capital.initial_capital
@@ -587,6 +827,8 @@ class BacktestEngine:
                         exit_reason="backtest_end",
                         confidence_at_entry=pos.confidence_at_entry,
                     ))
+                    if risk_engine_enabled and risk_state is not None:
+                        risk_state.remove_stop(ticker)
 
         return BacktestResults(
             trade_log=trade_log,
@@ -594,6 +836,7 @@ class BacktestEngine:
             rejected_signals=rejected_signals,
             config=self.config,
             force_close_exit_friction=force_close_exit_friction,
+            stop_loss_events=stop_loss_events,
         )
 
     # ── Helper methods ────────────────────────────────────────────
@@ -643,6 +886,22 @@ class BacktestEngine:
                 return d
         return None
 
+    def _get_ticker_history(
+        self,
+        price_history_by_ticker: Dict[str, pd.DataFrame],
+        ticker: str,
+        as_of_date: pd.Timestamp,
+        n_rows: int,
+    ) -> pd.DataFrame:
+        """Return up-to-date trailing OHLC history for one ticker."""
+        ticker_history = price_history_by_ticker.get(ticker)
+        if ticker_history is None:
+            return pd.DataFrame(columns=["Date", "Open", "High", "Low", "Close"])
+        eligible = ticker_history[ticker_history["Date"] <= as_of_date]
+        if eligible.empty:
+            return eligible
+        return eligible.tail(n_rows).copy()
+
     def _advance_trading_days(
         self, start_date: pd.Timestamp, n_days: int, all_dates: list
     ) -> pd.Timestamp:
@@ -682,10 +941,12 @@ class BacktestResults:
         rejected_signals: List[RejectedSignal],
         config: TradingConfig,
         force_close_exit_friction: float = 0.0,
+        stop_loss_events: Optional[List[StopLossEvent]] = None,
     ):
         self.trade_log = trade_log
         self.daily_records = daily_records
         self.rejected_signals = rejected_signals
+        self.stop_loss_events = stop_loss_events or []
         self.config = config
         # D1 fix: daily_records[-1].equity marks force-closed positions at close (MTM,
         # no friction).  Store the exit friction so final_equity() returns the correct
@@ -696,6 +957,7 @@ class BacktestResults:
         self.trades_df = self._trades_to_df()
         self.equity_df = self._equity_to_df()
         self.rejected_df = self._rejected_to_df()
+        self.stop_events_df = self._stop_events_to_df()
 
     def _trades_to_df(self) -> pd.DataFrame:
         if not self.trade_log:
@@ -759,6 +1021,23 @@ class BacktestResults:
                 "confidence": r.confidence,
                 "rejection_reason": r.rejection_reason,
                 "rejection_layer": r.rejection_layer,
+            })
+        return pd.DataFrame(records)
+
+    def _stop_events_to_df(self) -> pd.DataFrame:
+        if not self.stop_loss_events:
+            return pd.DataFrame()
+        records = []
+        for event in self.stop_loss_events:
+            records.append({
+                "ticker": event.ticker,
+                "trigger_date": event.trigger_date,
+                "stop_price": event.stop_price,
+                "trigger_low": event.trigger_low,
+                "entry_price": event.entry_price,
+                "exit_price": event.exit_price,
+                "gap_through": event.gap_through,
+                "atr_at_entry": event.atr_at_entry,
             })
         return pd.DataFrame(records)
 
@@ -922,6 +1201,9 @@ class BacktestResults:
             for reason, count in sorted(exit_reasons.items(), key=lambda x: -x[1]):
                 lines.append(f"  {reason:<25} {count:>6}")
 
+        if self.stop_loss_events:
+            lines.append(f"  Stop-loss events:    {len(self.stop_loss_events):>10}")
+
         lines.append("")
         lines.append("=" * 60)
         return "\n".join(lines)
@@ -938,6 +1220,8 @@ class BacktestResults:
             self.equity_df.to_csv(out / "backtest_equity.csv", index=False)
         if not self.rejected_df.empty:
             self.rejected_df.to_csv(out / "backtest_rejected.csv", index=False)
+        if not self.stop_events_df.empty:
+            self.stop_events_df.to_csv(out / "backtest_stop_events.csv", index=False)
 
         # Save summary text
         with open(out / "backtest_summary.txt", "w") as f:

@@ -27,6 +27,7 @@ from typing import List
 import pandas as pd
 import numpy as np
 import pytest
+from pandas.testing import assert_frame_equal
 
 from trading_system.backtest_engine import (
     BacktestEngine,
@@ -137,6 +138,75 @@ class TestBacktestEngineConstruction:
         )
         with pytest.raises(ValueError, match="Invalid config"):
             BacktestEngine(bad_config)
+
+    def test_use_risk_engine_false_preserves_legacy_outputs(self, simple_config):
+        """Legacy behavior must be preserved when risk engine is disabled."""
+        dates = pd.bdate_range("2024-01-02", periods=12)
+        signal_df = _make_signal_df(["AAPL", "MSFT"], dates[:9], signal="BUY")
+        price_df = _make_price_df(["AAPL", "MSFT"], dates, base_price=100.0, drift=0.002)
+
+        legacy_engine = BacktestEngine(simple_config)
+        flagged_engine = BacktestEngine(simple_config, use_risk_engine=False)
+
+        legacy_results = legacy_engine.run(signal_df, price_df)
+        flagged_results = flagged_engine.run(signal_df, price_df)
+
+        assert_frame_equal(legacy_results.trades_df, flagged_results.trades_df, check_exact=True)
+        assert_frame_equal(legacy_results.equity_df, flagged_results.equity_df, check_exact=True)
+        assert_frame_equal(legacy_results.rejected_df, flagged_results.rejected_df, check_exact=True)
+        assert flagged_results.stop_events_df.empty
+
+
+class TestRiskEngineIntegration:
+    def test_stop_loss_event_recorded_with_use_risk_engine(self, simple_config):
+        """Phase 2 should emit stop-loss events and stop_loss exits."""
+        dates = pd.bdate_range("2024-01-02", periods=35)
+        rows = []
+        for idx, d in enumerate(dates):
+            open_p = 100.0 + (idx * 0.10)
+            high_p = open_p + 2.0
+            low_p = open_p - 2.0
+            close_p = open_p + 0.5
+            if idx == 24:
+                low_p = 90.0  # hard breach below expected ATR stop
+            rows.append({
+                "Date": pd.Timestamp(d),
+                "Ticker": "AAPL",
+                "Open": open_p,
+                "High": high_p,
+                "Low": low_p,
+                "Close": close_p,
+            })
+        price_df = pd.DataFrame(rows)
+
+        signal_df = pd.DataFrame(
+            [
+                {
+                    "date": pd.Timestamp(dates[22]),
+                    "ticker": "AAPL",
+                    "signal": "BUY",
+                    "confidence": 0.90,
+                    "sector": "Tech",
+                }
+            ]
+        )
+
+        engine = BacktestEngine(simple_config, use_risk_engine=True)
+        results = engine.run(signal_df, price_df)
+
+        assert any(t.exit_reason == "stop_loss" for t in results.trade_log)
+        assert len(results.stop_loss_events) == 1
+        assert not results.stop_events_df.empty
+
+        stop_event = results.stop_loss_events[0]
+        expected_exit_open = price_df.loc[
+            (price_df["Date"] == pd.Timestamp(dates[25])) & (price_df["Ticker"] == "AAPL"),
+            "Open",
+        ].iloc[0]
+        assert stop_event.ticker == "AAPL"
+        assert stop_event.gap_through is True
+        assert stop_event.trigger_low <= stop_event.stop_price
+        assert stop_event.exit_price == pytest.approx(expected_exit_open, abs=1e-9)
 
 
 # ============================================================

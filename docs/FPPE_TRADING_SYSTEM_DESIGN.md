@@ -1,8 +1,10 @@
 # FPPE Trading System — Architecture & Design Specification
 
-**Version:** 0.3 (Empirical parameter update after Phase 1 backtest)
-**Date:** March 19, 2026
-**Status:** ACTIVE — Phase 1 complete. Phase 2 (risk engine) next.
+**Version:** 0.4 (Phase 2 risk layer integrated)
+**Date:** March 20, 2026
+**Status:** ACTIVE — Phase 1 complete. Phase 2 (`risk_engine.py`, `risk_state.py`) implemented and wired into `backtest_engine` (`use_risk_engine=True`).
+
+**Revision notes (v0.4):** Phase 2 delivers Layer 2 as specified in Section 4.3: volatility-only position sizing (2% equity max-loss budget per trade), ATR-based stops evaluated on intraday lows with next-day-open exits, and portfolio drawdown brake/halt (linear ramp between `drawdown_brake_threshold` and `drawdown_halt_threshold`). `python -m trading_system.run_phase2` compares Phase 1 equal-weight vs Phase 2 on cached 2024 signals when validation OHLCV is available. Full 2024 metric comparison should be logged from an actual run (see `PROJECT_GUIDE.md` §7.6 for provenance rules).
 
 **Revision notes (v0.3):** Phase 1 backtest completed on 2024 validation data with real FPPE signals. Two empirical parameter optimizations applied based on sweep results:
 
@@ -638,11 +640,11 @@ Build the configuration module, the signal adapter, and a minimal backtester tha
 
 **This phase intentionally uses 2024 as a demonstration slice, NOT a tuning dataset.** No parameters are optimized against 2024 results. The purpose is to verify mechanical correctness.
 
-### Phase 2: Risk Layer (risk_engine.py)
+### Phase 2: Risk Layer (risk_engine.py) — **Complete**
 
-Add volatility-based position sizing, stop-losses, and the drawdown brake. Replace equal-weight with dynamic sizing. Add re-entry cooldown logic.
+Volatility-based position sizing, ATR stop-losses, and drawdown brake/halt are implemented in `trading_system/risk_engine.py` and `trading_system/risk_state.py`, integrated into `backtest_engine` (`use_risk_engine=True`). Phase 1 re-entry cooldown logic is unchanged.
 
-**Deliverable:** Re-run 2024 backtest with risk engine active. Compare:
+**Deliverable (verification):** Re-run 2024 backtest with risk engine active (e.g. `python -m trading_system.run_phase2` with `data/val_db.parquet`). Compare:
 - Does dynamic sizing reduce max drawdown relative to Phase 1's equal-weight?
 - Are stop-losses firing at appropriate levels? Check for gap-through-stop cases.
 - Does the drawdown brake visibly reduce position sizes during losing streaks?
@@ -754,3 +756,4 @@ Before any code is written, confirm:
 - *v0.1 (2026-03-19): Initial draft*
 - *v0.2 (2026-03-19): Revised after two independent reviews. Major scope reduction for v1, fixed confidence double-counting, added baselines, revised friction model, added signal adapter for hybrid FPPE.*
 - *v0.3 (2026-03-19): Phase 1 backtest complete. Empirical parameter sweep results applied: confidence_threshold 0.65→0.60, max_holding_days 10→14. Phase 1 result: 22.3% annual, Sharpe 1.82, Max DD 6.9%. Candlestick categorization module designed (see CANDLESTICK_CATEGORIZATION_DESIGN.md).*
+- *v0.4 (2026-03-20): Phase 2 risk layer implemented (`risk_engine.py`, `risk_state.py`, `BacktestEngine.use_risk_engine`, `run_phase2.py`). Document status updated; empirical Phase 1 vs Phase 2 table remains run-specific — generate via comparison runner with local OHLCV.*

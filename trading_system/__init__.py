@@ -1,7 +1,7 @@
 """
 FPPE Trading System v1 — Long-only backtesting and evaluation framework.
 
-Design doc: FPPE_TRADING_SYSTEM_DESIGN.md v0.3
+Design doc: FPPE_TRADING_SYSTEM_DESIGN.md v0.4
 
 Exports:
     TradingConfig      — Master config dataclass. Use TradingConfig.from_profile()
@@ -14,6 +14,13 @@ Exports:
     SignalSource       — Enum: KNN / DL / ENSEMBLE
     SECTOR_MAP         — 52-ticker sector classification dict.
     ALL_TICKERS        — Sorted list of all 52 universe tickers.
+    RiskState          — Layer 2: peak equity and drawdown mode for a backtest run.
+    PositionDecision   — Layer 2: sizing/stop output from risk_engine.size_position().
+    StopLossEvent      — Layer 2: recorded stop trigger (ticker, date, stop price).
+    size_position      — Layer 2: volatility-based size + ATR stop (+ drawdown scalar).
+    compute_atr_pct    — Layer 2: ATR as fraction of price (ta library).
+    check_stop_loss    — Layer 2: intraday low vs stop.
+    compute_drawdown_scalar — Layer 2: brake/halt scalar and mode string.
 """
 
 from .config import TradingConfig, DEFAULT_CONFIG, SECTOR_MAP, ALL_TICKERS

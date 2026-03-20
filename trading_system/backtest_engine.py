@@ -14,7 +14,7 @@ Phase 1 uses equal-weight position sizing (5% of equity per trade).
 Phases 2-3 will replace this with volatility-based sizing (Layer 2)
 and confidence-based ranking (Layer 3).
 
-Design doc reference: FPPE_TRADING_SYSTEM_DESIGN.md v0.3, Section 4.2
+Design doc reference: FPPE_TRADING_SYSTEM_DESIGN.md v0.4, Section 4.2
 """
 
 import pandas as pd

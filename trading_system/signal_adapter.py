@@ -9,7 +9,7 @@ This adapter decouples the trading system from FPPE internals. If FPPE changes
 models, adds ensemble methods, or adjusts output format, only this file changes.
 The four trading layers never see model-specific fields.
 
-Design doc reference: FPPE_TRADING_SYSTEM_DESIGN.md v0.3, Section 5.1
+Design doc reference: FPPE_TRADING_SYSTEM_DESIGN.md v0.4, Section 5.1
 """
 
 import pandas as pd

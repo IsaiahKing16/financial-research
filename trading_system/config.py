@@ -5,7 +5,7 @@ Single source of truth for all tunable parameters. No magic numbers
 anywhere else in the codebase. Every parameter has a comment explaining
 why that value was chosen.
 
-Design doc reference: FPPE_TRADING_SYSTEM_DESIGN.md v0.3, Section 4.1
+Design doc reference: FPPE_TRADING_SYSTEM_DESIGN.md v0.4, Section 4.1
 """
 
 import dataclasses

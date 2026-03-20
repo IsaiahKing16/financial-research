@@ -3,9 +3,9 @@
 
 **Version:** 1.0
 **Date:** March 19, 2026
-**Status:** DESIGN COMPLETE — Ready for implementation
+**Status:** IMPLEMENTED — See `trading_system/risk_engine.py`, `risk_state.py`, and `tests/test_phase2_integration.py`
 **Prerequisite:** Phase 1 complete (backtest_engine.py, config.py, signal_adapter.py)
-**Design doc parent:** FPPE_TRADING_SYSTEM_DESIGN.md v0.3, Section 4.3
+**Design doc parent:** FPPE_TRADING_SYSTEM_DESIGN.md v0.4, Section 4.3
 
 ---
 

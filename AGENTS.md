@@ -124,6 +124,10 @@ Agent disagrees with design → Posts concern on Linear issue → Composer evalu
 
 10. **Verify against the design doc**, not your personal preferences. If the design says "linear brake," don't suggest "exponential" in a code review — that's a design issue, not a code issue.
 
+### Cursor Cloud agents and API rate limits
+
+11. **Stagger concurrent cloud work.** To prevent API rate-limit timeouts, never assign more than one complex repository task to Cursor cloud agents simultaneously. Either stagger task starts by at least 60 seconds, or use Linear blocking dependencies to enforce sequential execution (see *Cursor Cloud specific instructions → Sequential execution via Linear*).
+
 ---
 
 ## Task Assignment by Milestone
@@ -190,12 +194,27 @@ HANDOFF to [Agent Name]:
 
 ---
 
-*AGENTS.md v1.0 — March 19, 2026*
+*AGENTS.md v1.1 — March 20, 2026*
 *This file is read by ALL agents at the start of each session. Keep it current.*
 
 ---
 
 ## Cursor Cloud specific instructions
+
+### Sequential execution via Linear
+
+If strict order is preferred over parallel runs, use Linear’s native **Blocked by** links so background agents see a dependency graph and do not all start at once (reduces API rate-limit failures).
+
+**Example (M1 design-review chain):**
+
+1. Mark **SLE-6** as *Blocked by* **SLE-5**
+2. Mark **SLE-7** as *Blocked by* **SLE-6**
+3. Mark **SLE-8** as *Blocked by* **SLE-7**
+4. Assign the issues to **@Cursor** (or your workspace agent)
+
+When **SLE-5** is Done, **SLE-6** unblocks; repeat down the chain. Use the same pattern for any ordered batch (A → B → C), not only this milestone.
+
+**Alternative:** If issues are not linked, wait at least **60 seconds** between starting complex cloud-agent tasks so launches are staggered manually.
 
 ### Environment
 

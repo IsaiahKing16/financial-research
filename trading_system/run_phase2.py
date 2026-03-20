@@ -65,6 +65,14 @@ def _load_price_df(price_path: Path) -> pd.DataFrame:
 
     price_df = raw[required].copy()
     price_df["Date"] = pd.to_datetime(price_df["Date"])
+    # Align with signal dates (naive calendar dates): strip tz without shifting the NY session date.
+    if getattr(price_df["Date"].dt, "tz", None) is not None:
+        price_df["Date"] = (
+            price_df["Date"]
+            .dt.tz_convert("America/New_York")
+            .dt.normalize()
+            .dt.tz_localize(None)
+        )
     return price_df
 
 

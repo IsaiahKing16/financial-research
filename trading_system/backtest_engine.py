@@ -160,6 +160,7 @@ class BacktestEngine:
         """
         # ── Validate inputs ──────────────────────────────────────────
         self._validate_inputs(signal_df, price_df)
+        signal_df, price_df = self._normalize_signal_and_price_dates(signal_df, price_df)
         risk_engine_enabled = (
             self.use_risk_engine if use_risk_engine is None else use_risk_engine
         )
@@ -848,6 +849,29 @@ class BacktestEngine:
         price_missing = [c for c in price_required if c not in price_df.columns]
         if price_missing:
             raise ValueError(f"price_df missing columns: {price_missing}")
+
+    def _normalize_signal_and_price_dates(
+        self, signal_df: pd.DataFrame, price_df: pd.DataFrame
+    ) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        """Return copies with tz-naive calendar dates so signals align with OHLC rows.
+
+        yfinance and some parquet writers emit tz-aware ``Date`` columns; cached
+        signals typically use naive dates — mixing them breaks timestamp compares
+        in the simulation loop.
+        """
+        sig = signal_df.copy()
+        price = price_df.copy()
+        sig["date"] = pd.to_datetime(sig["date"])
+        if getattr(sig["date"].dt, "tz", None) is not None:
+            sig["date"] = (
+                sig["date"].dt.tz_convert("America/New_York").dt.normalize().dt.tz_localize(None)
+            )
+        price["Date"] = pd.to_datetime(price["Date"])
+        if getattr(price["Date"].dt, "tz", None) is not None:
+            price["Date"] = (
+                price["Date"].dt.tz_convert("America/New_York").dt.normalize().dt.tz_localize(None)
+            )
+        return sig, price
 
     def _build_price_lookup(
         self, price_df: pd.DataFrame

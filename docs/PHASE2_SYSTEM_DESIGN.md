@@ -11,24 +11,11 @@
 
 ## 0. PRE-IMPLEMENTATION ISSUES
 
-These issues **must be resolved before writing any Phase 2 code.** They were discovered during the design audit and represent real discrepancies between documentation and codebase state.
+Historical audit notes from 2026-03-19. **Phase 1 and Phase 2 are implemented** in `trading_system/` as of 2026-03-20 (see `risk_engine.py`, `risk_state.py`, `tests/test_phase2_integration.py`).
 
-### ISSUE 0.1: Missing Phase 1 Files (BLOCKING)
+### ISSUE 0.1: Missing Phase 1 Files — **RESOLVED**
 
-**Observed state (2026-03-19):** The `trading_system/` directory contains only `config.py` and `__pycache__/`. The following files referenced in PROJECT_GUIDE.md and PHASE1_FILE_REVIEW.md are absent:
-
-| Expected File | Status | Referenced By |
-|---------------|--------|---------------|
-| `trading_system/__init__.py` | **MISSING** | PROJECT_GUIDE §2, PHASE1_FILE_REVIEW |
-| `trading_system/signal_adapter.py` | **MISSING** | PROJECT_GUIDE §2, Design doc §5.1 |
-| `trading_system/backtest_engine.py` | **MISSING** | PROJECT_GUIDE §2, Design doc §4.2, PHASE1_FILE_REVIEW |
-| `trading_system/run_phase1.py` | **MISSING** | PROJECT_GUIDE §2 |
-
-Additionally, the 88 trading_system tests referenced in PROJECT_GUIDE (test_trading_config, test_signal_adapter, test_backtest_engine) are not present in `tests/`.
-
-**Resolution required:** Either (a) locate and restore these files, or (b) re-implement Phase 1 before beginning Phase 2. Phase 2 cannot proceed without a working backtest_engine.py — the risk engine's entire output is consumed by the backtest loop.
-
-**Confidence level:** High that files are missing, not merely in a different location. The `ls` output of trading_system/ shows only config.py (17KB). The total test count visible in tests/ is consistent with the 243 pattern_engine tests but not the claimed 331 total (243 + 88).
+**Original concern (2026-03-19):** `trading_system/` was incomplete in an early snapshot. **Current state:** `__init__.py`, `signal_adapter.py`, `backtest_engine.py`, `run_phase1.py`, `risk_engine.py`, `risk_state.py`, and `run_phase2.py` are present; trading_system tests live in `tests/test_trading_config.py`, `test_signal_adapter.py`, `test_backtest_engine.py`, and `test_phase2_integration.py` (102 tests total in the full suite’s trading_system slice).
 
 ### ISSUE 0.2: Conservative Profile Brake Inconsistency (NON-BLOCKING)
 

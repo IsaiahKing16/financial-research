@@ -1,5 +1,5 @@
 # PROJECT_GUIDE.md — Multi-AI Collaboration Reference
-# Last Updated: 2026-03-19
+# Last Updated: 2026-03-20
 # Owner: Sleep (Isaia)
 # Primary AI: Claude (Anthropic) | Supporting: Gemini, ChatGPT
 
@@ -13,8 +13,8 @@ analogue matching on return fingerprints to generate probabilistic BUY/SELL/HOLD
 signals across a 52-ticker universe.
 
 The project has three codebases:
-1. **`pattern_engine/`** — Python package (21 modules, 388 tests all passing)
-2. **`trading_system/`** — Four-layer trading system built on FPPE signals (Phase 1 complete)
+1. **`pattern_engine/`** — Python package (21 modules; bulk of the automated test suite)
+2. **`trading_system/`** — Four-layer trading system built on FPPE signals (**Phase 1 complete; Phase 2 risk engine integrated** — see `docs/PHASE2_RESULTS.md`)
 3. **`pattern-engine-v2.1.jsx`** — Standalone React demo (claude.ai artifact, no HTTP calls)
 
 **Key design documents (always reference before modifying related code):**
@@ -295,13 +295,13 @@ BSS < 0    = worse than base rate
 - 2024 fold = positive BSS — genuine predictive skill on unseen data
 - 2022 bear market = worst fold (regime shift, fewer bear training analogues)
 - Expanding window means later folds have more training data → better performance
-- 388 automated tests all passing (300 pattern_engine + 88 trading_system)
+- 458 automated tests all passing (pattern_engine + expanded trading_system including Phase 2 risk tests)
 
 ---
 
 ## 7. PHASE 1 TRADING SYSTEM RESULTS
 
-**Status:** Complete. All Phase 1 bugs fixed. Phase 2 (risk_engine.py) is next.
+**Status:** Phase 1 complete (all bugs fixed). **Phase 2 risk layer** (`risk_engine.py`, `risk_state.py`, backtest integration) is **shipped** — see §7.6 and `docs/PHASE2_RESULTS.md`.
 **Full specification:** `docs/FPPE_TRADING_SYSTEM_DESIGN.md` v0.3
 **Structural audit:** `docs/PHASE1_FILE_REVIEW.md` — 9 findings (3 critical, 5 significant, 1 deferred)
 
@@ -361,13 +361,16 @@ All findings from `docs/PHASE1_FILE_REVIEW.md`:
 | D2 | backtest_engine.py | _advance_trading_days() silently truncated year-boundary cooldowns | **Fixed** |
 | D3 | backtest_engine.py | strategy_return_excl_cash is approximate (error < 1%) | Deferred to Phase 4 |
 
-### 7.5 Open Items Entering Phase 2
+### 7.5 Open Items After Phase 2
 
 | Item | Priority |
 |------|----------|
-| Phase 2: risk_engine.py (ATR stops, volatility sizing, drawdown brake) | **High — next** |
 | Conservative profile empirical validation (run threshold_sweep.py at 0.68) | Medium |
 | D3: TWRR decomposition in strategy_evaluator.py | Low — Phase 4 |
+
+### 7.6 Phase 2 — Risk engine (complete)
+
+**Delivered:** `trading_system/risk_engine.py`, `trading_system/risk_state.py`, `use_risk_engine` integration in `backtest_engine.py`, `run_phase2.py`, unit + integration tests (`tests/test_risk_*.py`, `tests/test_phase2_integration.py`). **Spec / approval:** `docs/SLE-9_APPROVED_IMPLEMENTATION_PLAN.md`, `docs/PHASE2_SYSTEM_DESIGN.md`, cross-review `docs/SLE-28_PHASE_2_CROSS_AGENT_REVIEW.md`. **Validation notes:** `docs/PHASE2_RESULTS.md`.
 
 ---
 
@@ -493,7 +496,7 @@ pip install -r requirements.txt  # includes optuna
 ```cmd
 python -m pytest tests/ -v
 ```
-All **388 tests** must pass (24 test files: 21 pattern_engine + 3 trading_system).
+All **458 tests** must pass (27 test files under `tests/`, including Phase 2 risk and integration coverage).
 
 ### Key Entry Points
 
@@ -631,12 +634,12 @@ Professional DOCX report (~20 pages, 4 sections):
 - [x] docs/PHASE1_FILE_REVIEW.md — structural audit complete
 - [x] docs/CANDLESTICK_CATEGORIZATION_DESIGN.md v0.2 — future scaling module designed
 
-### Phase 2 — Risk Engine (Next)
-- [ ] `trading_system/risk_engine.py` — ATR stop-losses, volatility-based position sizing
-- [ ] Drawdown brake (linear scalar at 15%) and halt (full stop at 20%)
-- [ ] Integration: Layer 1 consumes Layer 2 sizing instead of fixed 5% equal-weight
-- [ ] Validate: re-run Phase 1 backtest with dynamic sizing, confirm Sharpe improvement
-- [ ] Re-validate max_holding_days in bear-market or multi-year data
+### Phase 2 — Risk Engine — **Complete**
+- [x] `trading_system/risk_engine.py` — ATR stop-losses, volatility-based position sizing
+- [x] Drawdown brake (linear scalar at 15%) and halt (full stop at 20%)
+- [x] Integration: backtest consumes risk sizing when `use_risk_engine=True`
+- [x] Validation suite + results documented (`docs/PHASE2_RESULTS.md`)
+- [ ] Re-validate max_holding_days in bear-market or multi-year data (ongoing research)
 - [ ] Run threshold_sweep.py at 0.68 (conservative profile empirical validation)
 
 ### Phase 3 — Portfolio Manager

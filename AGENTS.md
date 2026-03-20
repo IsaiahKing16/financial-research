@@ -205,7 +205,7 @@ HANDOFF to [Agent Name]:
 
 ### Running tests
 
-- `source venv/bin/activate && python -m pytest tests/ -v` — runs all 388 tests (~2.5 min on cloud VM).
+- `source venv/bin/activate && python -m pytest tests/ -v` — runs full suite (~458 tests, ~2.5 min on cloud VM).
 - All tests use synthetic data from `tests/conftest.py` fixtures; no network access or data files needed.
 - CI targets Windows (`windows-latest`), but the full suite also passes on Linux.
 

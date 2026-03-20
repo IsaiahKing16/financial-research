@@ -5,7 +5,7 @@ Financial Pattern Prediction Engine (FPPE) v2.2 — K-NN analogue matching for p
 See PROJECT_GUIDE.md for full architecture, API, and roadmap.
 
 ## Commands
-- `python -m pytest tests/ -v` — Run all 388 tests (always run before committing)
+- `python -m pytest tests/ -v` — Run full suite (458 tests; always run before committing)
 - `python -m pattern_engine.live` — Production EOD signals
 - `python -m pattern_engine.overnight` — 6-hour overnight runner
 - `venv\Scripts\activate` — Windows venv activation

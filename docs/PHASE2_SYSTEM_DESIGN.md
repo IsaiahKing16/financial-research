@@ -49,7 +49,7 @@ The design doc references "20-day ATR" but does not specify whether this uses:
 - Manual True Range computation
 - A pre-computed column from the FPPE data pipeline
 
-**Recommendation:** Use the `ta` library (`ta.volatility.AverageTrueRange`) since it's already in requirements.txt. Compute ATR inside risk_engine from raw OHLCV data rather than expecting a pre-computed column — this keeps the risk engine self-contained and testable without FPPE pipeline dependencies.
+**Recommendation (updated SLE-29):** Compute ATR inside `risk_engine` from raw OHLCV: manual True Range, then Wilder-style EWM via pandas (`ewm(alpha=1/lookback, adjust=False)`). This matches standard ATR numerics and is the shipped implementation. The `ta` library’s `AverageTrueRange` is an optional alternative for parity experiments only. ATR must not rely on a pre-computed upstream column — the risk layer stays self-contained and testable without FPPE pipeline dependencies.
 
 ---
 

@@ -62,7 +62,7 @@ Phase 2 adds three capabilities to the FPPE trading system:
 **Input:** PROJECT_GUIDE.md, CLAUDE.md
 **Question to answer:** Is the documentation accurate and ready for Phase 2?
 **Key checks:**
-- Test count = 388, module count = 21+5, all paths use `docs/` prefix
+- Test count = 458+ full suite (post–Phase 2), module count = 21+5, all paths use `docs/` prefix
 - Phase 1 completion items checked off
 - ISSUE 0.1 (missing files) resolved
 

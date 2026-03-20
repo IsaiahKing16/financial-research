@@ -1,8 +1,16 @@
 # FPPE Trading System — Architecture & Design Specification
 
-**Version:** 0.3 (Empirical parameter update after Phase 1 backtest)
-**Date:** March 19, 2026
-**Status:** ACTIVE — Phase 1 complete. Phase 2 (risk engine) next.
+**Version:** 0.4 (Phase 3 Portfolio Manager complete)
+**Date:** March 20, 2026
+**Status:** ACTIVE — Phase 3 complete. Phase 4 (strategy evaluator) next.
+
+**Revision notes (v0.4):** Phase 3 Portfolio Manager implemented and validated.
+
+- **New modules:** `trading_system/portfolio_state.py` (frozen dataclasses: `RankedSignal`, `AllocationDecision`, `PortfolioSnapshot`), `trading_system/portfolio_manager.py` (Layer 3 logic: `rank_signals`, `check_allocation`, `allocate_day`)
+- **Integration:** `BacktestEngine` now accepts `use_portfolio_manager=True` (requires `use_risk_engine=True`). PM pre-filters on count constraints (holding, cooldown, sector limit); risk engine gates on dollar constraints (exposure, capital). Rank order preserved end-to-end.
+- **Backtest validation (2024, 52-ticker universe):** Phase 3 matches Phase 2 exactly — Ann. 15.1%, Sharpe 1.93, Max DD 3.9%, Win rate 52.4%, 103 trades. PM generated 37 portfolio-layer rejections (29 already-holding, 7 cooldown, 1 sector limit).
+- **Test suite:** 556 tests, 0 failures. Layer 3 adds 11 integration tests, 30 unit tests (portfolio_manager), 20 unit tests (portfolio_state).
+- **Phase 3 branch:** `phase3-portfolio-manager` — ready for merge to main.
 
 **Revision notes (v0.3):** Phase 1 backtest completed on 2024 validation data with real FPPE signals. Two empirical parameter optimizations applied based on sweep results:
 

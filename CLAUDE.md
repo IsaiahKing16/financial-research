@@ -16,7 +16,8 @@ matching on return fingerprints. Generates probabilistic BUY/SELL/HOLD signals.
 ## Codebases
 
 - `pattern_engine/` — 21 modules, 300 tests (Python package)
-- `trading_system/` — 7 modules, 485 tests (Phase 1 & 2 complete)
+- `trading_system/` — 9 modules, 556 tests (Phase 1, 2 & 3 complete)
+  - New in Phase 3: `portfolio_state.py`, `portfolio_manager.py`
 - `pattern-engine-v2.1.jsx` — React demo (standalone artifact)
 
 ## Critical Rules
@@ -45,8 +46,8 @@ regime=binary, horizon=fwd_7d_up
 
 ## Current Phase
 
-**Phase 3: Portfolio Manager** — Signal ranking, sector allocation, capital queue.
-Phase 2 (risk engine) is complete. See `docs/PHASE2_SYSTEM_DESIGN.md`.
+**Phase 3: Portfolio Manager** — COMPLETE. Signal ranking, sector allocation, capital queue.
+Phase 4 (strategy evaluator) is next. See `docs/FPPE_TRADING_SYSTEM_DESIGN.md` v0.4.
 
 ## Session Protocol
 

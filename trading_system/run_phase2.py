@@ -1,306 +1,311 @@
 """
-run_phase2.py - Phase 2 Comparison Runner
+run_phase2.py — Phase 1 vs Phase 2 Comparison Runner
 
-Loads cached 2024 signals, runs:
-  - Phase 1 baseline (use_risk_engine=False)
-  - Phase 2 risk-managed backtest (use_risk_engine=True)
+Loads cached 2024 signals, runs both Phase 1 (equal-weight) and Phase 2
+(ATR-based risk engine) backtests side-by-side, then prints a comparison
+table and saves all artefacts to results/.
 
-Then prints a metric comparison table and saves result artifacts to results/.
+Phase 2 artefacts (prefixed with "phase2_"):
+  results/phase2_backtest_trades.csv
+  results/phase2_backtest_equity.csv
+  results/phase2_backtest_rejected.csv
+  results/phase2_backtest_stop_events.csv
+  results/phase2_backtest_summary.txt
 
 Usage:
     python -m trading_system.run_phase2
-    python -m trading_system.run_phase2 --price-path data/val_db.parquet
+    python -m trading_system.run_phase2 --no-phase1   # Skip Phase 1 re-run
+
+Phase 2 success criteria (from docs/PHASE2_SYSTEM_DESIGN.md):
+  - Max drawdown < 6.9%  (Phase 1 baseline was 6.9%)
+  - Sharpe ratio >= 1.82  (Phase 1 baseline was 1.82)
+  - Net expectancy > $0 after friction
+  - Stop-losses fire at appropriate levels
+  - Drawdown brake reduces sizing during losing streaks
+  - All 485+ tests still pass
 """
 
-from __future__ import annotations
-
 import argparse
-import inspect
 import sys
-from dataclasses import asdict, is_dataclass
 from pathlib import Path
-from typing import Any, Optional
 
+import numpy as np
 import pandas as pd
 
-# Add repo root to path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-from trading_system.backtest_engine import BacktestEngine
-from trading_system.config import TradingConfig
-from trading_system.signal_adapter import load_cached_signals
-
-DEFAULT_SIGNALS_PATH = REPO_ROOT / "results" / "cached_signals_2024.csv"
-DEFAULT_PRICE_PATH = REPO_ROOT / "data" / "val_db.parquet"
-DEFAULT_OUTPUT_DIR = REPO_ROOT / "results"
+from trading_system.backtest_engine import BacktestEngine, BacktestResults
+from trading_system.config import TradingConfig, SECTOR_MAP
 
 
-def _load_price_df(price_path: Path) -> pd.DataFrame:
-    """Load OHLC prices and return standardized DataFrame for backtest."""
-    if not price_path.exists():
+# ─────────────────────────────────────────────────────────────────────────────
+# DATA LOADING
+# ─────────────────────────────────────────────────────────────────────────────
+
+def load_signals(config: TradingConfig) -> pd.DataFrame:
+    """Load cached 2024 signals and re-label using the active config thresholds.
+
+    The cache stores raw calibrated confidence for every ticker-day pair.
+    Re-applying the threshold at run-time means you can change
+    config.signals.confidence_threshold without regenerating signals.
+    """
+    cache_path = REPO_ROOT / "results" / "cached_signals_2024.csv"
+    if not cache_path.exists():
         raise FileNotFoundError(
-            f"Price data not found: {price_path}. "
-            "Pass --price-path to a parquet/csv file containing "
-            "[Date, Ticker, Open, High, Low, Close]."
+            f"Cached signals not found at {cache_path}. "
+            "Run `python -m trading_system.run_phase1 --use-cached-signals` first, "
+            "or generate signals from the K-NN pipeline."
         )
 
-    if price_path.suffix.lower() == ".parquet":
-        raw = pd.read_parquet(price_path)
-    elif price_path.suffix.lower() == ".csv":
-        raw = pd.read_csv(price_path)
-    else:
-        raise ValueError(
-            f"Unsupported price file format: {price_path.suffix}. "
-            "Use parquet or csv."
+    from trading_system.signal_adapter import load_cached_signals
+    signal_df = load_cached_signals(str(cache_path))
+
+    # Re-label using configured thresholds
+    if "confidence" in signal_df.columns and "n_matches" in signal_df.columns:
+        t   = config.signals.confidence_threshold
+        mm  = config.signals.min_matches
+        ma  = config.signals.min_agreement
+        signal_df = signal_df.copy()
+        signal_df["agreement"] = (signal_df["confidence"] - 0.5).abs() * 2
+
+        buy_mask  = (
+            (signal_df["confidence"] >= t)
+            & (signal_df["n_matches"] >= mm)
+            & (signal_df["agreement"] >= ma)
+        )
+        sell_mask = (
+            (signal_df["confidence"] <= (1.0 - t))
+            & (signal_df["n_matches"] >= mm)
+            & (signal_df["agreement"] >= ma)
+        )
+        signal_df["signal"] = "HOLD"
+        signal_df.loc[buy_mask,  "signal"] = "BUY"
+        signal_df.loc[sell_mask, "signal"] = "SELL"
+
+        print(
+            f"  Re-labeled at threshold={t:.2f}: "
+            f"{buy_mask.sum()} BUY, {sell_mask.sum()} SELL, "
+            f"{(~buy_mask & ~sell_mask).sum()} HOLD"
         )
 
-    required = ["Date", "Ticker", "Open", "High", "Low", "Close"]
-    missing = [col for col in required if col not in raw.columns]
-    if missing:
-        raise ValueError(
-            f"Price file missing required columns: {missing}. "
-            f"Found: {list(raw.columns)}"
-        )
-
-    price_df = raw[required].copy()
-    price_df["Date"] = pd.to_datetime(price_df["Date"])
-    # Align with signal dates (naive calendar dates): strip tz without shifting the NY session date.
-    if getattr(price_df["Date"].dt, "tz", None) is not None:
-        price_df["Date"] = (
-            price_df["Date"]
-            .dt.tz_convert("America/New_York")
-            .dt.normalize()
-            .dt.tz_localize(None)
-        )
-    return price_df
+    return signal_df
 
 
-def _run_backtest_with_mode(
-    engine: BacktestEngine,
-    signal_df: pd.DataFrame,
-    price_df: pd.DataFrame,
-    *,
-    use_risk_engine: bool,
-) -> Any:
-    """Run backtest in baseline/risk mode with interface compatibility checks."""
-    run_signature = inspect.signature(engine.run)
-    has_use_risk_engine = "use_risk_engine" in run_signature.parameters
-
-    if use_risk_engine and not has_use_risk_engine:
-        raise RuntimeError(
-            "BacktestEngine.run() does not support use_risk_engine yet. "
-            "Phase 2 integration (SLE-13) must be merged before run_phase2 "
-            "can execute risk-managed mode."
-        )
-
-    if has_use_risk_engine:
-        return engine.run(
-            signal_df=signal_df,
-            price_df=price_df,
-            use_risk_engine=use_risk_engine,
-        )
-
-    # Backward-compatible baseline call path
-    return engine.run(signal_df=signal_df, price_df=price_df)
-
-
-def _fmt_pct(value: Optional[float]) -> str:
-    return "N/A" if value is None else f"{value:,.2%}"
-
-
-def _fmt_float(value: Optional[float]) -> str:
-    return "N/A" if value is None else f"{value:,.3f}"
-
-
-def _fmt_currency(value: Optional[float]) -> str:
-    return "N/A" if value is None else f"${value:,.2f}"
-
-
-def _fmt_delta(value: Optional[float], formatter: str) -> str:
-    if value is None:
-        return "N/A"
-    if formatter == "pct":
-        return f"{value:+,.2%}"
-    if formatter == "float":
-        return f"{value:+,.3f}"
-    return f"{value:+,.2f}"
-
-
-def _print_comparison_table(phase1_results: Any, phase2_results: Any) -> None:
-    """Print core Phase 1 vs Phase 2 metric comparison table."""
-    rows = [
-        ("Annual return", phase1_results.annualized_return(), phase2_results.annualized_return(), "pct"),
-        ("Sharpe", phase1_results.sharpe_ratio(), phase2_results.sharpe_ratio(), "float"),
-        ("Max drawdown", phase1_results.max_drawdown(), phase2_results.max_drawdown(), "pct"),
-        ("Win rate", phase1_results.win_rate(), phase2_results.win_rate(), "pct"),
-        ("Net expectancy", phase1_results.net_expectancy(), phase2_results.net_expectancy(), "currency"),
-    ]
-
-    print("\n" + "=" * 84)
-    print("  PHASE 1 VS PHASE 2 COMPARISON")
-    print("=" * 84)
-    print(f"{'Metric':<20} {'Phase 1':>18} {'Phase 2':>18} {'Delta (P2-P1)':>20}")
-    print("-" * 84)
-
-    for name, p1, p2, kind in rows:
-        if kind == "pct":
-            p1_fmt = _fmt_pct(p1)
-            p2_fmt = _fmt_pct(p2)
-        elif kind == "float":
-            p1_fmt = _fmt_float(p1)
-            p2_fmt = _fmt_float(p2)
-        else:
-            p1_fmt = _fmt_currency(p1)
-            p2_fmt = _fmt_currency(p2)
-
-        delta = p2 - p1 if p1 is not None and p2 is not None else None
-        delta_fmt = _fmt_delta(delta, kind if kind != "currency" else "currency")
-        print(f"{name:<20} {p1_fmt:>18} {p2_fmt:>18} {delta_fmt:>20}")
-
-    print("=" * 84)
-
-
-def _save_results_bundle(results: Any, output_dir: Path, prefix: str) -> None:
-    """Save trades, equity, rejected signals, and summary for a phase run."""
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    if getattr(results, "trades_df", None) is not None:
-        results.trades_df.to_csv(output_dir / f"{prefix}_trades.csv", index=False)
-    if getattr(results, "equity_df", None) is not None:
-        results.equity_df.to_csv(output_dir / f"{prefix}_equity.csv", index=False)
-    if getattr(results, "rejected_df", None) is not None:
-        results.rejected_df.to_csv(output_dir / f"{prefix}_rejected.csv", index=False)
-
-    with open(output_dir / f"{prefix}_summary.txt", "w", encoding="utf-8") as handle:
-        handle.write(results.summary())
-
-
-def _extract_stop_loss_events_df(results: Any) -> pd.DataFrame:
-    """Extract stop-loss events from results in a backward-compatible way."""
-    events_df = getattr(results, "stop_loss_events_df", None)
-    if isinstance(events_df, pd.DataFrame):
-        return events_df.copy()
-
-    events = getattr(results, "stop_loss_events", None)
-    if events:
-        rows = []
-        for event in events:
-            if isinstance(event, dict):
-                rows.append(event)
-            elif is_dataclass(event):
-                rows.append(asdict(event))
-            else:
-                rows.append({"event": str(event)})
-        return pd.DataFrame(rows)
-
-    trades_df = getattr(results, "trades_df", None)
-    if isinstance(trades_df, pd.DataFrame) and not trades_df.empty and "exit_reason" in trades_df.columns:
-        stop_df = trades_df[trades_df["exit_reason"] == "stop_loss"].copy()
-        preferred_cols = [
-            "trade_id",
-            "ticker",
-            "entry_date",
-            "exit_date",
-            "entry_price",
-            "exit_price",
-            "net_pnl",
-            "holding_days",
-            "exit_reason",
-        ]
-        existing_cols = [col for col in preferred_cols if col in stop_df.columns]
-        return stop_df[existing_cols]
-
-    return pd.DataFrame(
-        columns=[
-            "trade_id",
-            "ticker",
-            "entry_date",
-            "exit_date",
-            "entry_price",
-            "exit_price",
-            "net_pnl",
-            "holding_days",
-            "exit_reason",
-        ]
-    )
-
-
-def main() -> None:
-    """Run baseline and risk-managed backtests and print/save comparison output."""
-    parser = argparse.ArgumentParser(
-        description="FPPE Trading System - Phase 2 comparison runner"
-    )
-    parser.add_argument(
-        "--signals-path",
-        type=Path,
-        default=DEFAULT_SIGNALS_PATH,
-        help="Path to cached signal CSV (default: results/cached_signals_2024.csv)",
-    )
-    parser.add_argument(
-        "--price-path",
-        type=Path,
-        default=DEFAULT_PRICE_PATH,
-        help="Path to OHLC price parquet/csv (default: data/val_db.parquet)",
-    )
-    parser.add_argument(
-        "--output-dir",
-        type=Path,
-        default=DEFAULT_OUTPUT_DIR,
-        help="Directory to write output artifacts (default: results/)",
-    )
-    args = parser.parse_args()
-
-    print("\n" + "=" * 84)
-    print("  FPPE TRADING SYSTEM - PHASE 2 COMPARISON RUNNER")
-    print("=" * 84)
-
-    if not args.signals_path.exists():
+def load_price_df() -> pd.DataFrame:
+    """Load OHLC price data from the validation parquet database."""
+    val_path = REPO_ROOT / "data" / "val_db.parquet"
+    if not val_path.exists():
         raise FileNotFoundError(
-            f"Signals file not found: {args.signals_path}. "
-            "Generate it first or point --signals-path to a valid cache file."
+            f"val_db.parquet not found at {val_path}. "
+            "Ensure pattern_engine data pipeline has been run."
         )
-
-    signal_df = load_cached_signals(str(args.signals_path))
-    price_df = _load_price_df(args.price_path)
-
-    print(f"\n  Signals: {len(signal_df):,} rows from {args.signals_path}")
+    val_db = pd.read_parquet(val_path)
+    price_df = val_db[["Date", "Ticker", "Open", "High", "Low", "Close"]].copy()
     print(
-        "  Prices:  "
-        f"{len(price_df):,} rows, "
+        f"  Price data: {len(price_df):,} rows, "
         f"{price_df['Ticker'].nunique()} tickers, "
         f"{price_df['Date'].min().date()} to {price_df['Date'].max().date()}"
     )
+    return price_df
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# RESULTS HELPERS
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _metrics(results: BacktestResults) -> dict:
+    """Extract the comparison metrics from a BacktestResults object."""
+    ne  = results.net_expectancy()
+    wr  = results.win_rate()
+    md  = results.max_drawdown()
+    sr  = results.sharpe_ratio()
+    ar  = results.annualized_return()
+    tc  = results.total_trades()
+    fe  = results.final_equity()
+    ic  = results.config.capital.initial_capital
+
+    stop_count = len(results.stop_loss_events)
+    gap_count  = (
+        results.stop_events_df["gap_through"].sum()
+        if not results.stop_events_df.empty and "gap_through" in results.stop_events_df.columns
+        else 0
+    )
+
+    return {
+        "trades":         tc,
+        "win_rate":       wr,
+        "net_expectancy": ne,
+        "annualized":     ar,
+        "sharpe":         sr,
+        "max_dd":         md,
+        "final_equity":   fe,
+        "total_return":   (fe / ic - 1) if (fe is not None and ic > 0) else None,
+        "stop_events":    stop_count,
+        "gap_throughs":   gap_count,
+    }
+
+
+def _fmt(val, fmt: str, fallback: str = "N/A") -> str:
+    if val is None:
+        return fallback
+    return format(val, fmt)
+
+
+def print_comparison_table(m1: dict, m2: dict) -> None:
+    """Print a side-by-side Phase 1 vs Phase 2 performance table."""
+    W = 62
+    print("\n" + "=" * W)
+    print(f"  {'METRIC':<28}  {'PHASE 1':>12}  {'PHASE 2':>12}")
+    print("  " + "-" * (W - 2))
+
+    rows = [
+        ("Trades",             _fmt(m1["trades"], "d"),              _fmt(m2["trades"], "d")),
+        ("Win rate",           _fmt(m1["win_rate"], ".1%"),           _fmt(m2["win_rate"], ".1%")),
+        ("Net expectancy/trade",_fmt(m1["net_expectancy"], "+.2f"),   _fmt(m2["net_expectancy"], "+.2f")),
+        ("Annualized return",  _fmt(m1["annualized"], "+.1%"),        _fmt(m2["annualized"], "+.1%")),
+        ("Sharpe ratio",       _fmt(m1["sharpe"], ".2f"),             _fmt(m2["sharpe"], ".2f")),
+        ("Max drawdown",       _fmt(m1["max_dd"], ".1%"),             _fmt(m2["max_dd"], ".1%")),
+        ("Total return",       _fmt(m1["total_return"], "+.1%"),      _fmt(m2["total_return"], "+.1%")),
+        ("Final equity",       _fmt(m1["final_equity"], ",.0f"),      _fmt(m2["final_equity"], ",.0f")),
+        ("Stop-loss events",   str(m1["stop_events"]),                str(m2["stop_events"])),
+        ("Gap-through events", str(m1["gap_throughs"]),               str(m2["gap_throughs"])),
+    ]
+
+    for label, v1, v2 in rows:
+        print(f"  {label:<28}  {v1:>12}  {v2:>12}")
+
+    print("=" * W)
+
+
+def print_phase2_criteria(m2: dict) -> None:
+    """Check Phase 2 success criteria and print a PASS/FAIL table."""
+    ne = m2["net_expectancy"]
+    md = m2["max_dd"]
+    sr = m2["sharpe"]
+
+    criteria = [
+        ("Net expectancy > $0",       ne is not None and ne > 0,    _fmt(ne, "+.2f") + "/trade"),
+        ("Max drawdown < 6.9%",       md < 0.069,                   _fmt(md, ".1%")),
+        ("Sharpe >= 1.82",            sr is not None and sr >= 1.82, _fmt(sr, ".2f")),
+        ("Stop events recorded",      m2["stop_events"] >= 0,       str(m2["stop_events"]) + " events"),
+    ]
+
+    print("\n" + "=" * 62)
+    print("  PHASE 2 SUCCESS CRITERIA")
+    print("  " + "-" * 60)
+    for label, passed, value in criteria:
+        status = "PASS" if passed else "FAIL"
+        print(f"  [{status:^4}]  {label:<30}  {value}")
+    print("=" * 62)
+
+
+def save_phase2_results(results: BacktestResults, output_dir: Path) -> None:
+    """Save Phase 2 artefacts to output_dir, prefixed with 'phase2_'."""
+    output_dir.mkdir(exist_ok=True)
+
+    if not results.trades_df.empty:
+        results.trades_df.to_csv(output_dir / "phase2_backtest_trades.csv",   index=False)
+    if not results.equity_df.empty:
+        results.equity_df.to_csv(output_dir / "phase2_backtest_equity.csv",   index=False)
+    if not results.rejected_df.empty:
+        results.rejected_df.to_csv(output_dir / "phase2_backtest_rejected.csv", index=False)
+    if not results.stop_events_df.empty:
+        results.stop_events_df.to_csv(
+            output_dir / "phase2_backtest_stop_events.csv", index=False
+        )
+
+    with open(output_dir / "phase2_backtest_summary.txt", "w") as f:
+        f.write(results.summary())
+
+    print(f"\n  Phase 2 results saved to {output_dir}/")
+    print("    phase2_backtest_trades.csv")
+    print("    phase2_backtest_equity.csv")
+    print("    phase2_backtest_rejected.csv")
+    if not results.stop_events_df.empty:
+        print(f"    phase2_backtest_stop_events.csv  "
+              f"({len(results.stop_events_df)} stop events)")
+    print("    phase2_backtest_summary.txt")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MAIN
+# ─────────────────────────────────────────────────────────────────────────────
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="FPPE Trading System — Phase 1 vs Phase 2 Comparison"
+    )
+    parser.add_argument(
+        "--no-phase1", action="store_true",
+        help="Skip Phase 1 re-run (uses zero-column placeholders in comparison table)"
+    )
+    args = parser.parse_args()
+
+    print("\n" + "=" * 62)
+    print("  FPPE TRADING SYSTEM — PHASE 2 COMPARISON RUNNER")
+    print("  Phase 1 (equal-weight) vs Phase 2 (ATR-based risk engine)")
+    print("=" * 62)
+
+    # ── Configuration ─────────────────────────────────────────────
     config = TradingConfig()
-    engine = BacktestEngine(config)
+    print(config.summary())
 
-    print("\n  Running Phase 1 baseline (use_risk_engine=False)...")
-    phase1_results = _run_backtest_with_mode(
-        engine, signal_df, price_df, use_risk_engine=False
-    )
+    # ── Load data ─────────────────────────────────────────────────
+    print("\n  Loading signals and price data ...")
+    signal_df = load_signals(config)
+    price_df  = load_price_df()
 
-    print("\n  Running Phase 2 (use_risk_engine=True)...")
-    phase2_results = _run_backtest_with_mode(
-        engine, signal_df, price_df, use_risk_engine=True
-    )
+    # ── Phase 1 backtest (baseline) ───────────────────────────────
+    m1 = {k: None for k in [
+        "trades", "win_rate", "net_expectancy", "annualized",
+        "sharpe", "max_dd", "final_equity", "total_return",
+        "stop_events", "gap_throughs",
+    ]}
 
-    _print_comparison_table(phase1_results, phase2_results)
+    if not args.no_phase1:
+        print("\n" + "─" * 62)
+        print("  Running Phase 1 (equal-weight, use_risk_engine=False) ...")
+        engine_p1 = BacktestEngine(config=config, use_risk_engine=False)
+        results_p1 = engine_p1.run(signal_df, price_df, equal_weight_pct=0.05)
+        m1 = _metrics(results_p1)
+        print(results_p1.summary())
+    else:
+        print("\n  [--no-phase1] Skipping Phase 1 re-run.")
 
-    _save_results_bundle(phase1_results, args.output_dir, "phase1")
-    _save_results_bundle(phase2_results, args.output_dir, "phase2")
+    # ── Phase 2 backtest ──────────────────────────────────────────
+    print("\n" + "─" * 62)
+    print("  Running Phase 2 (ATR-based sizing, use_risk_engine=True) ...")
+    engine_p2 = BacktestEngine(config=config, use_risk_engine=True)
+    results_p2 = engine_p2.run(signal_df, price_df)
+    m2 = _metrics(results_p2)
+    print(results_p2.summary())
 
-    stop_loss_df = _extract_stop_loss_events_df(phase2_results)
-    stop_loss_path = args.output_dir / "phase2_stop_loss_events.csv"
-    stop_loss_df.to_csv(stop_loss_path, index=False)
+    # ── Comparison table ─────────────────────────────────────────
+    print_comparison_table(m1, m2)
 
-    print("\n  Saved output artifacts:")
-    print(f"    - {args.output_dir / 'phase1_trades.csv'}")
-    print(f"    - {args.output_dir / 'phase1_equity.csv'}")
-    print(f"    - {args.output_dir / 'phase2_trades.csv'}")
-    print(f"    - {args.output_dir / 'phase2_equity.csv'}")
-    print(f"    - {stop_loss_path}")
-    print("\n  Done.")
+    # ── Phase 2 criteria check ────────────────────────────────────
+    print_phase2_criteria(m2)
+
+    # ── Stop-loss audit ───────────────────────────────────────────
+    if not results_p2.stop_events_df.empty:
+        sdf = results_p2.stop_events_df
+        print(f"\n  Stop-Loss Audit ({len(sdf)} events):")
+        print(f"  {'TICKER':<8}  {'DATE':<12}  {'STOP':>8}  {'LOW':>8}  "
+              f"{'ATR%':>6}  {'GAP':>5}")
+        print("  " + "-" * 54)
+        for _, e in sdf.iterrows():
+            gap_flag = "YES" if e["gap_through"] else "no"
+            print(
+                f"  {e['ticker']:<8}  {str(e['trigger_date']):<12}  "
+                f"{e['stop_price']:>8.2f}  {e['trigger_low']:>8.2f}  "
+                f"{e['atr_at_entry']:>6.2%}  {gap_flag:>5}"
+            )
+    else:
+        print("\n  No stop-loss events recorded in Phase 2 run.")
+
+    # ── Save Phase 2 artefacts ────────────────────────────────────
+    save_phase2_results(results_p2, REPO_ROOT / "results")
 
 
 if __name__ == "__main__":

@@ -13,50 +13,51 @@ This project is built by a **team of AI agents working together**, not a collect
 
 ---
 
-## Agent Roster
+## Agent Profiles & Routing Configuration
 
-### Claude Opus 4.6 — Lead Architect
-**Label:** `Agent: Opus`
-**Strengths:** Deep codebase understanding, complex multi-file changes, merge coordination, architectural decisions
-**Weaknesses:** Slower output, higher cost per token
-**Assigned to:** Core algorithm implementation, integration work, backtest engine modifications, final validation
-**How to use:** Give Opus the hardest problems — the ones where understanding 5 files simultaneously matters. Don't waste Opus on simple doc updates.
+To ensure seamless automation through Linear, each agent must be assigned using its exact Cursor API string in the issue description (for example: `[model=claude-opus-4-6]`).
 
-### Claude Sonnet 4.6 — Fast Implementer
-**Label:** `Agent: Sonnet`
-**Strengths:** Speed, well-scoped tasks, test writing, documentation updates
-**Weaknesses:** May miss cross-module implications on very complex tasks
-**Assigned to:** Entry-point scripts, stress tests, documentation updates, fast verification tasks
-**How to use:** Give Sonnet tasks with clear boundaries and explicit acceptance criteria. Sonnet excels when the "what" is defined and the "how" needs execution.
+1. Opus 4.6 (Claude Code)
+Cursor API String: claude-opus-4-6
 
-### Cursor Composer 2 — Coordinator
-**Label:** `Agent: Composer`
-**Strengths:** Multi-agent synthesis, conflict resolution, plan management, big-picture thinking
-**Weaknesses:** Not the best for line-by-line implementation
-**Assigned to:** Review synthesis, implementation plan approval, final sign-off, cross-agent coordination
-**How to use:** Composer is the glue. Use it to read all reviews, find consensus, resolve conflicts, and produce the plan that everyone follows. Composer never writes production code.
+Role: Architect / Lead
 
-### GPT-5.3 Codex Extra High — Parallel Implementer
-**Label:** `Agent: Codex`
-**Strengths:** Isolated module implementation, test generation, parallel execution
-**Weaknesses:** Needs explicit context — doesn't carry conversation history
-**Assigned to:** Self-contained modules (risk_state.py), integration test writing
-**How to use:** Give Codex modules with zero or minimal dependencies on other new code. Include the full design doc section and all type signatures in the issue description.
+Best For: Complex multi-file changes, merge coordination, final plan execution, and critical path synthesis. Owns the hardest architectural integration tasks for the quantitative engine.
 
-### GPT-5.4 Extra High — Deep Analyst
-**Label:** `Agent: GPT-5.4`
-**Strengths:** Mathematical analysis, algorithm verification, academic literature awareness
-**Weaknesses:** May over-engineer or suggest unnecessary complexity
-**Assigned to:** Design review (risk model math), code review of data structures, edge case analysis
-**How to use:** Point GPT-5.4 at algorithms and ask "is this correct?" Include the mathematical spec and expected invariants.
+2. Sonnet 4.6
+Cursor API String: claude-sonnet-4-6
 
-### Gemini 3.1 Pro — Independent Reviewer
-**Label:** `Agent: Gemini`
-**Strengths:** Fresh perspective, alternative approaches, catches assumptions others miss
-**Weaknesses:** Less context on FPPE history — needs full design docs provided
-**Assigned to:** Design alternative proposals, cross-agent code review, assumption stress-testing
-**How to use:** Gemini is the "red team." Give it the design and ask it to find problems. Give it code written by Claude/GPT and ask it to find bugs. Its value is in being different, not better.
+Role: Fast Implementer
 
+Best For: Scoped tasks with clear specs, writing test coverage, and updating project documentation to accurately reflect the current repository state.
+
+3. Composer 2
+Cursor API String: N/A (Native Cursor Interface)
+
+Role: Plan Review / Synthesizer
+
+Best For: Reviewing plans before execution, synthesizing cross-agent reviews, and acting as the human-in-the-loop gateway to approve milestones.
+
+4. GPT-5.3 Codex
+Cursor API String: gpt-5.3-codex
+
+Role: Parallel Implementation
+
+Best For: Independent feature branches, isolated Python module work, and drafting highly specific data processing scripts.
+
+5. GPT-5.4 Extra High
+Cursor API String: gpt-5.4
+
+Role: Deep Analysis
+
+Best For: Research-heavy tasks, deep algorithmic validation (e.g., verifying drawdown brake mechanics and position sizing math), and extreme edge-case detection.
+
+6. Gemini 3.1 Pro
+Cursor API String: gemini-3.1-pro-preview
+
+Role: Cross-Validation / Red Team
+
+Best For: Second-opinion reviews, proposing alternative architectural approaches, and identifying logic blind spots missed by the Anthropic or OpenAI models.
 ---
 
 ## Collaboration Patterns

@@ -387,6 +387,8 @@ def compute_atr_pct(price_history: pd.DataFrame, lookback: int = 20) -> float:
 
 **Implementation note:** Use `ta.volatility.AverageTrueRange(high, low, close, window=lookback).average_true_range()` from the `ta` library. Then divide the final ATR value by the current close price to get ATR%.
 
+**Amendment (implemented):** The final implementation uses `pandas.ewm(alpha=1/lookback, adjust=False, min_periods=lookback).mean()` directly instead of the `ta` library. These are mathematically equivalent — both apply Wilder's smoothing with `alpha = 1/period`. The pandas path was accepted because it eliminates a library call while keeping the same numeric result, and `pandas` is already a hard dependency. No behavior change; the `ta` library is still available for other uses.
+
 **Edge cases:**
 - If a ticker has fewer than `lookback + 1` rows of history (newly added or IPO), REJECT the trade with reason "Insufficient price history for ATR computation".
 - If ATR% computes to 0.0 (price was perfectly flat for 20 days — theoretically possible but practically means bad data), REJECT with reason "Zero ATR — likely data issue".

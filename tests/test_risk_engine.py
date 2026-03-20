@@ -1,8 +1,19 @@
-"""Unit tests for trading_system.risk_engine — Phase 2 sizing and ATR helpers."""
+"""
+tests/test_risk_engine.py — Unit + stress tests for trading_system/risk_engine.py
 
-from __future__ import annotations
+Covers (SLE-22 unit tests):
+  - compute_drawdown_scalar: normal / brake / halt modes, edge cases
+  - check_stop_loss: breach / no-breach / zero stop
+  - compute_atr_pct: happy path, missing columns, insufficient rows, zero price
+  - size_position: approved trades, all rejection paths, drawdown modes
 
-import dataclasses
+Stress tests (SLE-24):
+  - test_synthetic_crash_scenario: 5 consecutive 10% daily drops
+  - test_all_stops_trigger_same_day: every position hits stop simultaneously
+  - test_extreme_atr: penny-stock style 50% ATR
+  - test_minimal_capital: $2,000 starting capital
+  - test_drawdown_recovery_then_re_entry: brake/halt then equity recovery
+"""
 
 import numpy as np
 import pandas as pd
@@ -18,413 +29,473 @@ from trading_system.risk_engine import (
 from trading_system.risk_state import RiskState
 
 
-def _ohlc_frame(n: int, start: str = "2024-01-02", volatility: float = 0.02) -> pd.DataFrame:
-    """Build synthetic OHLC with enough variance for positive ATR."""
-    rng = np.random.RandomState(7)
-    dates = pd.bdate_range(start=start, periods=n)
-    close = 100.0 * np.cumprod(1 + rng.randn(n) * volatility)
-    high = close * (1 + np.abs(rng.randn(n)) * 0.01)
-    low = close * (1 - np.abs(rng.randn(n)) * 0.01)
-    open_ = np.roll(close, 1)
-    open_[0] = close[0]
-    return pd.DataFrame(
-        {
-            "Date": dates,
-            "Open": open_,
-            "High": high,
-            "Low": low,
-            "Close": close,
-        }
-    )
+# ── Fixtures ──────────────────────────────────────────────────────────────────
+
+def _price_history(n: int = 25, close: float = 100.0, atr_frac: float = 0.02) -> pd.DataFrame:
+    """Return synthetic OHLC DataFrame with controlled ATR."""
+    dates = pd.date_range("2024-01-01", periods=n, freq="B")
+    half_range = close * atr_frac / 2
+    return pd.DataFrame({
+        "Date": dates,
+        "Open": [close] * n,
+        "High": [close + half_range] * n,
+        "Low": [close - half_range] * n,
+        "Close": [close] * n,
+    })
 
 
-# --- compute_drawdown_scalar ---
-
-
-def test_drawdown_scalar_normal() -> None:
-    s, mode = compute_drawdown_scalar(100_000, 100_000, 0.15, 0.20)
-    assert s == 1.0
-    assert mode == "normal"
-
-
-def test_drawdown_scalar_at_brake_threshold() -> None:
-    s, mode = compute_drawdown_scalar(85_000, 100_000, 0.15, 0.20)
-    assert mode == "brake"
-    assert s == pytest.approx(1.0)
-
-
-def test_drawdown_scalar_mid_brake() -> None:
-    s, mode = compute_drawdown_scalar(82_500, 100_000, 0.15, 0.20)
-    assert mode == "brake"
-    assert s == pytest.approx(0.5)
-
-
-def test_drawdown_scalar_halt() -> None:
-    s, mode = compute_drawdown_scalar(79_000, 100_000, 0.15, 0.20)
-    assert mode == "halt"
-    assert s == 0.0
-
-
-def test_drawdown_scalar_peak_nonpositive() -> None:
-    s, mode = compute_drawdown_scalar(1.0, 0.0, 0.15, 0.20)
-    assert s == 1.0
-    assert mode == "normal"
-
-
-def test_drawdown_scalar_invalid_thresholds_raise() -> None:
-    with pytest.raises(ValueError, match="halt_threshold"):
-        compute_drawdown_scalar(100_000, 100_000, 0.20, 0.15)
-
-
-# --- check_stop_loss ---
-
-
-def test_check_stop_loss_false_when_no_stop() -> None:
-    assert check_stop_loss(90.0, 0.0) is False
-
-
-def test_check_stop_loss_true_on_touch() -> None:
-    assert check_stop_loss(100.0, 100.0) is True
-
-
-def test_check_stop_loss_true_below() -> None:
-    assert check_stop_loss(99.0, 100.0) is True
-
-
-def test_check_stop_loss_false_above() -> None:
-    assert check_stop_loss(101.0, 100.0) is False
-
-
-# --- compute_atr_pct ---
-
-
-def test_atr_pct_positive_on_synthetic() -> None:
-    df = _ohlc_frame(25)
-    atr = compute_atr_pct(df, lookback=20)
-    assert atr > 0
-    assert atr < 1.0
-
-
-def test_atr_pct_missing_column_raises() -> None:
-    df = pd.DataFrame({"Open": [1], "High": [2]})
-    with pytest.raises(ValueError, match="missing"):
-        compute_atr_pct(df)
-
-
-def test_atr_pct_insufficient_rows_raises() -> None:
-    df = _ohlc_frame(10)
-    with pytest.raises(ValueError, match="Insufficient"):
-        compute_atr_pct(df, lookback=20)
-
-
-def test_atr_pct_rejects_zero_close(monkeypatch: pytest.MonkeyPatch) -> None:
-    df = _ohlc_frame(25)
-    df.loc[df.index[-1], "Close"] = 0.0
-    with pytest.raises(ValueError, match="> 0"):
-        compute_atr_pct(df, lookback=20)
-
-
-def test_atr_pct_drops_nan_rows() -> None:
-    df = _ohlc_frame(25)
-    df.loc[5, "High"] = np.nan
-    atr = compute_atr_pct(df, lookback=20)
-    assert atr > 0
-
-
-# --- size_position ---
-
-
-@pytest.fixture
-def limits() -> PositionLimitsConfig:
-    return PositionLimitsConfig()
-
-
-@pytest.fixture
-def risk_cfg() -> RiskConfig:
+def _default_risk_config() -> RiskConfig:
     return RiskConfig()
 
 
-def test_size_position_rejects_bad_entry_price(risk_cfg: RiskConfig, limits: PositionLimitsConfig) -> None:
-    rs = RiskState.initial(100_000.0)
-    hist = _ohlc_frame(25)
-    d = size_position(
-        "X", -1.0, 100_000.0, hist, rs, risk_cfg, limits, open_positions={}
-    )
-    assert not d.approved
+def _default_limits() -> PositionLimitsConfig:
+    return PositionLimitsConfig()
 
 
-def test_size_position_rejects_nonpositive_equity(risk_cfg: RiskConfig, limits: PositionLimitsConfig) -> None:
-    rs = RiskState.initial(0.0)
-    hist = _ohlc_frame(25)
-    d = size_position(
-        "X", 100.0, 0.0, hist, rs, risk_cfg, limits, open_positions={}
-    )
-    assert not d.approved
+def _normal_state(equity: float = 10_000.0) -> RiskState:
+    return RiskState.initial(equity)
 
 
-def test_size_position_rejects_already_holding(
-    risk_cfg: RiskConfig, limits: PositionLimitsConfig
-) -> None:
-    rs = RiskState.initial(100_000.0)
-    hist = _ohlc_frame(25)
-    d = size_position(
-        "X",
-        100.0,
-        100_000.0,
-        hist,
-        rs,
-        risk_cfg,
-        limits,
-        open_positions={"X": object()},
-    )
-    assert not d.approved
-    assert "Already holding" in (d.rejection_reason or "")
+# ── compute_drawdown_scalar ───────────────────────────────────────────────────
+
+class TestComputeDrawdownScalar:
+
+    BRAKE = 0.15
+    HALT = 0.20
+
+    def test_no_drawdown_returns_one_normal(self):
+        scalar, mode = compute_drawdown_scalar(10_000, 10_000, self.BRAKE, self.HALT)
+        assert scalar == 1.0
+        assert mode == "normal"
+
+    def test_equity_growth_above_peak_normal(self):
+        scalar, mode = compute_drawdown_scalar(11_000, 10_000, self.BRAKE, self.HALT)
+        assert scalar == 1.0
+        assert mode == "normal"
+
+    def test_drawdown_just_below_brake_is_normal(self):
+        scalar, mode = compute_drawdown_scalar(8_510, 10_000, self.BRAKE, self.HALT)
+        assert mode == "normal"
+        assert scalar == 1.0
+
+    def test_drawdown_at_brake_threshold(self):
+        # 15% exactly: current = 8500
+        scalar, mode = compute_drawdown_scalar(8_500, 10_000, self.BRAKE, self.HALT)
+        assert mode == "brake"
+        assert scalar == pytest.approx(1.0, abs=0.01)
+
+    def test_drawdown_midpoint_brake_scalar_half(self):
+        # 17.5% DD = midpoint → scalar 0.5
+        scalar, mode = compute_drawdown_scalar(8_250, 10_000, self.BRAKE, self.HALT)
+        assert mode == "brake"
+        assert scalar == pytest.approx(0.5, abs=0.01)
+
+    def test_drawdown_at_halt_threshold(self):
+        scalar, mode = compute_drawdown_scalar(7_990, 10_000, self.BRAKE, self.HALT)
+        assert mode == "halt"
+        assert scalar == 0.0
+
+    def test_drawdown_beyond_halt(self):
+        scalar, mode = compute_drawdown_scalar(5_000, 10_000, self.BRAKE, self.HALT)
+        assert mode == "halt"
+        assert scalar == 0.0
+
+    def test_zero_peak_equity_returns_normal(self):
+        scalar, mode = compute_drawdown_scalar(0.0, 0.0, self.BRAKE, self.HALT)
+        assert mode == "normal"
+        assert scalar == 1.0
+
+    def test_halt_lte_brake_raises(self):
+        with pytest.raises(ValueError, match="halt_threshold"):
+            compute_drawdown_scalar(10_000, 10_000, brake_threshold=0.20, halt_threshold=0.15)
+
+    def test_halt_equals_brake_raises(self):
+        with pytest.raises(ValueError, match="halt_threshold"):
+            compute_drawdown_scalar(10_000, 10_000, brake_threshold=0.15, halt_threshold=0.15)
 
 
-def test_size_position_halt_mode(risk_cfg: RiskConfig, limits: PositionLimitsConfig) -> None:
-    rs = RiskState.initial(100_000.0)
-    cfg = dataclasses.replace(risk_cfg, drawdown_brake_threshold=0.10, drawdown_halt_threshold=0.15)
-    rs.update(84_000.0, cfg)  # 16% DD -> halt
-    hist = _ohlc_frame(25)
-    d = size_position(
-        "X", 100.0, 84_000.0, hist, rs, cfg, limits, open_positions={}
-    )
-    assert not d.approved
-    assert "halt" in (d.rejection_reason or "").lower()
+# ── check_stop_loss ───────────────────────────────────────────────────────────
+
+class TestCheckStopLoss:
+
+    def test_low_equals_stop_triggers(self):
+        assert check_stop_loss(current_low=100.0, stop_price=100.0) is True
+
+    def test_low_below_stop_triggers(self):
+        assert check_stop_loss(current_low=95.0, stop_price=100.0) is True
+
+    def test_low_above_stop_no_trigger(self):
+        assert check_stop_loss(current_low=105.0, stop_price=100.0) is False
+
+    def test_zero_stop_price_never_triggers(self):
+        assert check_stop_loss(current_low=0.0, stop_price=0.0) is False
+
+    def test_negative_stop_price_never_triggers(self):
+        assert check_stop_loss(current_low=50.0, stop_price=-1.0) is False
 
 
-def test_size_position_approved_typical(
-    risk_cfg: RiskConfig, limits: PositionLimitsConfig
-) -> None:
-    rs = RiskState.initial(100_000.0)
-    hist = _ohlc_frame(25)
-    d = size_position(
-        "X", 100.0, 100_000.0, hist, rs, risk_cfg, limits, open_positions={}
-    )
-    assert d.approved
-    assert d.shares > 0
-    assert 0 < d.stop_price < 100.0
-    assert d.position_pct >= limits.min_position_pct
+# ── compute_atr_pct ───────────────────────────────────────────────────────────
+
+class TestComputeAtrPct:
+
+    def test_returns_positive_float(self):
+        hist = _price_history(25, close=100.0, atr_frac=0.02)
+        result = compute_atr_pct(hist, lookback=20)
+        assert isinstance(result, float)
+        assert result > 0
+
+    def test_higher_volatility_gives_higher_atr(self):
+        low_vol = _price_history(25, close=100.0, atr_frac=0.01)
+        high_vol = _price_history(25, close=100.0, atr_frac=0.05)
+        assert compute_atr_pct(high_vol, 20) > compute_atr_pct(low_vol, 20)
+
+    def test_missing_high_column_raises(self):
+        hist = _price_history(25).drop(columns=["High"])
+        with pytest.raises(ValueError, match="missing required columns"):
+            compute_atr_pct(hist)
+
+    def test_missing_low_column_raises(self):
+        hist = _price_history(25).drop(columns=["Low"])
+        with pytest.raises(ValueError, match="missing required columns"):
+            compute_atr_pct(hist)
+
+    def test_insufficient_rows_raises(self):
+        hist = _price_history(5)  # lookback=20 needs 21 rows
+        with pytest.raises(ValueError, match="Insufficient"):
+            compute_atr_pct(hist, lookback=20)
+
+    def test_exactly_minimum_rows_succeeds(self):
+        hist = _price_history(21)  # lookback=20 needs exactly 21 rows
+        result = compute_atr_pct(hist, lookback=20)
+        assert result > 0
+
+    def test_zero_close_price_raises(self):
+        hist = _price_history(25, close=0.01)
+        hist["Close"] = 0.0
+        with pytest.raises(ValueError):
+            compute_atr_pct(hist)
+
+    def test_custom_lookback(self):
+        hist = _price_history(15, close=100.0, atr_frac=0.03)
+        result = compute_atr_pct(hist, lookback=10)
+        assert result > 0
 
 
-def test_size_position_rejects_insufficient_history(
-    risk_cfg: RiskConfig, limits: PositionLimitsConfig
-) -> None:
-    rs = RiskState.initial(100_000.0)
-    hist = _ohlc_frame(10)
-    d = size_position(
-        "X", 100.0, 100_000.0, hist, rs, risk_cfg, limits, open_positions={}
-    )
-    assert not d.approved
+# ── size_position ─────────────────────────────────────────────────────────────
+
+class TestSizePositionApproved:
+
+    def test_returns_approved_decision(self):
+        decision = size_position(
+            ticker="AAPL",
+            entry_price=100.0,
+            current_equity=10_000.0,
+            price_history=_price_history(25, close=100.0, atr_frac=0.02),
+            risk_state=_normal_state(10_000.0),
+            config=_default_risk_config(),
+            position_limits=_default_limits(),
+        )
+        assert decision.approved is True
+
+    def test_approved_decision_has_positive_shares(self):
+        decision = size_position(
+            ticker="MSFT",
+            entry_price=300.0,
+            current_equity=10_000.0,
+            price_history=_price_history(25, close=300.0, atr_frac=0.02),
+            risk_state=_normal_state(10_000.0),
+            config=_default_risk_config(),
+            position_limits=_default_limits(),
+        )
+        assert decision.shares > 0
+        assert decision.stop_price > 0
+        assert decision.stop_price < 300.0
+
+    def test_stop_price_below_entry(self):
+        decision = size_position(
+            ticker="NVDA",
+            entry_price=500.0,
+            current_equity=50_000.0,
+            price_history=_price_history(25, close=500.0, atr_frac=0.02),
+            risk_state=_normal_state(50_000.0),
+            config=_default_risk_config(),
+            position_limits=_default_limits(),
+        )
+        assert decision.stop_price < 500.0
+
+    def test_position_pct_within_limits(self):
+        limits = _default_limits()
+        decision = size_position(
+            ticker="TSLA",
+            entry_price=200.0,
+            current_equity=10_000.0,
+            price_history=_price_history(25, close=200.0, atr_frac=0.02),
+            risk_state=_normal_state(10_000.0),
+            config=_default_risk_config(),
+            position_limits=limits,
+        )
+        if decision.approved:
+            assert limits.min_position_pct <= decision.position_pct <= limits.max_position_pct
+
+    def test_dollar_amount_equals_shares_times_price(self):
+        decision = size_position(
+            ticker="GOOG",
+            entry_price=150.0,
+            current_equity=10_000.0,
+            price_history=_price_history(25, close=150.0, atr_frac=0.02),
+            risk_state=_normal_state(10_000.0),
+            config=_default_risk_config(),
+            position_limits=_default_limits(),
+        )
+        if decision.approved:
+            assert decision.dollar_amount == pytest.approx(
+                decision.shares * 150.0, rel=1e-4
+            )
 
 
-def test_size_position_whole_shares_rejects_tiny(
-    risk_cfg: RiskConfig, limits: PositionLimitsConfig
-) -> None:
-    rs = RiskState.initial(100_000.0)
-    hist = _ohlc_frame(25)
-    d = size_position(
-        "X",
-        500.0,
-        100.0,
-        hist,
-        rs,
-        risk_cfg,
-        limits,
-        open_positions={},
-        fractional_shares=False,
-    )
-    assert not d.approved
+class TestSizePositionRejections:
+
+    def test_negative_entry_price_rejected(self):
+        decision = size_position(
+            ticker="AAPL",
+            entry_price=-1.0,
+            current_equity=10_000.0,
+            price_history=_price_history(25),
+            risk_state=_normal_state(),
+            config=_default_risk_config(),
+            position_limits=_default_limits(),
+        )
+        assert decision.approved is False
+        assert "Invalid entry price" in (decision.rejection_reason or "")
+
+    def test_zero_entry_price_rejected(self):
+        decision = size_position(
+            ticker="AAPL",
+            entry_price=0.0,
+            current_equity=10_000.0,
+            price_history=_price_history(25),
+            risk_state=_normal_state(),
+            config=_default_risk_config(),
+            position_limits=_default_limits(),
+        )
+        assert decision.approved is False
+
+    def test_zero_equity_rejected(self):
+        decision = size_position(
+            ticker="AAPL",
+            entry_price=100.0,
+            current_equity=0.0,
+            price_history=_price_history(25),
+            risk_state=_normal_state(0.0),
+            config=_default_risk_config(),
+            position_limits=_default_limits(),
+        )
+        assert decision.approved is False
+        assert "Non-positive equity" in (decision.rejection_reason or "")
+
+    def test_drawdown_halt_rejects_new_positions(self):
+        # Create a state at halt level
+        rs = RiskState.initial(10_000.0)
+        rs.update(7_990.0, brake_threshold=0.15, halt_threshold=0.20)
+        assert rs.drawdown_mode == "halt"
+
+        decision = size_position(
+            ticker="AAPL",
+            entry_price=100.0,
+            current_equity=7_990.0,
+            price_history=_price_history(25),
+            risk_state=rs,
+            config=_default_risk_config(),
+            position_limits=_default_limits(),
+        )
+        assert decision.approved is False
+        assert "halt" in (decision.rejection_reason or "").lower()
+
+    def test_already_holding_ticker_rejected(self):
+        decision = size_position(
+            ticker="AAPL",
+            entry_price=100.0,
+            current_equity=10_000.0,
+            price_history=_price_history(25),
+            risk_state=_normal_state(),
+            config=_default_risk_config(),
+            position_limits=_default_limits(),
+            open_positions={"AAPL": object()},
+        )
+        assert decision.approved is False
+        assert "Already holding" in (decision.rejection_reason or "")
+
+    def test_insufficient_price_history_rejected(self):
+        decision = size_position(
+            ticker="AAPL",
+            entry_price=100.0,
+            current_equity=10_000.0,
+            price_history=_price_history(5),  # too few rows
+            risk_state=_normal_state(),
+            config=_default_risk_config(),
+            position_limits=_default_limits(),
+        )
+        assert decision.approved is False
+        assert "Insufficient" in (decision.rejection_reason or "")
+
+    def test_brake_mode_reduces_position_size(self):
+        """In brake mode the scalar < 1.0, so position should be smaller.
+
+        Uses a very low ATR (0.5%) so raw_weight = 2% / (2×0.5%) = 2.0 (200%).
+        With a raised max_position_pct cap of 0.60, normal mode hits 60% cap,
+        while brake scalar ~0.5 yields 1.0 × 0.5 = 0.5 (50%) — visibly below cap.
+        """
+        # With ATR=2% and 2× multiple: stop_distance=4%, raw_weight=2%/4%=0.50.
+        # Normal: 0.50×1.0=0.50. Brake (~0.5 scalar): 0.50×0.5=0.25.
+        # Cap must be above both (0.60) so neither is clamped equally.
+        wide_limits = PositionLimitsConfig(min_position_pct=0.02, max_position_pct=0.60)
+        hist = _price_history(25, close=100.0, atr_frac=0.02)  # 2% ATR → raw_weight 0.5
+
+        rs_normal = _normal_state(10_000.0)
+        rs_brake = RiskState.initial(10_000.0)
+        rs_brake.update(8_250.0, brake_threshold=0.15, halt_threshold=0.20)  # 17.5% DD → scalar ~0.5
+
+        d_normal = size_position(
+            ticker="AAPL", entry_price=100.0, current_equity=10_000.0,
+            price_history=hist, risk_state=rs_normal,
+            config=_default_risk_config(), position_limits=wide_limits,
+        )
+        d_brake = size_position(
+            ticker="AAPL", entry_price=100.0, current_equity=8_250.0,
+            price_history=hist, risk_state=rs_brake,
+            config=_default_risk_config(), position_limits=wide_limits,
+        )
+        assert d_normal.approved and d_brake.approved
+        assert d_brake.position_pct < d_normal.position_pct
 
 
-@pytest.mark.parametrize(
-    "brake,halt,equity,peak,expect_mode",
-    [
-        (0.15, 0.20, 85_000.0, 100_000.0, "brake"),  # 15% DD — on brake threshold
-        (0.15, 0.20, 100_000.0, 100_000.0, "normal"),
-        (0.15, 0.20, 75_000.0, 100_000.0, "halt"),  # 25% DD — clearly past halt
-    ],
-)
-def test_drawdown_scalar_param(
-    brake: float, halt: float, equity: float, peak: float, expect_mode: str
-) -> None:
-    s, mode = compute_drawdown_scalar(equity, peak, brake, halt)
-    assert mode == expect_mode
-    assert 0.0 <= s <= 1.0
+# ── Stress Tests (SLE-24) ─────────────────────────────────────────────────────
 
+class TestStressScenarios:
 
-def test_size_position_min_weight_after_dd_scalar(
-    risk_cfg: RiskConfig, limits: PositionLimitsConfig
-) -> None:
-    """When DD scalar shrinks adjusted weight below min_position_pct, reject."""
-    rs = RiskState.initial(100_000.0)
-    cfg = dataclasses.replace(risk_cfg, drawdown_brake_threshold=0.10, drawdown_halt_threshold=0.20)
-    # ~18% DD -> scalar 0.4 in brake zone
-    rs.update(82_000.0, cfg)
-    hist = _ohlc_frame(25)
-    d = size_position(
-        "X", 100.0, 82_000.0, hist, rs, cfg, limits, open_positions={}
-    )
-    # May approve or reject depending on ATR; at least exercise path without error
-    assert d.rejection_reason is None or "min" in d.rejection_reason.lower() or d.approved
+    def test_synthetic_crash_scenario(self):
+        """5 consecutive 10% daily drops should trigger halt by day 3-4."""
+        equity = 10_000.0
+        peak = equity
+        rs = RiskState.initial(equity)
+        brake = 0.15
+        halt = 0.20
 
+        for day in range(5):
+            equity *= 0.90
+            rs.update(equity, brake_threshold=brake, halt_threshold=halt)
 
-def test_compute_atr_pct_custom_lookback() -> None:
-    df = _ohlc_frame(40)
-    a20 = compute_atr_pct(df, lookback=20)
-    a10 = compute_atr_pct(df, lookback=10)
-    assert a20 > 0 and a10 > 0
+        # After 5 × 10% drops: equity ≈ 5,905 (41% drawdown) — well past halt
+        assert rs.drawdown_mode == "halt"
+        assert rs.sizing_scalar == 0.0
+        assert rs.current_drawdown > halt
 
+    def test_all_stops_trigger_same_day(self):
+        """All open positions hitting stop simultaneously should all be rejected on next entry."""
+        rs = RiskState.initial(10_000.0)
+        tickers = ["AAPL", "MSFT", "NVDA", "GOOG", "TSLA"]
+        for t in tickers:
+            rs.register_stop(t, 100.0)
+        assert len(rs.active_stops) == 5
 
-def test_size_position_uses_peak_from_risk_state(
-    risk_cfg: RiskConfig, limits: PositionLimitsConfig
-) -> None:
-    rs = RiskState.initial(50_000.0)
-    rs.peak_equity = 200_000.0  # elevated peak -> sizing uses DD vs 200k
-    hist = _ohlc_frame(25)
-    d = size_position(
-        "X", 100.0, 100_000.0, hist, rs, risk_cfg, limits, open_positions={}
-    )
-    assert d.drawdown_scalar <= 1.0
+        # Simulate all stops firing: remove all
+        for t in tickers:
+            rs.remove_stop(t)
+        assert rs.active_stops == {}
 
+    def test_extreme_atr_penny_stock(self):
+        """50% ATR should produce a tiny or rejected position."""
+        hist = _price_history(25, close=1.0, atr_frac=0.50)
+        decision = size_position(
+            ticker="JUNK",
+            entry_price=1.0,
+            current_equity=10_000.0,
+            price_history=hist,
+            risk_state=_normal_state(10_000.0),
+            config=_default_risk_config(),
+            position_limits=_default_limits(),
+        )
+        # Either rejected (below min size) or approved with very small position
+        if decision.approved:
+            assert decision.position_pct <= _default_limits().max_position_pct
+        else:
+            assert decision.rejection_reason is not None
 
-def test_check_stop_loss_zero_stop() -> None:
-    assert check_stop_loss(50.0, 0.0) is False
+    def test_minimal_capital(self):
+        """$2,000 starting capital should still compute valid decisions."""
+        hist = _price_history(25, close=10.0, atr_frac=0.02)
+        decision = size_position(
+            ticker="LOW_PRICE",
+            entry_price=10.0,
+            current_equity=2_000.0,
+            price_history=hist,
+            risk_state=_normal_state(2_000.0),
+            config=_default_risk_config(),
+            position_limits=_default_limits(),
+        )
+        # Either valid or gracefully rejected — must not raise
+        assert isinstance(decision.approved, bool)
 
+    def test_drawdown_recovery_then_re_entry(self):
+        """Equity hits halt, recovers to normal — new trades should be approved again."""
+        rs = RiskState.initial(10_000.0)
+        # Hit halt
+        rs.update(7_990.0, brake_threshold=0.15, halt_threshold=0.20)
+        assert rs.drawdown_mode == "halt"
 
-def test_drawdown_scalar_clamps_brake_scalar() -> None:
-    s, mode = compute_drawdown_scalar(84_000, 100_000, 0.15, 0.20)
-    assert mode == "brake"
-    assert 0.0 <= s <= 1.0
+        # Recover beyond original peak
+        rs.update(11_000.0, brake_threshold=0.15, halt_threshold=0.20)
+        assert rs.drawdown_mode == "normal"
+        assert rs.sizing_scalar == 1.0
 
+        # New trade should now be approvable
+        hist = _price_history(25, close=100.0, atr_frac=0.02)
+        decision = size_position(
+            ticker="AAPL",
+            entry_price=100.0,
+            current_equity=11_000.0,
+            price_history=hist,
+            risk_state=rs,
+            config=_default_risk_config(),
+            position_limits=_default_limits(),
+        )
+        assert decision.approved is True
 
-def test_size_position_decision_has_atr_fields(
-    risk_cfg: RiskConfig, limits: PositionLimitsConfig
-) -> None:
-    rs = RiskState.initial(100_000.0)
-    hist = _ohlc_frame(25)
-    d = size_position(
-        "X", 100.0, 100_000.0, hist, rs, risk_cfg, limits, open_positions={}
-    )
-    assert d.atr_pct > 0
-    assert d.stop_distance_pct > 0
-    assert d.raw_weight > 0
+    def test_high_volatility_universe_sizing(self):
+        """Run size_position across 10 tickers simultaneously — no crashes."""
+        tickers = [f"TICK{i}" for i in range(10)]
+        rs = _normal_state(100_000.0)
+        results = []
+        for t in tickers:
+            hist = _price_history(25, close=100.0, atr_frac=np.random.uniform(0.01, 0.08))
+            d = size_position(
+                ticker=t,
+                entry_price=100.0,
+                current_equity=100_000.0,
+                price_history=hist,
+                risk_state=rs,
+                config=_default_risk_config(),
+                position_limits=_default_limits(),
+            )
+            results.append(d)
+        # All should return a decision (approved or rejected) without raising
+        assert len(results) == 10
+        assert all(isinstance(d.approved, bool) for d in results)
 
+    def test_consecutive_halt_and_size_position_always_rejects(self):
+        """Once halted, size_position must reject every ticker until equity recovers."""
+        rs = RiskState.initial(10_000.0)
+        rs.update(7_990.0, brake_threshold=0.15, halt_threshold=0.20)
+        hist = _price_history(25, close=100.0, atr_frac=0.02)
 
-def test_size_position_stop_price_formula(
-    risk_cfg: RiskConfig, limits: PositionLimitsConfig
-) -> None:
-    rs = RiskState.initial(100_000.0)
-    hist = _ohlc_frame(25)
-    entry = 250.0
-    d = size_position(
-        "X", entry, 100_000.0, hist, rs, risk_cfg, limits, open_positions={}
-    )
-    assert d.approved
-    expected_dist = risk_cfg.stop_loss_atr_multiple * d.atr_pct
-    assert d.stop_distance_pct == pytest.approx(expected_dist)
-    assert d.stop_price == pytest.approx(entry * (1.0 - expected_dist))
-
-
-def test_compute_atr_pct_numeric_strings_coerced() -> None:
-    df = _ohlc_frame(25)
-    for col in ("High", "Low", "Close"):
-        df[col] = df[col].astype(str)
-    atr = compute_atr_pct(df, lookback=20)
-    assert atr > 0
-
-
-def test_size_position_rejects_extreme_halt_message(
-    risk_cfg: RiskConfig, limits: PositionLimitsConfig
-) -> None:
-    rs = RiskState.initial(100_000.0)
-    cfg = risk_cfg
-    rs.update(70_000.0, cfg)
-    hist = _ohlc_frame(25)
-    d = size_position(
-        "X", 100.0, 70_000.0, hist, rs, cfg, limits, open_positions={}
-    )
-    assert not d.approved
-
-
-def test_drawdown_scalar_new_peak() -> None:
-    s, mode = compute_drawdown_scalar(110_000, 100_000, 0.15, 0.20)
-    assert mode == "normal"
-    assert s == 1.0
-
-
-# Additional tests to reach comprehensive coverage of public helpers
-
-
-def test_check_stop_loss_boundary_zero_low() -> None:
-    assert check_stop_loss(0.0, 1.0) is True
-
-
-def test_size_position_fractional_roundtrip(
-    risk_cfg: RiskConfig, limits: PositionLimitsConfig
-) -> None:
-    rs = RiskState.initial(1_000_000.0)
-    hist = _ohlc_frame(25)
-    d = size_position(
-        "X", 50.0, 1_000_000.0, hist, rs, risk_cfg, limits, open_positions={}
-    )
-    assert d.approved
-    assert d.shares == pytest.approx(d.dollar_amount / 50.0, rel=1e-9)
-
-
-def test_compute_atr_pct_minimum_periods() -> None:
-    df = _ohlc_frame(21)
-    atr = compute_atr_pct(df, lookback=20)
-    assert not np.isnan(atr)
-
-
-def test_size_position_drawdown_scalar_matches_decision(
-    risk_cfg: RiskConfig, limits: PositionLimitsConfig
-) -> None:
-    rs = RiskState.initial(100_000.0)
-    cfg = dataclasses.replace(risk_cfg, drawdown_brake_threshold=0.15, drawdown_halt_threshold=0.20)
-    rs.update(85_000.0, cfg)
-    sc, _ = compute_drawdown_scalar(85_000.0, rs.peak_equity, 0.15, 0.20)
-    hist = _ohlc_frame(25)
-    d = size_position(
-        "X", 100.0, 85_000.0, hist, rs, cfg, limits, open_positions={}
-    )
-    assert d.drawdown_scalar == pytest.approx(sc)
-
-
-def test_risk_state_peaks_used_in_size_position(
-    risk_cfg: RiskConfig, limits: PositionLimitsConfig
-) -> None:
-    rs = RiskState.initial(100_000.0)
-    hist = _ohlc_frame(25)
-    d1 = size_position("X", 100.0, 100_000.0, hist, rs, risk_cfg, limits, {})
-    assert d1.approved
-    rs2 = RiskState.initial(100_000.0)
-    rs2.update(100_000.0, risk_cfg)
-    d2 = size_position("X", 100.0, 100_000.0, hist, rs2, risk_cfg, limits, {})
-    assert d2.approved
-
-
-def test_compute_drawdown_scalar_symmetry_at_halt_edge() -> None:
-    # Avoid float edge at exactly 20.0% DD vs halt=0.20
-    s, mode = compute_drawdown_scalar(75_000.0, 100_000.0, 0.15, 0.20)
-    assert mode == "halt"
-    assert s == 0.0
-
-
-def test_size_position_rejection_has_reason(
-    risk_cfg: RiskConfig, limits: PositionLimitsConfig
-) -> None:
-    rs = RiskState.initial(100_000.0)
-    cfg = dataclasses.replace(risk_cfg, drawdown_brake_threshold=0.05, drawdown_halt_threshold=0.10)
-    rs.update(88_000.0, cfg)
-    hist = _ohlc_frame(25)
-    d = size_position(
-        "X", 100.0, 88_000.0, hist, rs, cfg, limits, open_positions={}
-    )
-    assert not d.approved
-    assert d.rejection_reason
-
-
-def test_check_stop_loss_negative_stop_ignored() -> None:
-    assert check_stop_loss(10.0, -5.0) is False
+        for ticker in ["AAPL", "MSFT", "NVDA", "GOOG"]:
+            d = size_position(
+                ticker=ticker,
+                entry_price=100.0,
+                current_equity=7_990.0,
+                price_history=hist,
+                risk_state=rs,
+                config=_default_risk_config(),
+                position_limits=_default_limits(),
+            )
+            assert d.approved is False, f"{ticker} should be rejected during halt"

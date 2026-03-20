@@ -5,7 +5,7 @@ Financial Pattern Prediction Engine (FPPE) v2.2 — K-NN analogue matching for p
 See PROJECT_GUIDE.md for full architecture, API, and roadmap.
 
 ## Commands
-- `python -m pytest tests/ -v` — Run all 388 tests (always run before committing)
+- `python -m pytest tests/ -v` — Run all 402 tests (always run before committing)
 - `python -m pattern_engine.live` — Production EOD signals
 - `python -m pattern_engine.overnight` — 6-hour overnight runner
 - `venv\Scripts\activate` — Windows venv activation
@@ -36,7 +36,9 @@ See PROJECT_GUIDE.md for full architecture, API, and roadmap.
 - `pattern_engine/features.py` — Feature sets including `returns_overnight` and `returns_session`
 - `pattern_engine/overnight.py` — Checkpoint state machine (pending/running/completed/partial/failed)
 - `pattern_engine/manifest.py` — Run manifests, data versioning, prior-run context loading
-- `trading_system/backtest_engine.py` — Phase 1 backtester (42KB, all bugs fixed)
+- `trading_system/backtest_engine.py` — Backtester with integrated Phase 2 risk engine hooks
+- `trading_system/risk_engine.py` — Volatility sizing, ATR stops, drawdown scalar logic
+- `trading_system/risk_state.py` — Drawdown/risk state dataclasses and decision containers
 - `trading_system/signal_adapter.py` — Normalizes FPPE output to UnifiedSignal
 - `trading_system/config.py` — Trading system configuration
 - `docs/FPPE_TRADING_SYSTEM_DESIGN.md` — Trading system design doc

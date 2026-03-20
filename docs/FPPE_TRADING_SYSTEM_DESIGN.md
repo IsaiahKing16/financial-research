@@ -1,8 +1,16 @@
 # FPPE Trading System — Architecture & Design Specification
 
-**Version:** 0.3 (Empirical parameter update after Phase 1 backtest)
-**Date:** March 19, 2026
-**Status:** ACTIVE — Phase 1 complete. Phase 2 (risk engine) next.
+**Version:** 0.4 (Phase 2 completion update)
+**Date:** March 20, 2026
+**Status:** ACTIVE — Phase 1 and Phase 2 complete.
+
+**Revision notes (v0.4):** Phase 2 implementation is complete in `trading_system/risk_engine.py` and `trading_system/risk_state.py`, with Layer 1 integration in `trading_system/backtest_engine.py`. Public package exports were expanded in `trading_system/__init__.py` to include risk-state dataclasses and risk-engine helpers.
+
+**Phase 2 completion highlights:**
+- Volatility-based sizing integrated (ATR stop distance with min/max position clamps)
+- Drawdown brake/halt integrated (linear sizing scalar from 15% to 20% drawdown)
+- Stop-loss trigger path integrated (intraday low trigger, next-open execution semantics)
+- Trading-system automated test coverage expanded to include Phase 2 integration paths
 
 **Revision notes (v0.3):** Phase 1 backtest completed on 2024 validation data with real FPPE signals. Two empirical parameter optimizations applied based on sweep results:
 
@@ -754,3 +762,4 @@ Before any code is written, confirm:
 - *v0.1 (2026-03-19): Initial draft*
 - *v0.2 (2026-03-19): Revised after two independent reviews. Major scope reduction for v1, fixed confidence double-counting, added baselines, revised friction model, added signal adapter for hybrid FPPE.*
 - *v0.3 (2026-03-19): Phase 1 backtest complete. Empirical parameter sweep results applied: confidence_threshold 0.65→0.60, max_holding_days 10→14. Phase 1 result: 22.3% annual, Sharpe 1.82, Max DD 6.9%. Candlestick categorization module designed (see CANDLESTICK_CATEGORIZATION_DESIGN.md).*
+- *v0.4 (2026-03-20): Phase 2 complete. Added completion notes for risk_engine/risk_state implementation, Layer 1 integration, and package export updates.*

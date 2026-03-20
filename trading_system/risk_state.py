@@ -1,14 +1,32 @@
 """
-risk_state.py — Phase 2 portfolio risk state and decision records.
+risk_state.py — Portfolio risk tracking dataclasses for Phase 2.
+
+Design: docs/PHASE2_SYSTEM_DESIGN.md Section 3
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
-from typing import Dict, Optional
+from typing import Dict, Optional, Protocol
+
+
+class SupportsDrawdownThresholds(Protocol):
+    """Minimal surface for drawdown brake/halt configuration.
+
+    Satisfied by ``RiskConfig`` and test doubles — keeps this module free of
+    heavy imports.
+    """
+
+    drawdown_brake_threshold: float
+    drawdown_halt_threshold: float
 
 
 @dataclass(frozen=True)
 class PositionDecision:
-    """Output of a position sizing request."""
+    """Output of the risk engine's position sizing calculation.
+
+    Immutable — computed once per trade candidate, never modified.
+    """
 
     approved: bool
     ticker: str
@@ -36,7 +54,11 @@ class PositionDecision:
 
 @dataclass(frozen=True)
 class StopLossEvent:
-    """Audit record created when a stop-loss is triggered."""
+    """Record of a stop-loss trigger for audit trail.
+
+    Created when intraday low <= stop_price. The actual exit occurs at
+    next-day open (not at the stop price) per design doc Section 4.2.
+    """
 
     ticker: str
     trigger_date: str
@@ -47,10 +69,21 @@ class StopLossEvent:
     gap_through: bool
     atr_at_entry: float
 
+    def __post_init__(self) -> None:
+        """Validate event fields."""
+        if not self.ticker:
+            raise ValueError("ticker must be non-empty")
+        if not self.trigger_date:
+            raise ValueError("trigger_date must be non-empty")
+
 
 @dataclass
 class RiskState:
-    """Mutable portfolio-level risk state updated through the backtest lifecycle."""
+    """Mutable state tracking portfolio-level risk metrics.
+
+    Updated daily by backtest_engine after mark-to-market.
+    Read by risk_engine when sizing new positions.
+    """
 
     peak_equity: float
     current_equity: float
@@ -60,9 +93,52 @@ class RiskState:
     active_stops: Dict[str, float] = field(default_factory=dict)
     daily_atr_cache: Dict[str, float] = field(default_factory=dict)
 
+    def update(self, current_equity: float, config: SupportsDrawdownThresholds) -> None:
+        """Recompute drawdown state after daily mark-to-market.
+
+        Args:
+            current_equity: Portfolio equity after today's mark-to-market.
+            config: Risk configuration for brake/halt thresholds.
+        """
+        brake = config.drawdown_brake_threshold
+        halt = config.drawdown_halt_threshold
+        if brake >= halt:
+            raise ValueError(
+                f"drawdown_brake_threshold ({brake}) must be < "
+                f"drawdown_halt_threshold ({halt})"
+            )
+
+        if current_equity > self.peak_equity:
+            self.peak_equity = current_equity
+
+        self.current_equity = current_equity
+
+        if self.peak_equity > 0:
+            self.current_drawdown = (self.peak_equity - current_equity) / self.peak_equity
+        else:
+            self.current_drawdown = 0.0
+
+        if self.current_drawdown >= halt:
+            self.drawdown_mode = "halt"
+            self.sizing_scalar = 0.0
+        elif self.current_drawdown >= brake:
+            self.drawdown_mode = "brake"
+            self.sizing_scalar = (halt - self.current_drawdown) / (halt - brake)
+        else:
+            self.drawdown_mode = "normal"
+            self.sizing_scalar = 1.0
+
+    def register_stop(self, ticker: str, stop_price: float) -> None:
+        """Record a new stop-loss for an open position."""
+        self.active_stops[ticker] = stop_price
+
+    def remove_stop(self, ticker: str) -> None:
+        """Remove stop when position is closed."""
+        self.active_stops.pop(ticker, None)
+
     @classmethod
-    def initial(cls, starting_equity: float) -> "RiskState":
-        """Create initial state at backtest start."""
+    def initial(cls, starting_equity: float) -> RiskState:
+        """Create initial risk state at start of backtest."""
         return cls(
             peak_equity=starting_equity,
             current_equity=starting_equity,
@@ -72,39 +148,3 @@ class RiskState:
             active_stops={},
             daily_atr_cache={},
         )
-
-    def update(self, current_equity: float, brake_threshold: float, halt_threshold: float) -> None:
-        """Update drawdown metrics after mark-to-market."""
-        if current_equity > self.peak_equity:
-            self.peak_equity = current_equity
-
-        self.current_equity = current_equity
-        if self.peak_equity > 0:
-            self.current_drawdown = max(0.0, 1.0 - (current_equity / self.peak_equity))
-        else:
-            self.current_drawdown = 0.0
-
-        if self.current_drawdown >= halt_threshold:
-            self.drawdown_mode = "halt"
-            self.sizing_scalar = 0.0
-            return
-
-        if self.current_drawdown >= brake_threshold:
-            self.drawdown_mode = "brake"
-            span = halt_threshold - brake_threshold
-            self.sizing_scalar = (
-                (halt_threshold - self.current_drawdown) / span if span > 0 else 0.0
-            )
-            self.sizing_scalar = min(1.0, max(0.0, self.sizing_scalar))
-            return
-
-        self.drawdown_mode = "normal"
-        self.sizing_scalar = 1.0
-
-    def register_stop(self, ticker: str, stop_price: float) -> None:
-        """Track active stop-loss for an open position."""
-        self.active_stops[ticker] = stop_price
-
-    def remove_stop(self, ticker: str) -> None:
-        """Remove active stop when position closes."""
-        self.active_stops.pop(ticker, None)

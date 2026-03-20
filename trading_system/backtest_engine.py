@@ -738,11 +738,7 @@ class BacktestEngine:
             peak_equity = max(peak_equity, equity)
             drawdown = 1.0 - (equity / peak_equity) if peak_equity > 0 else 0.0
             if risk_engine_enabled and risk_state is not None:
-                risk_state.update(
-                    current_equity=equity,
-                    brake_threshold=cfg_risk.drawdown_brake_threshold,
-                    halt_threshold=cfg_risk.drawdown_halt_threshold,
-                )
+                risk_state.update(equity, cfg_risk)
 
             cum_return = (equity / self.config.capital.initial_capital) - 1.0
             prev_equity = daily_records[-1].equity if daily_records else self.config.capital.initial_capital

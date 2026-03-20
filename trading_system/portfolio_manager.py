@@ -166,20 +166,24 @@ def check_allocation(
             # Cooldown active but confidence margin met — allow through
 
     # Check 3: Sector position count
-    sector_count = snapshot.sector_position_counts.get(sector, 0)
-    if sector_count >= position_limits.max_positions_per_sector:
-        return AllocationDecision(
-            ticker=ticker,
-            approved=False,
-            rank=ranked_signal.rank,
-            confidence=confidence,
-            sector=sector,
-            rejection_reason=(
-                f"Sector {sector} at max "
-                f"{position_limits.max_positions_per_sector} positions"
-            ),
-            rejection_layer="portfolio",
-        )
+    # "Unknown" tickers lack a sector mapping — they are not a correlated group,
+    # so enforcing concentration limits on them would falsely throttle uncorrelated
+    # positions. Consistent with the Phase 1/2 path intent in backtest_engine.py.
+    if sector != "Unknown":
+        sector_count = snapshot.sector_position_counts.get(sector, 0)
+        if sector_count >= position_limits.max_positions_per_sector:
+            return AllocationDecision(
+                ticker=ticker,
+                approved=False,
+                rank=ranked_signal.rank,
+                confidence=confidence,
+                sector=sector,
+                rejection_reason=(
+                    f"Sector {sector} at max "
+                    f"{position_limits.max_positions_per_sector} positions"
+                ),
+                rejection_layer="portfolio",
+            )
 
     # All checks passed
     return AllocationDecision(

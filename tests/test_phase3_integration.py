@@ -69,8 +69,16 @@ def _sig(ticker, sector, dates, signal="BUY", confidence=0.75):
     ]
 
 
-def _test_config(max_positions_per_sector: int = 3, **risk_overrides) -> TradingConfig:
-    """TradingConfig tuned for deterministic integration tests."""
+def _test_config(
+    max_positions_per_sector: int = 3,
+    max_sector_pct: float = 0.30,
+    **risk_overrides,
+) -> TradingConfig:
+    """TradingConfig tuned for deterministic integration tests.
+
+    max_sector_pct: Set to 0.99 in sector-limit tests so the PM's count gate
+    is the binding constraint, not the dollar-based sector exposure check.
+    """
     base = TradingConfig()
     risk_base = base.risk
     if risk_overrides:
@@ -78,6 +86,7 @@ def _test_config(max_positions_per_sector: int = 3, **risk_overrides) -> Trading
     pos_limits = dataclasses.replace(
         base.position_limits,
         max_positions_per_sector=max_positions_per_sector,
+        max_sector_pct=max_sector_pct,
     )
     return dataclasses.replace(
         base,
@@ -197,7 +206,11 @@ class TestPhase3SectorLimits:
     """Portfolio manager enforces max_positions_per_sector on same-day signals."""
 
     def test_4th_signal_in_same_sector_rejected(self):
-        """With max_positions_per_sector=3, a 4th same-sector BUY is rejected by PM."""
+        """With max_positions_per_sector=3, a 4th same-sector BUY is rejected by PM.
+
+        max_sector_pct is set to 0.99 so the PM's count gate is the binding
+        constraint, not the dollar-based sector exposure check.
+        """
         tickers = ["AAPL", "MSFT", "GOOG", "META"]
         price_df = _flat_price_df(tickers, n_days=60)
 
@@ -210,7 +223,7 @@ class TestPhase3SectorLimits:
         signal_df = pd.DataFrame(rows)
 
         engine = BacktestEngine(
-            config=_test_config(max_positions_per_sector=3),
+            config=_test_config(max_positions_per_sector=3, max_sector_pct=0.99),
             use_risk_engine=True,
             use_portfolio_manager=True,
         )
@@ -223,7 +236,11 @@ class TestPhase3SectorLimits:
         assert len(portfolio_rejections) >= 1
 
     def test_sector_rejection_logged_with_portfolio_layer(self):
-        """The 4th-sector rejection has rejection_layer == 'portfolio'."""
+        """The 4th-sector rejection has rejection_layer == 'portfolio'.
+
+        max_sector_pct is set to 0.99 so PM's count gate fires before the
+        dollar-based sector_limit check.
+        """
         tickers = ["AAPL", "MSFT", "GOOG", "META"]
         price_df = _flat_price_df(tickers, n_days=60)
 
@@ -235,7 +252,7 @@ class TestPhase3SectorLimits:
         signal_df = pd.DataFrame(rows)
 
         engine = BacktestEngine(
-            config=_test_config(max_positions_per_sector=3),
+            config=_test_config(max_positions_per_sector=3, max_sector_pct=0.99),
             use_risk_engine=True,
             use_portfolio_manager=True,
         )

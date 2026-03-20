@@ -85,7 +85,7 @@ pattern_engine/                    # 21 modules, version 2.1.0
 ### Trading System Package (Phase 2 complete)
 
 ```
-trading_system/                    # 7 modules, 102 tests, Phase 2 risk layer integrated
+trading_system/                    # 7 modules, 90 tests, Phase 2 risk layer integrated
 ├── __init__.py                    # Full package exports (all primary symbols)
 ├── config.py                      # TradingConfig: 7 frozen sub-configs, from_profile()
 ├── signal_adapter.py              # Normalizes FPPE K-NN / DL outputs → UnifiedSignal
@@ -297,7 +297,7 @@ BSS < 0    = worse than base rate
 - 2024 fold = positive BSS — genuine predictive skill on unseen data
 - 2022 bear market = worst fold (regime shift, fewer bear training analogues)
 - Expanding window means later folds have more training data → better performance
-- 402 automated tests all passing (300 pattern_engine + 102 trading_system)
+- 390 automated tests all passing (300 pattern_engine + 90 trading_system)
 
 ---
 
@@ -495,7 +495,7 @@ pip install -r requirements.txt  # includes optuna
 ```cmd
 python -m pytest tests/ -v
 ```
-All **402 tests** must pass (24 test files: 21 pattern_engine + 3 trading_system).
+All **390 tests** must pass (24 test files: 21 pattern_engine + 3 trading_system).
 
 ### Key Entry Points
 
@@ -565,7 +565,7 @@ Merged to main branch 2026-03-18. Legacy files (strategy.py, strategyv1-v4.py) p
 but marked superseded.
 
 ### 12.2 Trading System (`trading_system/`)
-7 modules, 102 tests, all passing. Phase 2 (risk engine) complete.
+7 modules, 90 tests, all passing. Phase 2 (risk engine) complete.
 - Annualized return 22.3%, Sharpe 1.82, Max DD 6.9% on 2024 validation year
 - All 9 Phase 1 bugs fixed and documented in `docs/PHASE1_FILE_REVIEW.md`
 - `config.py`: 7 frozen sub-configs, 3 risk profiles, full validate() coverage
@@ -629,7 +629,7 @@ Professional DOCX report (~20 pages, 4 sections):
 - [x] trading_system/config.py — all 7 sub-configs frozen, 3 risk profiles, full validate()
 - [x] trading_system/signal_adapter.py — UnifiedSignal, adapt_knn/dl_signals, import guard
 - [x] trading_system/backtest_engine.py — P&L (no double-count), D1/D2 fixes, Layer 2 integration hooks
-- [x] 102 trading_system tests (test_trading_config, test_signal_adapter, test_backtest_engine)
+- [x] 90 trading_system tests (test_trading_config, test_signal_adapter, test_backtest_engine)
 - [x] Phase 1 results: 22.3% annual, Sharpe 1.82, Max DD 6.9% (beats SPY risk-adjusted)
 - [x] docs/FPPE_TRADING_SYSTEM_DESIGN.md v0.4
 - [x] docs/PHASE1_FILE_REVIEW.md — structural audit complete

@@ -78,17 +78,23 @@ raw_probs_valid = raw_probs[valid]
 y_val_valid     = y_val[valid]
 
 # --- BMACalibrator ---
-# Fit on training fold analogues (same structure)
-cal = BMACalibrator(n_iter=30)
-# Build training raw_probs matrix: for each train sample, top-K neighbour outcomes
-train_raw = np.zeros((len(X_train), TOP_K))
-for i, query in enumerate(X_train):
-    distances = metric.compute(query, X_train)
-    distances[i] = np.inf                               # exclude self
-    top_idx = np.argsort(distances)[:TOP_K]
-    train_raw[i] = y_train[top_idx]
+# CRITICAL: Mirror the production cal_frac=0.76 chronological split to prevent
+# temporal leakage. The Platt baseline respects this split; BMA must too or
+# any BSS improvement is a false positive.
+CAL_FRAC = 0.76
+cal_split = int(len(X_train) * CAL_FRAC)
+X_fit, X_cal = X_train[:cal_split], X_train[cal_split:]
+y_fit, y_cal  = y_train[:cal_split], y_train[cal_split:]
 
-cal.fit(train_raw, y_train)
+cal = BMACalibrator(n_iter=30)
+# Build cal raw_probs: for each cal sample, top-K neighbours from fit portion only
+cal_raw = np.zeros((len(X_cal), TOP_K))
+for i, query in enumerate(X_cal):
+    distances = metric.compute(query, X_fit)            # query against fit only
+    top_idx = np.argsort(distances)[:TOP_K]
+    cal_raw[i] = y_fit[top_idx]
+
+cal.fit(cal_raw, y_cal)
 
 # Calibrated probs: one scalar per val row
 cal_probs = np.array([float(cal.transform(row)) for row in raw_probs_valid])
@@ -208,10 +214,7 @@ for atr_mult in [3.0, 3.25, 3.5, 3.75, 4.0]:
 from research.slip_deficit import SlipDeficit as _SlipDeficit  # import at top of file
 
 _sd = _SlipDeficit()                         # stateless; instantiate once per backtest run (move to __init__)
-_ticker_close = pd.DataFrame(
-    {"close": [row["close"] for row in price_history.to_dict("records")]},
-    index=price_history.index,
-)
+_ticker_close = price_history[["close"]].copy()   # price_history is already a DataFrame — no rebuild
 try:
     _overlay = _sd.compute(_ticker_close)
     _effective_atr_mult = (
@@ -264,15 +267,25 @@ python -m pytest tests/ -q --tb=no   # must still show 574+ passed
 
 **Integration path:**
 
-1. Install: `python -m pip install faiss-cpu`
-2. Implement `research/faiss_distance.py` subclassing `BaseDistanceMetric`:
-   - `fit()`: build `faiss.IndexFlatL2` (exact) or `IndexIVFFlat` (approximate) on `X_train`
+1. **Install (prefer `hnswlib` over `faiss-cpu`):**
+   ```bash
+   python -m pip install hnswlib
+   ```
+   `faiss-cpu` can fail to compile or lack AVX2 support in mixed Windows/WSL environments.
+   `hnswlib` is pip-friendly on Windows and does not require a C++ build chain.
+   Fall back to `faiss-cpu` only if `hnswlib` recall benchmarks are insufficient.
+
+2. Implement `research/hnsw_distance.py` subclassing `BaseDistanceMetric`:
+   - `fit()`: build `hnswlib.Index` (space=`l2`, dim=8) on `X_train`
    - `compute()`: query index, return distances shape `(N,)`
+
 3. Validate recall@50 ≥ 0.95 vs exact ball_tree on held-out set
+
 4. Only then: modify `matching.py` to accept `BaseDistanceMetric` objects (Phase C promotion unlocks this file)
+
 5. Swap `EngineConfig.distance_metric` from string → `BaseDistanceMetric` instance
 
-**Keep `nn_jobs=1`** — FAISS handles its own threading; joblib parallelism is still forbidden.
+**Keep `nn_jobs=1`** — HNSW handles its own threading; joblib parallelism is still forbidden.
 
 ---
 

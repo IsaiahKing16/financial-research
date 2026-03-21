@@ -512,6 +512,11 @@ class BacktestEngine:
                     entry_price = raw_entry_price * (1 + cfg_costs.total_entry_bps / 10_000)
 
                     # 4c. Risk engine: ATR history + sizing
+                    # PM checked count-based constraints (holding, cooldown, sector count).
+                    # size_position re-checks holding + sector count internally for
+                    # defense-in-depth — intentional, not redundant duplication.
+                    # Dollar-based constraints (ATR stop, drawdown brake, exposure %)
+                    # are ONLY handled here; PM has no visibility into position sizes.
                     history_rows = cfg_risk.volatility_lookback + 1
                     price_history = self._get_ticker_history(
                         price_history_by_ticker=price_history_by_ticker,

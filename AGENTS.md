@@ -15,48 +15,46 @@ This project is built by a **team of AI agents working together**, not a collect
 
 ## Agent Profiles & Routing Configuration
 
-To ensure seamless automation through Linear, each agent must be assigned using its exact Cursor API string in the issue description (for example: `[model=claude-3-opus]`).
+**Cursor model routing rule:** Every issue assigned to Cursor MUST include an explicit `[model=<cursor-api-string>]` tag on the **first line** of the description. Do NOT rely on Cursor to infer the model from the agent name or from this file — it will resolve "Claude Opus" to the latest Claude model ID (e.g. `claude-opus-4-6`), which may not be valid in Cursor's supported model list. The tag must use the exact Cursor API string listed below.
 
-1. Claude 3 Opus
-Cursor API String: claude-3-opus
+**Phase 3 lesson:** Issues that omitted the `[model=...]` tag caused Cursor to fail with `AI Model Not Found: Model name is not valid: "claude-opus-4-6"` across all 7 Phase 3 issues. The fix for Phase 4+: always prepend the tag.
 
-Role: Architect / Lead
+**Issue description template:**
+```
+[model=<cursor-api-string>]
 
-Best For: Complex multi-file changes, merge coordination, final plan execution, and critical path synthesis. Owns the hardest architectural integration tasks for the quantitative engine.
+**Role Directive:** Act strictly as the <Agent Name> defined in AGENTS.md. <Focus sentence>.
 
-2. Claude 3.5 Sonnet
-Cursor API String: claude-3.5-sonnet
+## Objective
+...
+```
 
-Role: Fast Implementer
+---
 
+| # | Agent | Cursor API String | Role |
+|---|-------|-------------------|------|
+| 1 | Claude Opus (Lead Architect) | `claude-3-opus` | Complex multi-file integration, architectural decisions, critical path |
+| 2 | Claude Sonnet (Fast Implementer) | `claude-3.5-sonnet` | Scoped implementation, test writing, documentation |
+| 3 | Composer 2 | N/A (native Cursor UI only) | Plan review, milestone sign-off, cross-agent synthesis |
+| 4 | GPT-4o | `gpt-4o` | Parallel isolated module work, data processing scripts |
+| 5 | o1 | `o1` | Deep algorithmic validation, math verification, edge-case detection |
+| 6 | Gemini | `gemini-3.1-pro-preview` | Cross-validation, red-team review, architectural alternatives |
+
+**Extended profiles:**
+
+**Claude Opus — Lead Architect**
+Best For: Complex multi-file changes, merge coordination, final plan execution, and critical path synthesis. Owns the hardest architectural integration tasks.
+
+**Claude Sonnet — Fast Implementer**
 Best For: Scoped tasks with clear specs, writing test coverage, and updating project documentation to accurately reflect the current repository state.
 
-3. Composer 2
-Cursor API String: N/A (Native Cursor Interface)
-
-Role: Plan Review / Synthesizer
-
-Best For: Reviewing plans before execution, synthesizing cross-agent reviews, and acting as the human-in-the-loop gateway to approve milestones.
-
-4. GPT-4o
-Cursor API String: gpt-4o
-
-Role: Parallel Implementation
-
+**GPT-4o — Parallel Implementer**
 Best For: Independent feature branches, isolated Python module work, and drafting highly specific data processing scripts.
 
-5. o1 (OpenAI Reasoning Model)
-Cursor API String: o1
-
-Role: Deep Analysis
-
+**o1 — Deep Analyst**
 Best For: Research-heavy tasks, deep algorithmic validation (e.g., verifying drawdown brake mechanics and position sizing math), and extreme edge-case detection.
 
-6. Gemini 3.1 Pro
-Cursor API String: gemini-3.1-pro-preview
-
-Role: Cross-Validation / Red Team
-
+**Gemini — Cross-Validator**
 Best For: Second-opinion reviews, proposing alternative architectural approaches, and identifying logic blind spots missed by the Anthropic or OpenAI models.
 ---
 

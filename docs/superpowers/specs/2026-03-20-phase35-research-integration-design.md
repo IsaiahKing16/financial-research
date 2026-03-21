@@ -1,7 +1,7 @@
 # Phase 3.5 — Research Integration Design
 **Date:** 2026-03-20
 **Status:** Approved, pending implementation
-**Branch:** phase3-portfolio-manager (to be implemented on new branch)
+**Branch:** `phase35-research` (create from `phase3-portfolio-manager`)
 
 ---
 
@@ -59,7 +59,10 @@ See `research/phase_c_roadmap.md` for structured stubs.
 
 Abstract base classes defined in `research/__init__.py` enforce the interface contract each
 research module must satisfy. When a module is ready for production promotion, it already
-implements the exact interface the production caller expects — zero changes to callers required.
+implements the exact interface the production module it replaces exposes. Note: callers in
+`signal_adapter.py` currently invoke calibration via a legacy function pair
+(`fit_platt_scaling` / `calibrate_probabilities`) rather than through any ABC seam.
+Migration of those callers is Phase C promotion work, not Phase B.
 
 ### Package Structure
 
@@ -99,13 +102,17 @@ class BaseCalibrator(ABC):
 
 class BaseRiskOverlay(ABC):
     @abstractmethod
-    def compute(self, prices_df: pd.DataFrame, positions: list) -> "RiskOverlayResult": ...
+    def compute(self, prices_df: pd.DataFrame,
+                positions: Optional[list] = None) -> "RiskOverlayResult": ...
 
 @dataclass
 class RiskOverlayResult:
-    slip_deficit: float        # (price - SMA200) / SMA200
+    slip_deficit: float   # Signed: (price - SMA200) / SMA200. Positive = above anchor
+                          # (overextended/loaded); negative = below anchor (oversold).
+                          # Seismic analogy maps to strictly non-negative loading, but the
+                          # signed financial interpretation is intentional and correct.
     ttf_probability: float     # [0, 1] — probability of imminent failure
-    tighten_stops: bool        # True when TTF probability exceeds threshold
+    tighten_stops: bool        # True when vol Z-score exceeds ttf_threshold
 ```
 
 ---
@@ -131,15 +138,22 @@ than a pattern with different structural shape.
 **Data flow:**
 ```
 8-feature fingerprint (ret_1d..ret_90d)
-  → construct_weighted_point_set()     # shape: (8, 2) — (time_lag, return_value)
-  → weights = uniform (1/8 each)      # volume weights deferred to Phase C (LOB data)
-  → ot.emd2(current_weights,          # exact EMD via POT network simplex solver
-             hist_weights,
-             cost_matrix)             # pairwise euclidean on (time, return) coords
+  → construct_weighted_point_set()
+        current_coords: shape (8, 2)  # each row: (time_lag * time_penalty,
+                                      #            return_value * price_penalty)
+        hist_coords:    shape (8, 2)
+        weights_a = weights_b = np.full(8, 1/8)   # uniform; volume weights Phase C
+  → cost_matrix = cdist(current_coords, hist_coords, metric='euclidean')
+                                      # shape (8, 8) — required by ot.emd2
+  → ot.emd2(weights_a, weights_b, cost_matrix)   # POT network simplex solver
   → scalar distance
 ```
 
-**Fallback:** If `pot` unavailable, falls back to `scipy.stats.wasserstein_distance_nd`.
+**Fallback:** If `pot` is unavailable, the fallback applies penalty weights by pre-scaling
+the coordinate arrays before calling `scipy.stats.wasserstein_distance_nd(current_coords,
+hist_coords)`. This is numerically equivalent because the Euclidean cost structure is
+identical. Minimum SciPy version required: **1.13** (when `wasserstein_distance_nd` was
+added). If SciPy < 1.13, raise `ImportError` with a clear message.
 
 **Production promotion path:** Replaces `ball_tree` distance computation in `matching.py`
 `Matcher` class once walk-forward BSS improvement is confirmed.
@@ -160,7 +174,9 @@ heavy-tailed financial returns that Platt's Gaussian assumption underestimates.
 (Doc 1, "Improving Baseline Probabilities" section; references Raftery et al. BMA paper).
 
 **ABC implemented:** `BaseCalibrator` — `transform()` matches `PlattCalibrator` interface
-exactly for drop-in compatibility with the three-filter gate in `signal_adapter.py`.
+exactly. Drop-in compatibility with production callers requires Phase C migration of
+`signal_adapter.py`'s legacy `fit_platt_scaling`/`calibrate_probabilities` functions to
+call through the ABC. This wiring is deferred to Phase C.
 
 **Key parameters (constructor):**
 - `num_analogs: int` — number of historical analogues (typically top_k=50)
@@ -168,11 +184,22 @@ exactly for drop-in compatibility with the three-filter gate in `signal_adapter.
 - `max_iter: int = 50` — EM convergence iterations
 
 **EM Algorithm:**
+
+The implementation uses a Gaussian variance M-step as a deliberate approximation of the
+full Student's t EM (which requires an auxiliary u-weight precision variable). This is
+acceptable for a research module: the t-distribution is used in the E-step PDF (providing
+heavy-tail probability mass), while the simpler Gaussian variance update avoids the
+u-weight complexity at the cost of slight variance underestimation in extreme tails. A
+comment in the code must document this tradeoff explicitly. The full Student's t M-step
+(with u-weights) is a Phase C upgrade candidate.
+
 ```
-E-step: latent_probs[i] = w[i] * t_pdf(realized_return | analog[i], var[i])
-        normalized across all analogs
-M-step: w[i]   = mean(latent_probs[:, i])
-        var[i] = sum(latent_probs[:, i] * (y - analog[i])^2) / sum(latent_probs[:, i])
+E-step: latent_pdfs[n, i] = w[i] * t_pdf(y[n] | loc=analog[i], scale=sqrt(var[i]), df=df)
+        latent_probs[n, i] = latent_pdfs[n, i] / sum(latent_pdfs[n, :])   # normalize
+
+M-step: w[i]   = mean(latent_probs[:, i])                                 # weight update
+        var[i] = sum(latent_probs[:, i] * (y - analog[i])^2)              # Gaussian approx
+                 / sum(latent_probs[:, i])                                 # (see note above)
 ```
 
 **Additional method:** `generate_pdf(analogue_returns, return_grid) -> np.ndarray`
@@ -180,7 +207,7 @@ Returns the full BMA probability density function — used for confidence interv
 computation in the three-filter gate (Phase C integration).
 
 **Production promotion path:** Replaces `PlattCalibrator` in `calibration.py` once
-BSS improvement confirmed. Zero changes to `signal_adapter.py` callers required.
+BSS improvement confirmed. Requires Phase C migration of `signal_adapter.py` callers.
 
 ---
 
@@ -198,16 +225,24 @@ earthquake forecasting (Docs 1 & 2, "Geophysics and Seismology" sections).
 
 **Key parameters (constructor):**
 - `sma_window: int = 200` — fundamental anchor (SMA-200)
-- `ttf_threshold: float = 2.0` — Z-score threshold above which `tighten_stops=True`
+- `ttf_threshold: float = 2.0` — vol Z-score threshold above which `tighten_stops=True`
 - `vol_lookback: int = 90` — rolling window for volatility baseline
+
+**Behavior for insufficient history:** If `len(prices_df) < sma_window`, raise `ValueError`
+with message `"Price series too short for sma_window={sma_window}: got {len} rows"`.
+Consistent with `compute_atr_pct()` in `risk_engine.py`.
 
 **Computation:**
 ```
 slip_deficit     = (current_price - SMA(sma_window)) / SMA(sma_window)
+                   # signed: positive = overextended above anchor (loaded)
+                   # negative = below anchor (oversold)
 vol_zscore       = (realized_vol_10d - mean(realized_vol, vol_lookback))
                    / std(realized_vol, vol_lookback)
-ttf_probability  = sigmoid(vol_zscore)
-tighten_stops    = ttf_probability > sigmoid(ttf_threshold)
+ttf_probability  = sigmoid(vol_zscore)       # [0,1] continuous probability
+tighten_stops    = vol_zscore > ttf_threshold # direct Z-score comparison
+                                              # semantically clear: ttf_threshold is
+                                              # always interpreted as a Z-score
 ```
 
 **Integration intent:** `backtest_engine.py` can optionally call `SlipDeficit.compute()`
@@ -232,6 +267,7 @@ All run within the existing `pytest` suite without special configuration.
 | Identical distributions | same fingerprint twice | distance ≈ 0.0 |
 | Directional ordering | close vs far pairs | EMD(close) < EMD(far) |
 | time_penalty=0.0 | sets differing only in time axis | distance ≈ 0.0 |
+| price_penalty=0.0 | sets differing only in return axis | distance ≈ 0.0 |
 
 ### `test_bma_calibrator.py`
 | Test | Input | Expected |
@@ -240,6 +276,7 @@ All run within the existing `pytest` suite without special configuration.
 | Post-fit state | fit on synthetic data | `fitted == True`, `weights.sum() ≈ 1.0` |
 | Output range | transform() | all outputs in [0, 1] |
 | Uniform convergence | identical analogs, same y | weights ≈ equal |
+| Two-cluster convergence | half analogs at 0.0, half at 1.0 | each cluster weight ≈ 0.5 (catches weight collapse bugs) |
 
 ### `test_slip_deficit.py`
 | Test | Input | Expected |
@@ -248,6 +285,8 @@ All run within the existing `pytest` suite without special configuration.
 | Zero deficit | price == SMA200 exactly | `slip_deficit == 0.0` |
 | Positive deficit + stops | price >> SMA200, high vol | `slip_deficit > 0`, `tighten_stops == True` |
 | Result types | any valid input | all `RiskOverlayResult` fields present and typed correctly |
+| positions=None and positions=[] | both passed to compute() | no error (positions is optional and unused) |
+| Insufficient history | len(prices_df) < sma_window | raises `ValueError` with message citing sma_window |
 
 ---
 
@@ -277,11 +316,13 @@ See `research/phase_c_roadmap.md` for structured stubs covering:
 
 - [ ] `research/` package created with ABCs and all 3 modules
 - [ ] All 3 modules pass ABC interface compliance (instantiation + method signatures)
-- [ ] All smoke tests pass (12 tests total across 3 files)
+- [ ] All smoke tests pass (16 tests total: 5 EMD + 5 BMA + 6 slip-deficit)
 - [ ] All 556 existing tests continue to pass
 - [ ] `pot` added to project dependencies
-- [ ] Phase C roadmap document written
-- [ ] Implementation committed on dedicated branch
+- [ ] Phase C roadmap document written at `research/phase_c_roadmap.md` with all 4 domains,
+      each containing: description, production integration point, new dependencies, success
+      metric, and estimated complexity rating (S/M/L)
+- [ ] Implementation committed on branch `phase35-research`
 
 ## Promotion Criteria (Phase C gate)
 

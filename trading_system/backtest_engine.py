@@ -24,6 +24,11 @@ from typing import List, Dict, Optional, Tuple
 from .config import TradingConfig, DEFAULT_CONFIG, SECTOR_MAP
 from .risk_engine import check_stop_loss, size_position
 from .risk_state import RiskState, StopLossEvent
+from .portfolio_manager import (
+    rank_signals as _pm_rank_signals,
+    check_allocation as _pm_check_allocation,
+)
+from .portfolio_state import PortfolioSnapshot
 
 
 # ============================================================
@@ -45,6 +50,7 @@ class OpenPosition:
     stop_loss_price: float         # Set by risk engine; 0 = no stop in Phase 1
     atr_pct_at_entry: float = 0.0  # ATR% at entry for stop-loss audit records
     days_held: int = 0
+    last_close_price: float = 0.0  # Last observed close; MTM fallback for halted days
 
 
 @dataclass
@@ -117,9 +123,15 @@ class BacktestEngine:
         self,
         config: TradingConfig = None,
         use_risk_engine: bool = False,
+        use_portfolio_manager: bool = False,
     ):
+        if use_portfolio_manager and not use_risk_engine:
+            raise ValueError(
+                "use_portfolio_manager=True requires use_risk_engine=True"
+            )
         self.config = config or DEFAULT_CONFIG
         self.use_risk_engine = use_risk_engine
+        self.use_portfolio_manager = use_portfolio_manager
         self._validate_config()
 
     def _validate_config(self):
@@ -135,6 +147,7 @@ class BacktestEngine:
         price_df: pd.DataFrame,
         equal_weight_pct: float = 0.05,
         use_risk_engine: Optional[bool] = None,
+        use_portfolio_manager: Optional[bool] = None,
     ) -> "BacktestResults":
         """Run the full backtest simulation.
 
@@ -163,6 +176,14 @@ class BacktestEngine:
         risk_engine_enabled = (
             self.use_risk_engine if use_risk_engine is None else use_risk_engine
         )
+        pm_enabled = (
+            self.use_portfolio_manager if use_portfolio_manager is None
+            else use_portfolio_manager
+        )
+        if pm_enabled and not risk_engine_enabled:
+            raise ValueError(
+                "use_portfolio_manager=True requires use_risk_engine=True"
+            )
 
         # ── Initialize state ─────────────────────────────────────────
         cash = self.config.capital.initial_capital
@@ -209,7 +230,12 @@ class BacktestEngine:
         cumulative_cash_yield = 0.0
         cumulative_trading_pnl = 0.0
 
-        engine_mode = "Phase 2 (Risk Engine)" if risk_engine_enabled else "Phase 1 (Equal Weight)"
+        if pm_enabled:
+            engine_mode = "Phase 3 (Portfolio Manager + Risk Engine)"
+        elif risk_engine_enabled:
+            engine_mode = "Phase 2 (Risk Engine)"
+        else:
+            engine_mode = "Phase 1 (Equal Weight)"
         print(f"\n{'='*60}")
         print(f"  BACKTEST ENGINE — {engine_mode}")
         if risk_engine_enabled:
@@ -410,7 +436,188 @@ class BacktestEngine:
                 (signal_df["signal"] == "BUY")
             ].sort_values("confidence", ascending=False)
 
-            for _, sig_row in day_buys.iterrows():
+            if pm_enabled:
+                # === Phase 3: Unified PM + Risk Engine loop ====================
+                # PM and risk engine are interleaved per signal so that a risk
+                # engine rejection does NOT burn a PM sector slot.  Running state
+                # (sector counts, open tickers) is updated ONLY after BOTH layers
+                # approve and the trade is physically executed.
+
+                # 1. Clean expired cooldowns before ranking
+                expired_cd = [
+                    t for t, cd in cooldowns.items()
+                    if current_date >= cd["until_date"]
+                ]
+                for t in expired_cd:
+                    del cooldowns[t]
+
+                # 2. Convert signal rows to dicts for portfolio_manager
+                day_buy_signals = []
+                for _, row in day_buys.iterrows():
+                    _t = row["ticker"]
+                    day_buy_signals.append({
+                        "ticker": _t,
+                        "confidence": row["confidence"],
+                        "date": current_date,
+                        "sector": row.get("sector") or SECTOR_MAP.get(_t, "Unknown"),
+                    })
+
+                # 3. Rank signals (confidence desc, ticker asc tie-break)
+                ranked_signals = _pm_rank_signals(
+                    day_buy_signals, self.config.sector_map
+                )
+
+                # 4. Running state — updated ONLY when BOTH PM + risk engine approve
+                running_sector_counts: Dict[str, int] = {}
+                for p in open_positions.values():
+                    running_sector_counts[p.sector] = (
+                        running_sector_counts.get(p.sector, 0) + 1
+                    )
+                running_open_tickers: set = set(open_positions.keys())
+
+                for signal in ranked_signals:
+                    ticker = signal.ticker
+                    confidence = signal.confidence
+                    sector = signal.sector
+
+                    # 4a. PM gate: count-based constraints against running state
+                    running_snapshot = PortfolioSnapshot(
+                        open_tickers=frozenset(running_open_tickers),
+                        sector_position_counts=running_sector_counts,
+                        cooldowns=cooldowns,
+                        cooldown_reentry_margin=cfg_trade.reentry_confidence_margin,
+                    )
+                    pm_dec = _pm_check_allocation(signal, running_snapshot, cfg_pos)
+                    if not pm_dec.approved:
+                        rejected_signals.append(RejectedSignal(
+                            date=current_date, ticker=ticker, signal="BUY",
+                            confidence=confidence,
+                            rejection_reason=pm_dec.rejection_reason or "Portfolio rejected",
+                            rejection_layer="portfolio",
+                        ))
+                        continue
+
+                    # 4b. Data check
+                    next_prices = price_lookup.get((next_date, ticker))
+                    if next_prices is None:
+                        rejected_signals.append(RejectedSignal(
+                            date=current_date, ticker=ticker, signal="BUY",
+                            confidence=confidence,
+                            rejection_reason="No price data for next trading day",
+                            rejection_layer="data",
+                        ))
+                        continue
+
+                    raw_entry_price = next_prices["open"]
+                    entry_price = raw_entry_price * (1 + cfg_costs.total_entry_bps / 10_000)
+
+                    # 4c. Risk engine: ATR history + sizing
+                    # PM checked count-based constraints (holding, cooldown, sector count).
+                    # size_position re-checks holding + sector count internally for
+                    # defense-in-depth — intentional, not redundant duplication.
+                    # Dollar-based constraints (ATR stop, drawdown brake, exposure %)
+                    # are ONLY handled here; PM has no visibility into position sizes.
+                    history_rows = cfg_risk.volatility_lookback + 1
+                    price_history = self._get_ticker_history(
+                        price_history_by_ticker=price_history_by_ticker,
+                        ticker=ticker,
+                        as_of_date=current_date,
+                        n_rows=history_rows,
+                    )
+                    if price_history.empty:
+                        rejected_signals.append(RejectedSignal(
+                            date=current_date, ticker=ticker, signal="BUY",
+                            confidence=confidence,
+                            rejection_reason="Insufficient history: 0 rows",
+                            rejection_layer="risk_engine",
+                        ))
+                        continue
+
+                    decision = size_position(
+                        ticker=ticker,
+                        entry_price=entry_price,
+                        current_equity=equity,
+                        price_history=price_history,
+                        risk_state=risk_state if risk_state is not None else RiskState.initial(equity),
+                        config=cfg_risk,
+                        position_limits=cfg_pos,
+                        sector_map=self.config.sector_map,
+                        open_positions=open_positions,
+                        fractional_shares=self.config.capital.fractional_shares,
+                    )
+                    if not decision.approved:
+                        rejected_signals.append(RejectedSignal(
+                            date=current_date, ticker=ticker, signal="BUY",
+                            confidence=confidence,
+                            rejection_reason=decision.rejection_reason or "Risk engine rejected trade",
+                            rejection_layer="risk_engine",
+                        ))
+                        continue
+
+                    # 4d. Post-sizing dollar guards (PM checks counts; these check dollars)
+                    sector_exposure = sum(
+                        p.position_pct for p in open_positions.values()
+                        if p.sector == sector
+                    )
+                    if sector_exposure + decision.position_pct > cfg_pos.max_sector_pct:
+                        rejected_signals.append(RejectedSignal(
+                            date=current_date, ticker=ticker, signal="BUY",
+                            confidence=confidence,
+                            rejection_reason=f"Sector {sector} exposure would exceed {cfg_pos.max_sector_pct:.0%}",
+                            rejection_layer="sector_limit",
+                        ))
+                        continue
+
+                    current_exposure = sum(
+                        p.position_pct for p in open_positions.values()
+                    )
+                    if current_exposure + decision.position_pct > self.config.capital.max_gross_exposure:
+                        rejected_signals.append(RejectedSignal(
+                            date=current_date, ticker=ticker, signal="BUY",
+                            confidence=confidence,
+                            rejection_reason=f"Gross exposure would exceed {self.config.capital.max_gross_exposure:.0%}",
+                            rejection_layer="exposure_limit",
+                        ))
+                        continue
+
+                    if cash < decision.dollar_amount:
+                        rejected_signals.append(RejectedSignal(
+                            date=current_date, ticker=ticker, signal="BUY",
+                            confidence=confidence,
+                            rejection_reason=f"Insufficient cash (${cash:,.0f} < ${decision.dollar_amount:,.0f})",
+                            rejection_layer="capital",
+                        ))
+                        continue
+
+                    # 4e. Both layers approved — execute and update PM running state
+                    cost = decision.shares * entry_price
+                    cash -= cost
+
+                    trade_counter += 1
+                    open_positions[ticker] = OpenPosition(
+                        trade_id=trade_counter,
+                        ticker=ticker,
+                        sector=sector,
+                        entry_date=next_date,
+                        raw_entry_price=raw_entry_price,
+                        entry_price=entry_price,
+                        shares=decision.shares,
+                        position_pct=decision.position_pct,
+                        confidence_at_entry=confidence,
+                        stop_loss_price=decision.stop_price,
+                        atr_pct_at_entry=decision.atr_pct,
+                    )
+                    if risk_state is not None:
+                        risk_state.register_stop(ticker, decision.stop_price)
+
+                    # Sector slot committed only here — after full execution
+                    running_open_tickers.add(ticker)
+                    running_sector_counts[sector] = (
+                        running_sector_counts.get(sector, 0) + 1
+                    )
+
+            # Phase 1/2 path — skipped when pm_enabled=True
+            for _, sig_row in ([] if pm_enabled else day_buys.iterrows()):
                 ticker = sig_row["ticker"]
                 confidence = sig_row["confidence"]
                 sector = sig_row.get("sector", SECTOR_MAP.get(ticker, None))
@@ -724,10 +931,15 @@ class BacktestEngine:
             for ticker, pos in open_positions.items():
                 prices = price_lookup.get((current_date, ticker))
                 if prices:
+                    pos.last_close_price = prices["close"]
                     invested_value += pos.shares * prices["close"]
                 else:
-                    # Use entry price if no current data
-                    invested_value += pos.shares * pos.entry_price
+                    # Fall back to last known close, not entry price.
+                    # Using entry_price collapses P&L to zero on halted days,
+                    # creating phantom drawdown spikes that can trigger the
+                    # drawdown brake erroneously.
+                    fallback = pos.last_close_price if pos.last_close_price > 0 else pos.entry_price
+                    invested_value += pos.shares * fallback
 
             # Cash yield
             cash_yield_today = cash * daily_rf_rate
@@ -916,14 +1128,20 @@ class BacktestEngine:
         as_of_date: pd.Timestamp,
         n_rows: int,
     ) -> pd.DataFrame:
-        """Return up-to-date trailing OHLC history for one ticker."""
+        """Return up-to-date trailing OHLC history for one ticker.
+
+        Uses binary search (O(log N)) rather than boolean mask (O(N)).
+        Safe because price_history_by_ticker DataFrames are pre-sorted by Date.
+        """
         ticker_history = price_history_by_ticker.get(ticker)
         if ticker_history is None:
             return pd.DataFrame(columns=["Date", "Open", "High", "Low", "Close"])
-        eligible = ticker_history[ticker_history["Date"] <= as_of_date]
-        if eligible.empty:
-            return eligible
-        return eligible.tail(n_rows).copy()
+        dates = ticker_history["Date"].values
+        idx = dates.searchsorted(np.datetime64(as_of_date, "ns"), side="right")
+        if idx == 0:
+            return ticker_history.iloc[0:0].copy()
+        start_idx = max(0, idx - n_rows)
+        return ticker_history.iloc[start_idx:idx].copy()
 
     def _advance_trading_days(
         self, start_date: pd.Timestamp, n_days: int, all_dates: list

@@ -15,48 +15,46 @@ This project is built by a **team of AI agents working together**, not a collect
 
 ## Agent Profiles & Routing Configuration
 
-To ensure seamless automation through Linear, each agent must be assigned using its exact Cursor API string in the issue description (for example: `[model=claude-opus-4-6]`).
+**Cursor model routing rule:** Every issue assigned to Cursor MUST include an explicit `[model=<cursor-api-string>]` tag on the **first line** of the description. Do NOT rely on Cursor to infer the model from the agent name or from this file — it will resolve "Claude Opus" to the latest Claude model ID (e.g. `claude-opus-4-6`), which may not be valid in Cursor's supported model list. The tag must use the exact Cursor API string listed below.
 
-1. Opus 4.6 (Claude Code)
-Cursor API String: claude-opus-4-6
+**Phase 3 lesson:** Issues that omitted the `[model=...]` tag caused Cursor to fail with `AI Model Not Found: Model name is not valid: "claude-opus-4-6"` across all 7 Phase 3 issues. The fix for Phase 4+: always prepend the tag.
 
-Role: Architect / Lead
+**Issue description template:**
+```
+[model=<cursor-api-string>]
 
-Best For: Complex multi-file changes, merge coordination, final plan execution, and critical path synthesis. Owns the hardest architectural integration tasks for the quantitative engine.
+**Role Directive:** Act strictly as the <Agent Name> defined in AGENTS.md. <Focus sentence>.
 
-2. Sonnet 4.6
-Cursor API String: claude-sonnet-4-6
+## Objective
+...
+```
 
-Role: Fast Implementer
+---
 
+| # | Agent | Cursor API String | Role |
+|---|-------|-------------------|------|
+| 1 | Claude Opus (Lead Architect) | `claude-3-opus` | Complex multi-file integration, architectural decisions, critical path |
+| 2 | Claude Sonnet (Fast Implementer) | `claude-3.5-sonnet` | Scoped implementation, test writing, documentation |
+| 3 | Composer 2 | N/A (native Cursor UI only) | Plan review, milestone sign-off, cross-agent synthesis |
+| 4 | GPT-4o | `gpt-4o` | Parallel isolated module work, data processing scripts |
+| 5 | o1 | `o1` | Deep algorithmic validation, math verification, edge-case detection |
+| 6 | Gemini | `gemini-3.1-pro-preview` | Cross-validation, red-team review, architectural alternatives |
+
+**Extended profiles:**
+
+**Claude Opus — Lead Architect**
+Best For: Complex multi-file changes, merge coordination, final plan execution, and critical path synthesis. Owns the hardest architectural integration tasks.
+
+**Claude Sonnet — Fast Implementer**
 Best For: Scoped tasks with clear specs, writing test coverage, and updating project documentation to accurately reflect the current repository state.
 
-3. Composer 2
-Cursor API String: N/A (Native Cursor Interface)
-
-Role: Plan Review / Synthesizer
-
-Best For: Reviewing plans before execution, synthesizing cross-agent reviews, and acting as the human-in-the-loop gateway to approve milestones.
-
-4. GPT-5.3 Codex
-Cursor API String: gpt-5.3-codex
-
-Role: Parallel Implementation
-
+**GPT-4o — Parallel Implementer**
 Best For: Independent feature branches, isolated Python module work, and drafting highly specific data processing scripts.
 
-5. GPT-5.4 Extra High
-Cursor API String: gpt-5.4
-
-Role: Deep Analysis
-
+**o1 — Deep Analyst**
 Best For: Research-heavy tasks, deep algorithmic validation (e.g., verifying drawdown brake mechanics and position sizing math), and extreme edge-case detection.
 
-6. Gemini 3.1 Pro
-Cursor API String: gemini-3.1-pro-preview
-
-Role: Cross-Validation / Red Team
-
+**Gemini — Cross-Validator**
 Best For: Second-opinion reviews, proposing alternative architectural approaches, and identifying logic blind spots missed by the Anthropic or OpenAI models.
 ---
 
@@ -67,7 +65,7 @@ Best For: Second-opinion reviews, proposing alternative architectural approaches
 Agent A writes code → Agent B (different family) reviews it
 ```
 - Opus writes risk_engine.py → Gemini reviews
-- Codex writes risk_state.py → GPT-5.4 reviews
+- GPT-4o writes risk_state.py → o1 reviews
 - **Rule:** The writer NEVER reviews their own code. Cross-family reviews catch more bugs.
 
 ### Pattern 2: Parallel Implementation → Integration
@@ -76,7 +74,7 @@ Agent A implements Module X  ─┐
                                ├── Agent C integrates both
 Agent B implements Module Y  ─┘
 ```
-- Codex implements risk_state.py (pure dataclasses, no deps)
+- GPT-4o implements risk_state.py (pure dataclasses, no deps)
 - Opus implements risk_engine.py (imports risk_state)
 - Opus integrates both into backtest_engine.py
 - **Rule:** Parallel agents agree on interfaces BEFORE implementation starts.
@@ -87,7 +85,7 @@ Agent A reviews aspect 1  ─┐
 Agent B reviews aspect 2   ├── Composer synthesizes into final plan
 Agent C reviews aspect 3  ─┘
 ```
-- GPT-5.4 reviews math, Opus reviews integration, Gemini proposes alternatives
+- o1 reviews math, Opus reviews integration, Gemini proposes alternatives
 - Composer reads all reviews, finds consensus, escalates disagreements
 - **Rule:** Reviews are posted as Linear comments. Composer reads ALL comments before synthesizing.
 
@@ -132,7 +130,7 @@ Agent disagrees with design → Posts concern on Linear issue → Composer evalu
 ### M1: Design Review & Plan Approval
 | Issue | Agent | Type | Priority |
 |-------|-------|------|----------|
-| SLE-5: Risk model math review | GPT-5.4 | Review | High |
+| SLE-5: Risk model math review | o1 | Review | High |
 | SLE-6: Integration feasibility | Opus | Review | High |
 | SLE-7: PROJECT_GUIDE accuracy | Sonnet | Review | Medium |
 | SLE-8: Alternative approaches | Gemini | Review | Medium |
@@ -141,7 +139,7 @@ Agent disagrees with design → Posts concern on Linear issue → Composer evalu
 ### M2: Core Implementation
 | Issue | Agent | Type | Priority |
 |-------|-------|------|----------|
-| SLE-10: risk_state.py | Codex | Implementation | High |
+| SLE-10: risk_state.py | GPT-4o | Implementation | High |
 | SLE-11: risk_engine.py | Opus | Implementation | Urgent |
 | SLE-12: Stress tests | Sonnet | Implementation | Medium |
 
@@ -149,9 +147,9 @@ Agent disagrees with design → Posts concern on Linear issue → Composer evalu
 | Issue | Agent | Type | Priority |
 |-------|-------|------|----------|
 | SLE-13: backtest_engine integration | Opus | Integration | Urgent |
-| SLE-14: Integration tests | Codex | Implementation | High |
+| SLE-14: Integration tests | GPT-4o | Implementation | High |
 | SLE-15: run_phase2.py | Sonnet | Implementation | Medium |
-| SLE-16: Cross-agent code review | Gemini + GPT-5.4 | Review | High |
+| SLE-16: Cross-agent code review | Gemini + o1 | Review | High |
 
 ### M4: Validation & Documentation
 | Issue | Agent | Type | Priority |
@@ -184,14 +182,51 @@ HANDOFF to [Agent Name]:
 
 ## Linear Project Structure
 
-- **Project:** FPPE Phase 2: Risk Engine
+- **Project:** FPPE Phase 3: Portfolio Manager
 - **Team:** Sleepern
-- **Labels:** `Agent: *` for assignment, `Phase 2` for scope, `Review`/`Implementation`/`Integration` for type
-- **Milestones:** M1 → M2 → M3 → M4 (sequential gates, parallel work within each)
+- **Labels:** `Agent: *` for assignment, `Phase 3` for scope, `Review`/`Implementation`/`Integration` for type
+- **Milestones:** M1 → M2 → M3 → M4 → M5 (sequential gates, parallel work within each)
 
 ---
 
-*AGENTS.md v1.0 — March 19, 2026*
+## Phase 3 Milestone Assignments
+
+### M1: Data Structures & Unit Tests
+| Issue | Agent | Type | Status |
+|-------|-------|------|--------|
+| SLE-30: portfolio_state.py dataclasses | Codex | Implementation | ✅ Done |
+| SLE-31: test_portfolio_state.py | Sonnet | Implementation | ✅ Done |
+
+### M2: Core Logic & Coverage
+| Issue | Agent | Type | Status |
+|-------|-------|------|--------|
+| SLE-32: portfolio_manager.py | Opus | Implementation | ✅ Done |
+| SLE-33: test_portfolio_manager.py | Sonnet | Implementation | ✅ Done |
+
+### M3: Integration & Backtest
+| Issue | Agent | Type | Status |
+|-------|-------|------|--------|
+| SLE-34: backtest_engine.py integration | Opus | Integration | ✅ Done |
+| SLE-35: test_phase3_integration.py | Sonnet | Implementation | ✅ Done |
+
+### M4: Exports & Regression
+| Issue | Agent | Type | Status |
+|-------|-------|------|--------|
+| SLE-36: trading_system/__init__.py | Sonnet | Implementation | ✅ Done |
+| SLE-37: Full regression suite + tag | Opus | Integration | ✅ Done |
+
+### M5: Validation & Code Review
+| Issue | Agent | Type | Status |
+|-------|-------|------|--------|
+| SLE-38: Backtest comparison P1/P2/P3 | Opus | Analysis | ✅ Done |
+| SLE-39: Cross-agent code review | Sonnet + Gemini | Review | ✅ Done |
+| SLE-40: Final cleanup + git push prep | Sonnet | Implementation | ✅ Done |
+
+**Phase 3 result:** 556 tests passing, 0 failures. Phase 3 matches Phase 2 performance metrics exactly (Sharpe 1.93, Ann. 15.1%, MaxDD 3.9%). Portfolio layer adds explicit rejection tracking (37 PM rejections in 2024 backtest).
+
+---
+
+*AGENTS.md v2.0 — March 20, 2026 — Updated for Phase 3 completion*
 *This file is read by ALL agents at the start of each session. Keep it current.*
 
 ---

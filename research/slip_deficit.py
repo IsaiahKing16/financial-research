@@ -61,7 +61,7 @@ class SlipDeficit(BaseRiskOverlay):
 
         Args:
             prices_df: DataFrame with a 'close' column and DatetimeIndex.
-                       Must have at least max(sma_window, vol_lookback) rows.
+                       Must have at least max(sma_window, vol_lookback + 10) rows.
             positions: Optional list of open positions (accepted, ignored).
 
         Returns:
@@ -70,12 +70,14 @@ class SlipDeficit(BaseRiskOverlay):
         Raises:
             ValueError: If prices_df has insufficient history.
         """
-        required = max(self.sma_window, self.vol_lookback)
+        # vol_series uses rolling(10).std(), which needs 10 bars to warm up.
+        # So we need vol_lookback + 10 rows to get vol_lookback settled vol values.
+        required = max(self.sma_window, self.vol_lookback + 10)
         if len(prices_df) < required:
             raise ValueError(
                 f"SlipDeficit requires at least {required} rows of price history "
-                f"(sma_window={self.sma_window}, vol_lookback={self.vol_lookback}), "
-                f"got {len(prices_df)}. insufficient history"
+                f"(sma_window={self.sma_window}, vol_lookback={self.vol_lookback}, "
+                f"rolling_vol_window=10), got {len(prices_df)}. insufficient history"
             )
 
         close = prices_df["close"].astype(float)

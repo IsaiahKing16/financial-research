@@ -304,8 +304,8 @@ BSS < 0    = worse than base rate
 
 ## 7. TRADING SYSTEM RESULTS
 
-**Status:** Phase 1 complete. Phase 2 complete. Phase 3 (Portfolio Manager) is next.
-**Full specification:** `docs/FPPE_TRADING_SYSTEM_DESIGN.md` v0.3
+**Status:** Phase 1 complete. Phase 2 complete. Phase 3 complete. Phase 3.5 (Research Integration) complete. Phase 4 (Strategy Evaluator) is next.
+**Full specification:** `docs/FPPE_TRADING_SYSTEM_DESIGN.md` v0.4
 **Structural audit:** `docs/PHASE1_FILE_REVIEW.md` — 9 findings (3 critical, 5 significant, 1 deferred)
 
 ### 7.1 Phase 1 Configuration
@@ -674,9 +674,20 @@ Professional DOCX report (~20 pages, 4 sections):
 - [ ] Re-validate max_holding_days in bear-market or multi-year data
 - [ ] Run threshold_sweep.py at 0.68 (conservative profile empirical validation)
 
-### Phase 3 — Portfolio Manager
-- [ ] `trading_system/portfolio_manager.py` — signal ranking, sector allocation, capital queue
-- [ ] Idle cash target ≤ 20% (from current ~25%)
+### Phase 3 — Portfolio Manager (complete)
+- [x] `trading_system/portfolio_manager.py` — signal ranking, sector allocation, capital queue
+- [x] `trading_system/portfolio_state.py` — immutable position state dataclass
+- [x] Integrated into `backtest_engine.py`; 556 tests passing
+
+### Phase 3.5 — Research Integration (complete)
+- [x] `research/` package: `BaseDistanceMetric`, `BaseCalibrator`, `BaseRiskOverlay` ABCs
+- [x] `research/emd_distance.py` — Earth Mover's Distance (POT backend, O(N) scan)
+- [x] `research/bma_calibrator.py` — Bayesian Model Averaging via EM (Student's t, df=3)
+- [x] `research/slip_deficit.py` — Seismic slip-deficit + TTF volatility overlay
+- [x] `research/phase_c_roadmap.md` — 4 deferred domains (FAISS, Hawkes, OODA, CBR/OWA)
+- [x] 574 tests passing (556 production + 18 research smoke tests)
+- [ ] Walk-forward validation: BSS ≥ 0.02 on 2024 fold required before production promotion
+- [ ] Path C: wire `ttf_probability` into `backtest_engine.py` stop scaling (>0.8 → 1.5× ATR)
 
 ### Phase 4 — Strategy Evaluator
 - [ ] `trading_system/strategy_evaluator.py` — rolling metrics, RED/YELLOW/GREEN status

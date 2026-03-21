@@ -99,8 +99,14 @@ class BaseCalibrator(ABC):
     @property
     @abstractmethod
     def fitted(self) -> bool: ...
+    # generate_pdf() is NOT declared in BaseCalibrator. It is BMA-specific and will be
+    # called through a concrete BMACalibrator reference in Phase C integration code.
+    # If a future calibrator also exposes a PDF method, promote it to the ABC at that time.
 
 class BaseRiskOverlay(ABC):
+    # No fit() method: overlays are stateless and compute entirely from the price series
+    # passed at call time. If a future overlay requires historical calibration, add fit()
+    # to the ABC at that point (known asymmetry with BaseDistanceMetric / BaseCalibrator).
     @abstractmethod
     def compute(self, prices_df: pd.DataFrame,
                 positions: Optional[list] = None) -> "RiskOverlayResult": ...
@@ -151,9 +157,12 @@ than a pattern with different structural shape.
 
 **Fallback:** If `pot` is unavailable, the fallback applies penalty weights by pre-scaling
 the coordinate arrays before calling `scipy.stats.wasserstein_distance_nd(current_coords,
-hist_coords)`. This is numerically equivalent because the Euclidean cost structure is
-identical. Minimum SciPy version required: **1.13** (when `wasserstein_distance_nd` was
-added). If SciPy < 1.13, raise `ImportError` with a clear message.
+hist_coords)`. This is numerically equivalent to POT for the **uniform-weight case only**,
+because `wasserstein_distance_nd` accepts no weights parameter. When Phase C adds
+volume-based non-uniform weights, this fallback must be replaced with a pure-numpy
+min-cost-flow implementation. Minimum SciPy version required: **1.13** (when
+`wasserstein_distance_nd` was added). If SciPy < 1.13, raise `ImportError` with a clear
+message directing the user to install `pot` instead.
 
 **Production promotion path:** Replaces `ball_tree` distance computation in `matching.py`
 `Matcher` class once walk-forward BSS improvement is confirmed.
@@ -228,9 +237,11 @@ earthquake forecasting (Docs 1 & 2, "Geophysics and Seismology" sections).
 - `ttf_threshold: float = 2.0` — vol Z-score threshold above which `tighten_stops=True`
 - `vol_lookback: int = 90` — rolling window for volatility baseline
 
-**Behavior for insufficient history:** If `len(prices_df) < sma_window`, raise `ValueError`
-with message `"Price series too short for sma_window={sma_window}: got {len} rows"`.
-Consistent with `compute_atr_pct()` in `risk_engine.py`.
+**Behavior for insufficient history:** If `len(prices_df) < max(sma_window, vol_lookback)`,
+raise `ValueError` with message `"Price series too short: need {max(sma_window,
+vol_lookback)} rows, got {len} rows"`. Both `sma_window` and `vol_lookback` are independent
+parameters, so the guard uses their maximum to avoid a degenerate vol Z-score when
+`vol_lookback > sma_window`. Consistent with `compute_atr_pct()` in `risk_engine.py`.
 
 **Computation:**
 ```
@@ -285,8 +296,9 @@ All run within the existing `pytest` suite without special configuration.
 | Zero deficit | price == SMA200 exactly | `slip_deficit == 0.0` |
 | Positive deficit + stops | price >> SMA200, high vol | `slip_deficit > 0`, `tighten_stops == True` |
 | Result types | any valid input | all `RiskOverlayResult` fields present and typed correctly |
-| positions=None and positions=[] | both passed to compute() | no error (positions is optional and unused) |
-| Insufficient history | len(prices_df) < sma_window | raises `ValueError` with message citing sma_window |
+| positions=None | passed to compute() | no error (positions is optional and unused) |
+| positions=[] | passed to compute() | no error — implement as two separate test functions or one `@pytest.mark.parametrize` |
+| Insufficient history | len(prices_df) < max(sma_window, vol_lookback) | raises `ValueError` with message citing required row count |
 
 ---
 
@@ -316,7 +328,7 @@ See `research/phase_c_roadmap.md` for structured stubs covering:
 
 - [ ] `research/` package created with ABCs and all 3 modules
 - [ ] All 3 modules pass ABC interface compliance (instantiation + method signatures)
-- [ ] All smoke tests pass (16 tests total: 5 EMD + 5 BMA + 6 slip-deficit)
+- [ ] All smoke tests pass (17 tests total: 5 EMD + 5 BMA + 7 slip-deficit)
 - [ ] All 556 existing tests continue to pass
 - [ ] `pot` added to project dependencies
 - [ ] Phase C roadmap document written at `research/phase_c_roadmap.md` with all 4 domains,

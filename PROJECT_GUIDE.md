@@ -507,17 +507,24 @@ For unattended 6+ hour overnight runs:
 ## 9. RUNNING THE SYSTEM
 
 ### Environment Setup
+
+> **Note:** The `venv/` directory is WSL-origin (Python 3.10, `pyvenv.cfg → /usr/bin`) and
+> cannot be activated from Windows shells. Use the system Python 3.12 directly.
+
 ```cmd
 cd C:\Users\Isaia\.claude\financial-research
-venv\Scripts\activate
-pip install -r requirements.txt  # includes optuna
+python -m pip install -r requirements.txt
+python -m pip install -r requirements-dev.txt
 ```
+
+`pot` and other packages install to user site-packages (`%APPDATA%\Python\Python312\site-packages`),
+which Python 3.12 picks up automatically — no activation step needed.
 
 ### Run Tests (always first)
 ```cmd
 python -m pytest tests/ -v
 ```
-All **485 tests** must pass (27 test files: 21 pattern_engine + 6 trading_system).
+All **574 tests** must pass (production + research smoke tests).
 
 ### Key Entry Points
 

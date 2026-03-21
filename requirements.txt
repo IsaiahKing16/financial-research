@@ -1,9 +1,14 @@
-# System A: Quant Engine - Dependencies
-# Install: pip install -r requirements.txt
+# FPPE - Dependencies
 #
-# NOTE: TensorFlow is NO LONGER REQUIRED.
-# The analogue matching approach uses scikit-learn's NearestNeighbors
-# which is pure CPU and runs fast on any hardware.
+# ENVIRONMENT NOTE (Windows):
+#   The venv at financial-research/venv is WSL-origin (Python 3.10, pyvenv.cfg → /usr/bin)
+#   and cannot be activated from Windows shells. Use the system Python 3.12 directly:
+#
+#     python -m pip install -r requirements.txt
+#     python -m pip install -r requirements-dev.txt
+#
+#   scipy and numpy are pre-installed system-wide. `pot` installs to user site-packages
+#   (%APPDATA%\Python\Python312\site-packages) which Python 3.12 picks up automatically.
 
 # Data
 yfinance>=0.2.36          # US stock data (no API key needed)
@@ -17,6 +22,10 @@ ta>=0.11.0
 # Machine learning
 scikit-learn>=1.3.0       # NearestNeighbors, StandardScaler, metrics
 optuna>=3.4.0             # Bayesian hyperparameter optimization (TPE)
+scipy>=1.6.0              # Wasserstein distance fallback, t-distribution (BMA)
+
+# Research modules (Phase 3.5)
+pot>=0.9.0                # Python Optimal Transport — ot.emd2 for EMDDistance
 
 # Visualization
 matplotlib>=3.7.0

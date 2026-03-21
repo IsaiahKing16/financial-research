@@ -19,7 +19,7 @@ Design doc reference: FPPE_TRADING_SYSTEM_DESIGN.md v0.3, Section 4.2
 
 import pandas as pd
 import numpy as np
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace as _dc_replace
 from typing import List, Dict, Optional, Tuple
 from .config import TradingConfig, DEFAULT_CONFIG, SECTOR_MAP
 from .risk_engine import check_stop_loss, size_position
@@ -29,6 +29,7 @@ from .portfolio_manager import (
     check_allocation as _pm_check_allocation,
 )
 from .portfolio_state import PortfolioSnapshot
+from research.slip_deficit import SlipDeficit as _SlipDeficit
 
 
 # ============================================================
@@ -132,6 +133,7 @@ class BacktestEngine:
         self.config = config or DEFAULT_CONFIG
         self.use_risk_engine = use_risk_engine
         self.use_portfolio_manager = use_portfolio_manager
+        self._slip_deficit = _SlipDeficit()  # stateless; instantiated once per engine
         self._validate_config()
 
     def _validate_config(self):
@@ -533,13 +535,36 @@ class BacktestEngine:
                         ))
                         continue
 
+                    # --- SlipDeficit TTF gate (Phase 3.5 research integration) ---
+                    # Tighten stop to 1.5×ATR when short-term vol Z-score > 0.8 sigmoid.
+                    # SlipDeficit requires 200 rows — fetch a wider window separately.
+                    _slip_history = self._get_ticker_history(
+                        price_history_by_ticker=price_history_by_ticker,
+                        ticker=ticker,
+                        as_of_date=current_date,
+                        n_rows=200,
+                    )
+                    try:
+                        _slip_df = _slip_history[["Close"]].rename(columns={"Close": "close"})
+                        _overlay = self._slip_deficit.compute(_slip_df)
+                        _effective_atr_mult = (
+                            1.5 if _overlay.ttf_probability > 0.8
+                            else cfg_risk.stop_loss_atr_multiple
+                        )
+                    except ValueError:
+                        # Insufficient history (<200 rows) — use configured multiple unchanged
+                        _effective_atr_mult = cfg_risk.stop_loss_atr_multiple
+                    _cfg_risk_effective = _dc_replace(
+                        cfg_risk, stop_loss_atr_multiple=_effective_atr_mult
+                    )
+
                     decision = size_position(
                         ticker=ticker,
                         entry_price=entry_price,
                         current_equity=equity,
                         price_history=price_history,
                         risk_state=risk_state if risk_state is not None else RiskState.initial(equity),
-                        config=cfg_risk,
+                        config=_cfg_risk_effective,
                         position_limits=cfg_pos,
                         sector_map=self.config.sector_map,
                         open_positions=open_positions,
@@ -704,13 +729,33 @@ class BacktestEngine:
                         ))
                         continue
 
+                    # --- SlipDeficit TTF gate (Phase 3.5 research integration) ---
+                    _slip_history = self._get_ticker_history(
+                        price_history_by_ticker=price_history_by_ticker,
+                        ticker=ticker,
+                        as_of_date=current_date,
+                        n_rows=200,
+                    )
+                    try:
+                        _slip_df = _slip_history[["Close"]].rename(columns={"Close": "close"})
+                        _overlay = self._slip_deficit.compute(_slip_df)
+                        _effective_atr_mult = (
+                            1.5 if _overlay.ttf_probability > 0.8
+                            else cfg_risk.stop_loss_atr_multiple
+                        )
+                    except ValueError:
+                        _effective_atr_mult = cfg_risk.stop_loss_atr_multiple
+                    _cfg_risk_effective = _dc_replace(
+                        cfg_risk, stop_loss_atr_multiple=_effective_atr_mult
+                    )
+
                     decision = size_position(
                         ticker=ticker,
                         entry_price=entry_price,
                         current_equity=equity,
                         price_history=price_history,
                         risk_state=risk_state if risk_state is not None else RiskState.initial(equity),
-                        config=cfg_risk,
+                        config=_cfg_risk_effective,
                         position_limits=cfg_pos,
                         sector_map=self.config.sector_map,
                         open_positions=open_positions,

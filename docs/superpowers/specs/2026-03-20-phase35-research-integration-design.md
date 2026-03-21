@@ -145,6 +145,8 @@ than a pattern with different structural shape.
 ```
 8-feature fingerprint (ret_1d..ret_90d)
   → construct_weighted_point_set()
+        time_lags = [1, 3, 7, 14, 30, 45, 60, 90]   # calendar-day lag per feature,
+                                                      # matching RETURN_WINDOWS in features.py
         current_coords: shape (8, 2)  # each row: (time_lag * time_penalty,
                                       #            return_value * price_penalty)
         hist_coords:    shape (8, 2)
@@ -154,6 +156,10 @@ than a pattern with different structural shape.
   → ot.emd2(weights_a, weights_b, cost_matrix)   # POT network simplex solver
   → scalar distance
 ```
+
+**`fit()` semantics:** EMD has no training phase. `fit(X_train)` stores `X_train` for
+optional normalization and returns `self`. For Phase B it is a no-op beyond storing the
+reference. Future variants may use it to compute normalization statistics.
 
 **Fallback:** If `pot` is unavailable, the fallback applies penalty weights by pre-scaling
 the coordinate arrays before calling `scipy.stats.wasserstein_distance_nd(current_coords,
@@ -192,6 +198,19 @@ call through the ABC. This wiring is deferred to Phase C.
 - `df: float = 3.0` — Student's t degrees of freedom (lower = heavier tails)
 - `max_iter: int = 50` — EM convergence iterations
 
+**Input/output semantics:**
+- `fit(raw_probs, y_true)`:
+  - `raw_probs`: shape `(N_training_samples, num_analogs)` — the raw KNN probability from
+    each of the K nearest neighbours across all training samples. `analog[i]` for sample n
+    is `raw_probs[n, i]`. Analogue locations are **fixed** throughout EM; only weights and
+    variances are updated.
+  - `y_true`: shape `(N_training_samples,)` — binary outcome (1=up, 0=not-up)
+- `transform(raw_probs)`:
+  - `raw_probs`: shape `(num_analogs,)` — the K raw probs for a single query point
+  - Returns: scalar = `np.dot(self.weights, raw_probs)` — posterior-weighted mean of the
+    K analogue probabilities. This is the BMA point forecast, guaranteed in [0, 1] as a
+    convex combination of [0, 1] values. Matches `PlattCalibrator.transform()` output type.
+
 **EM Algorithm:**
 
 The implementation uses a Gaussian variance M-step as a deliberate approximation of the
@@ -203,17 +222,20 @@ comment in the code must document this tradeoff explicitly. The full Student's t
 (with u-weights) is a Phase C upgrade candidate.
 
 ```
-E-step: latent_pdfs[n, i] = w[i] * t_pdf(y[n] | loc=analog[i], scale=sqrt(var[i]), df=df)
+E-step: latent_pdfs[n, i] = w[i] * t_pdf(y[n] | loc=raw_probs[n,i], scale=sqrt(var[i]), df=df)
         latent_probs[n, i] = latent_pdfs[n, i] / sum(latent_pdfs[n, :])   # normalize
 
 M-step: w[i]   = mean(latent_probs[:, i])                                 # weight update
-        var[i] = sum(latent_probs[:, i] * (y - analog[i])^2)              # Gaussian approx
+        var[i] = sum(latent_probs[:, i] * (y - raw_probs[:,i])^2)         # Gaussian approx
                  / sum(latent_probs[:, i])                                 # (see note above)
 ```
 
-**Additional method:** `generate_pdf(analogue_returns, return_grid) -> np.ndarray`
-Returns the full BMA probability density function — used for confidence interval
-computation in the three-filter gate (Phase C integration).
+**Additional method:** `generate_pdf(analogue_probs: np.ndarray, return_grid: np.ndarray) -> np.ndarray`
+- `analogue_probs`: shape `(num_analogs,)` — raw probs for the current query
+- `return_grid`: shape `(M,)` — grid of return values at which to evaluate the PDF
+- Returns: shape `(M,)` — BMA mixture density at each grid point
+Used for confidence interval computation in the three-filter gate (Phase C integration).
+Called through a concrete `BMACalibrator` reference, not through `BaseCalibrator`.
 
 **Production promotion path:** Replaces `PlattCalibrator` in `calibration.py` once
 BSS improvement confirmed. Requires Phase C migration of `signal_adapter.py` callers.
@@ -248,8 +270,15 @@ parameters, so the guard uses their maximum to avoid a degenerate vol Z-score wh
 slip_deficit     = (current_price - SMA(sma_window)) / SMA(sma_window)
                    # signed: positive = overextended above anchor (loaded)
                    # negative = below anchor (oversold)
-vol_zscore       = (realized_vol_10d - mean(realized_vol, vol_lookback))
-                   / std(realized_vol, vol_lookback)
+
+# realized_vol_10d: annualized std of log-returns over the most recent 10 trading days
+#   = std(log(close[t]/close[t-1]) for t in last 10 days) * sqrt(252)
+# This is computed as a rolling series across the full price history.
+# The Z-score baseline is the mean and std of that rolling series over vol_lookback periods.
+vol_series       = rolling_annualized_vol(prices_df['close'], window=10)  # shape (N,)
+vol_zscore       = (vol_series.iloc[-1] - vol_series.iloc[-vol_lookback:].mean())
+                   / vol_series.iloc[-vol_lookback:].std()
+
 ttf_probability  = sigmoid(vol_zscore)       # [0,1] continuous probability
 tighten_stops    = vol_zscore > ttf_threshold # direct Z-score comparison
                                               # semantically clear: ttf_threshold is

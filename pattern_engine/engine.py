@@ -315,6 +315,7 @@ class PatternEngine:
         engine._matcher._feature_cols = state["matcher_feature_cols"]
         engine._matcher._train_db = state["train_db"]
         engine._matcher._fitted = True
+        engine._matcher._rebuild_caches()  # populate vectorized-query numpy arrays
 
         # Re-compute regime labels for training data (G1: defensive None set)
         if engine._regime_labeler is not None and engine._regime_labeler.fitted:

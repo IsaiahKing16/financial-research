@@ -121,7 +121,7 @@ class RiskConfig:
     """
     volatility_lookback: int = 20          # Trading days for ATR calculation
     correlation_lookback: int = 60         # Trading days for pairwise correlations
-    stop_loss_atr_multiple: float = 2.0    # Stop = entry ± 2×ATR
+    stop_loss_atr_multiple: float = 3.0    # Stop = entry ± 3×ATR (swept 2–4, winner=3.0; see results/atr_sweep_results.tsv)
     max_loss_per_trade_pct: float = 0.02   # 2% of equity max loss per trade
     drawdown_brake_threshold: float = 0.15 # Reduce position sizes at 15% drawdown
     drawdown_halt_threshold: float = 0.20  # Halt all new trades at 20% drawdown

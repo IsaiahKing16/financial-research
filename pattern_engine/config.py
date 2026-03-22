@@ -26,6 +26,7 @@ class EngineConfig:
     distance_metric: str = "euclidean"  # Cosine collapsed at 93.3%
     nn_jobs: int = 1  # Must be 1 on Windows/Python 3.12 (joblib deadlock)
     batch_size: int = 256
+    use_hnsw: bool = False  # Swap ball_tree for HNSWIndex (research/hnsw_distance.py)
 
     # --- Features ---
     feature_set: str = "returns_only"  # Full 16 was 3.5x worse (sweeps 2/3)

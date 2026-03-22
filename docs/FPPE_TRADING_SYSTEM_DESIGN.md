@@ -1,8 +1,10 @@
 # FPPE Trading System — Architecture & Design Specification
 
-**Version:** 0.4 (Phase 3 Portfolio Manager complete)
-**Date:** March 20, 2026
-**Status:** ACTIVE — Phase 3 complete. Phase 4 (strategy evaluator) next.
+**Version:** 0.5 (Phase 3.5 Research Integration complete; SLE-47 HNSW + SLE-48 vectorized query)
+**Date:** March 21, 2026
+**Status:** ACTIVE — Phase 3 & 3.5 complete. Phase 4 (strategy evaluator) next.
+
+**Revision notes (v0.5):** Phase 3.5 Research Integration complete. ATR sweep locked 3.0×. HNSW index (SLE-47) integrated. Vectorized Matcher.query() (SLE-48) replaces per-row iloc. 596 tests passing.
 
 **Revision notes (v0.4):** Phase 3 Portfolio Manager implemented and validated.
 
@@ -12,34 +14,9 @@
 - **Test suite:** 556 tests, 0 failures. Layer 3 adds 11 integration tests, 30 unit tests (portfolio_manager), 20 unit tests (portfolio_state).
 - **Phase 3 branch:** `phase3-portfolio-manager` — ready for merge to main.
 
-**Revision notes (v0.3):** Phase 1 backtest completed on 2024 validation data with real FPPE signals. Two empirical parameter optimizations applied based on sweep results:
+**Revision notes (v0.3):** Phase 1 backtest on 2024 data. Empirical sweeps set confidence_threshold=0.60 (5 values tested) and max_holding_days=14 (7 windows tested). Result: 22.3% annual, Sharpe 1.82, Max DD 6.9%, beats SPY risk-adjusted. All v1 success criteria passed. CAUTION: 2024 was a strong bull year — re-validate max_holding_days in bear-market data.
 
-1. **Confidence threshold: 0.65 → 0.60** (threshold_sweep.py, 5 values tested)
-   - 0.65: 159 BUY, 8.9% annual, Sharpe 0.97, $3.79/trade expectancy, 22.6% invested
-   - 0.63: 530 BUY, 14.4% annual, Sharpe 1.39
-   - 0.60: 1,876 BUY, 19.5% annual, Sharpe 1.60, $4.13/trade expectancy, 70.5% invested ← optimum
-   - 0.58: 3,348 BUY, 16.2% annual, Sharpe 1.17 (dilution begins here)
-   - 0.55: 5,929 BUY, 15.9% annual, Sharpe 1.15
-
-2. **Max holding days: 10 → 14** (holding_period_sweep.py, 7 windows tested at threshold=0.60)
-   - 1d: -$1.22/trade, -3.9% annual (friction destroys alpha at this timescale)
-   - 3d: -$0.23/trade, 6.5% annual
-   - 5d: $0.67/trade, 10.5% annual
-   - 7d: $1.76/trade, 13.9% annual (FPPE projection horizon)
-   - 10d: $4.13/trade, 19.5% annual
-   - 14d: $6.65/trade, 22.3% annual, Sharpe 1.82, Win rate 60.4% ← optimum
-   - 20d: $7.09/trade, 17.5% annual (fewer trades drag annual return)
-
-**Combined Phase 1 result (threshold=0.60, max_hold=14d):**
-- Annual return: 22.3% | Sharpe: 1.82 | Max DD: 6.9% | Win rate: 60.4%
-- vs SPY buy-and-hold: 25.4% annual, Sharpe 1.52, Max DD 8.4%
-- Beats SPY on risk-adjusted basis (Sharpe 1.82 vs 1.52, lower drawdown)
-- All v1 success criteria passed
-
-**CAUTION:** 2024 was a strong bull year. Longer holds (14d) benefit from market beta.
-Re-validate max_holding_days against bear-market data before treating as permanent.
-
-**Revision notes (v0.2):** Incorporated feedback from two independent reviews. Major changes: v1 is now long-only (shorts deferred to v2), success criterion changed from aggressive return targets to edge preservation, simplified position sizing to remove confidence double-counting, fixed FPPE signal schema to support hybrid K-NN/deep learning outputs, added baseline comparisons, added re-entry cooldown logic, reduced max holding period from 20 to 10 trading days.
+**Revision notes (v0.2):** v1 is long-only (shorts deferred to v2). Position sizing is volatility-only (no confidence double-counting). Slippage revised to 10 bps (open is noisiest print). Max hold reduced from 20d to 10d (later revised to 14d in v0.3).
 
 ---
 
@@ -255,24 +232,9 @@ The system supports three configurable risk profiles. All profiles use the same 
 
 **Implementation:** Profile is a top-level config field (`config.profile = "aggressive" | "moderate" | "conservative"`). The `TradingConfig.from_profile(name)` class method instantiates the correct parameter set. Advanced users can override any individual parameter after profile selection.
 
-### 3.9 Variable Capital Tiers
+### 3.9 Capital
 
-The system scales across capital levels. Position sizing constraints adapt to ensure trades remain cost-effective at small capital and sufficiently diversified at large capital.
-
-| Capital Tier | Initial Capital | Min Position % | Max Position % | Max Positions | Notes |
-|-------------|----------------|---------------|---------------|---------------|-------|
-| Micro | $2,000 | 8% | 25% | 6-8 | Fewer, larger positions; 26 bps friction matters more |
-| Small | $5,000 | 5% | 15% | 10-12 | Balanced; friction still material |
-| Standard | $10,000 | 2% | 10% | 14-20 | **Current default** |
-| Growth | $25,000 | 2% | 8% | 20-30 | More positions, better diversification |
-| Large | $50,000 | 1% | 6% | 30-40 | More granular sizing; correlation management more important |
-| Institutional | $100,000 | 0.5% | 5% | 40-60 | Near-continuous deployment; slippage model may need revision |
-
-**Capital scaling rules:**
-- `min_position_pct`: Constrained by minimum dollar amount ($200 minimum to keep friction below 13% of position). At $2k capital, $200 = 10% minimum.
-- `max_position_pct`: Scales down with capital — higher capital permits more diversification, which reduces concentration risk. At $100k, a 10% position is a $10,000 single-name bet, which may exceed reasonable single-stock exposure.
-- Friction sensitivity: At $2k with a 5% position ($100), the 26 bps round-trip costs $0.26 — 0.26% of the position. At $100k with a 5% position ($5,000), the same trade costs $13 — same percentage but higher absolute dollar awareness.
-- **v1 default remains $10,000.** Capital tier configuration is planned for Phase 3+ when portfolio manager handles multi-position allocation.
+Current default: **$10,000 Standard tier** (min 2%, max 10% per position, 14-20 max positions). Capital tier scaling (Micro → Institutional) is deferred until Phase 4+ when portfolio manager handles multi-position allocation.
 
 ---
 
@@ -309,7 +271,7 @@ CONFIG
 ├── risk
 │   ├── volatility_lookback: 20        # trading days for ATR/vol calc
 │   ├── correlation_lookback: 60
-│   ├── stop_loss_atr_multiple: 2.0    # stop = entry - 2x ATR
+│   ├── stop_loss_atr_multiple: 3.0    # LOCKED (swept 2.0–4.0; 3.0× winner, 2026-03-21)
 │   ├── max_loss_per_trade_pct: 0.02   # 2% of equity max loss per trade
 │   ├── drawdown_brake_threshold: 0.15 # reduce sizing at 15% drawdown
 │   └── drawdown_halt_threshold: 0.20  # halt new trades at 20% drawdown
@@ -340,45 +302,9 @@ CONFIG
 - Trade approvals from Layer 3
 - Config parameters
 
-**Outputs:**
+**Outputs:** Trade log (trade_id, ticker, entry/exit date+price, gross/net PnL, holding_days, exit_reason), daily equity curve (equity, cash, drawdown, cash_yield), rejected signal log (rejection_reason, rejection_layer).
 
-1. **Trade log** (one row per completed trade):
-```
-trade_id | ticker | direction | entry_date | entry_price | exit_date | exit_price |
-position_pct | shares | gross_pnl | slippage_cost | spread_cost | total_costs |
-net_pnl | holding_days | exit_reason | confidence_at_entry | sector
-```
-
-2. **Daily equity curve** (one row per trading day):
-```
-date | equity | cash | invested_capital | gross_exposure | open_positions |
-daily_return | cumulative_return | drawdown_from_peak | cash_yield_today |
-strategy_return_excl_cash | strategy_return_incl_cash
-```
-
-3. **Rejected signal log** (one row per signal that was filtered out):
-```
-date | ticker | signal | confidence | rejection_reason | rejection_layer
-```
-
-**Execution logic:**
-1. On signal date (after close): receive unified signal from FPPE adapter
-2. Check re-entry cooldown rules for each ticker
-3. Pass surviving signals to Layer 3 for ranking and approval
-4. Approved signals go to Layer 2 for position sizing
-5. Next trading day at open: execute at `open_price × (1 + slippage_bps/10000)` for buys
-6. Mark-to-market all open positions daily at close
-7. Check exit conditions each day (see below)
-8. On exit: execute at `next_open × (1 - slippage_bps/10000)` for sells
-9. Accrue daily risk-free rate on idle cash
-
-**Exit conditions (any triggers exit at next open):**
-- SELL or HOLD signal on a held long position
-- Stop-loss triggered (intraday low ≤ stop price → exit at next open, NOT at stop price, to avoid unrealistic fills)
-- Max holding period (10 days) exceeded
-- Drawdown halt threshold reached (Layer 2 forces exit of all positions)
-
-**Stop-loss note (v0.2):** The original design assumed stops could execute at the stop price. Reviewers flagged that gap-through-stop scenarios (where the price opens below the stop) are common, especially on earnings or macro news. The backtest conservatively assumes exit at next-day open after the stop is triggered, not at the stop price itself. This produces more realistic P&L.
+**Execution:** Signal after close → cooldown check → Layer 3 rank → Layer 2 size → execute at next-day open with slippage. MTM at close daily. Exit triggers: SELL/HOLD signal on held position, stop triggered (exit at next open — not stop price), max hold exceeded, drawdown halt.
 
 ---
 
@@ -386,53 +312,17 @@ date | ticker | signal | confidence | rejection_reason | rejection_layer
 
 **Purpose:** Given an approved trade candidate, determine position size based on volatility. Enforce risk limits and drawdown protection.
 
-**v0.2 key change:** Position sizing is purely volatility-based. Confidence does NOT affect position size — it is used only in Layer 3 for ranking. This eliminates the double-counting problem where confidence drives the FPPE signal gate, then sizing, then ranking.
+**Key design:** Sizing is purely volatility-based; confidence drives Layer 3 ranking only (no double-counting).
 
-**Inputs:**
-- Approved trade candidate: `{ticker, signal, confidence}`
-- Current portfolio state (from Layer 1)
-- Ticker volatility data (ATR, rolling vol)
-- Config parameters
-
-**Outputs:**
-- Position size (% of equity and dollar amount)
-- Stop-loss price
-- Approval/rejection with reason
-
-**Position sizing formula (v1 — volatility-only):**
-
+**Position sizing:**
 ```
-target_risk_per_trade = max_loss_per_trade_pct (2% of equity)
-
-ticker_ATR_pct = 20-day ATR / current_price
-stop_distance = stop_loss_atr_multiple × ticker_ATR_pct (2 × ATR%)
-
-raw_weight = target_risk_per_trade / stop_distance
-    (sizes the position so that a stop-loss hit loses exactly 2% of equity)
-
-drawdown_scalar =
-    1.0             if drawdown < brake_threshold (15%)
-    linear 1.0→0.0  if drawdown between brake (15%) and halt (20%)
-    0.0             if drawdown ≥ halt_threshold (20%)
-
-final_weight = clamp(raw_weight × drawdown_scalar,
-                     min_position_pct, max_position_pct)
+stop_distance = stop_loss_atr_multiple × ATR%   # LOCKED: 3.0× (swept 2.0–4.0, 2026-03-21)
+raw_weight = max_loss_per_trade_pct / stop_distance  # 2% equity risk per trade
+final_weight = clamp(raw_weight × drawdown_scalar, min_pct, max_pct)
+drawdown_scalar: 1.0 → 0.0 linearly from 15% → 20% drawdown; 0.0 at halt
 ```
 
-**Why this is better than v0.1:** The v0.1 formula multiplied `max_position_pct × confidence_score × volatility_scalar`. This meant a 0.65 confidence signal on a low-vol stock could get a larger position than a 0.90 confidence signal on a high-vol stock — which conflates signal quality with position sizing. The v0.2 formula sizes purely on "how much can I lose if I'm wrong" (volatility), while letting Layer 3 decide "which signals are most worth taking" (confidence).
-
-**Stop-loss logic:**
-- Long positions: `entry_price × (1 - stop_loss_atr_multiple × ATR%)`
-- Per-trade max loss capped at 2% of total equity (if stop distance implies more, reduce position size)
-- Stops are evaluated on intraday lows, but execution occurs at next-day open (see Layer 1)
-
-**Rejection conditions:**
-- Position would breach sector concentration limit (30% or 3 positions in sector)
-- Position would push gross exposure above 100% (no leverage in v1)
-- Drawdown has hit halt threshold (20%)
-- Ticker is already held in the portfolio
-- Ticker is in cooldown period
-- Calculated position size falls below minimum (2% of equity)
+**Rejection conditions:** sector limit exceeded, gross exposure > 100%, drawdown halt, already held, cooldown, position below 2% minimum.
 
 ---
 
@@ -440,70 +330,9 @@ final_weight = clamp(raw_weight × drawdown_scalar,
 
 **Purpose:** When multiple BUY signals arrive on the same date, rank them and decide which become trades. Enforce capital and diversification constraints.
 
-**v0.2 key change:** Ranking is confidence-only for v1. The original composite score included an "expected risk-adjusted return" term derived from historical analogue returns. Reviewers correctly identified this as a likely source of hidden look-ahead bias and overfitting at this stage. The simpler ranking is also easier to validate and debug.
+**v1 ranking:** `rank_score = confidence` (ties: lower portfolio correlation, then alphabetical). v2 composite ranking (confidence + momentum + recency + volatility + correlation + pattern) deferred until v1 baseline is empirically validated. No grid-search on weights until 10+ years of data available.
 
-**Inputs:**
-- All BUY signals for a given date from FPPE (SELL signals generate exits, not new positions in v1)
-- Current portfolio state
-- Config parameters
-
-**Outputs:**
-- Ordered list of trades to execute (passed to Layer 2 for sizing)
-- Rejected signals with reasons
-
-**Ranking logic (v1 — baseline):**
-```
-rank_score = confidence
-```
-Ties broken by: lower correlation to existing portfolio, then alphabetical ticker (deterministic).
-
-**Ranking logic (v2+ — composite score):**
-
-The v2 ranking score combines multiple factors. Each factor is normalized to [0, 1] before weighting to prevent any single high-magnitude variable from dominating.
-
-```
-rank_score = (
-    w_confidence  × confidence_norm       # FPPE signal strength
-  + w_momentum    × sector_momentum_norm  # Is the sector trending with the signal?
-  + w_recency     × signal_recency_norm   # Days since last analogous signal
-  + w_volatility  × inv_volatility_norm   # Lower vol → larger normalized score
-  + w_correlation × inv_correlation_norm  # Lower correlation to existing portfolio
-  + w_pattern     × pattern_strength_norm # Candlestick pattern clarity (if module active)
-)
-
-# v2 default weights (to be validated empirically before promoting from default)
-w_confidence  = 0.40   # Dominant factor — FPPE's core output
-w_momentum    = 0.20   # Sector tailwind/headwind check
-w_recency     = 0.15   # Prefer signals with some recent confirmation
-w_volatility  = 0.10   # Prefer lower-vol assets at equal confidence
-w_correlation = 0.10   # Portfolio diversification benefit
-w_pattern     = 0.05   # Pattern categorization module (Phase 6)
-```
-
-**Factor definitions:**
-
-- `confidence_norm`: Calibrated FPPE probability, already on [0, 1]. No transformation needed.
-- `sector_momentum_norm`: Equal-weight sector return over the past 10 days vs. the rolling 90-day sector return. Positive momentum = sector is outperforming its own history. Normalized via min-max across all signals on the same date.
-- `signal_recency_norm`: Number of trading days since FPPE last generated a BUY signal on this ticker in the current direction, normalized to [0, 1] via sigmoid. Fresh signals score lower (potentially fleeting noise); signals that have held their direction for 2-5 days score higher (trend confirmation). NOT to be confused with the K-NN recency matching — this is the trading system's own signal history.
-- `inv_volatility_norm`: `1 / (1 + ATR_pct)` normalized across all signals. Lower volatility = higher score, reflecting that a given confidence level is more reliable on stable assets.
-- `inv_correlation_norm`: `1 - max_correlation_to_existing_portfolio`. If a new signal would be 90% correlated with an existing open position, it scores near zero on this factor. Encourages diversification.
-- `pattern_strength_norm`: Confidence in the candlestick pattern classification (Tier 1-3 match quality). Only active when the candlestick categorization module is running. Default = 0.5 (neutral) if module is inactive.
-
-**Why v2, not v1:** The factors beyond confidence risk introducing overfitting or look-ahead bias if implemented before the baseline (confidence-only) has been validated. Each factor will be added one at a time, with a before/after backtest comparison. A factor is only promoted to production if it demonstrably improves Sharpe or net expectancy without degrading drawdown.
-
-**Weight tuning governance:** Weights are not optimized via grid search against the 2024 backtest data. They are set by first-principles reasoning (confidence should dominate) and validated on 2025+ out-of-sample data. Grid search on weights is explicitly prohibited until 10+ years of data are available.
-
-**Allocation algorithm:**
-1. Collect all BUY signals for the date that pass FPPE's three-filter gate
-2. Remove signals for tickers currently held or in cooldown
-3. Sort by confidence descending (tie-breaking as above)
-4. Iterate through ranked signals:
-   a. Check sector limits (≤30% exposure, ≤3 positions per sector)
-   b. Check capital availability (enough cash for min position size)
-   c. If constraints pass → send to Layer 2 for sizing
-   d. If Layer 2 approves → add to execution queue
-   e. If any check fails → log rejection reason, move to next signal
-   f. Stop when no capital remains for minimum position size
+**Allocation algorithm:** Collect BUY signals → remove held/cooldown → sort by confidence → iterate: check sector (≤30%, ≤3) + capital → send to Layer 2 → stop when no capital remains.
 
 ---
 
@@ -605,21 +434,7 @@ The trading system does NOT consume these directly. A **signal adapter** normali
 
 **Note on adjusted prices (v0.2):** Using historically adjusted OHLCV data for v1. This correctly handles splits and dividends for backtesting purposes. The reviewers disagreed on whether this is sufficient — one said yes, the other said adjusted prices retroactively shift historical opens and can create phantom P&L. For v1 (paper trading research), adjusted prices are acceptable. For v2 (if approaching real capital), explicit corporate action handling should be added.
 
-**Historical data expansion roadmap:**
-
-The current dataset covers 2020-2024 (5 years). This is sufficient for Phase 1 pipeline validation but inadequate for robust parameter tuning or regime testing.
-
-| Phase | Data Coverage | Calendar Period | Purpose | Note |
-|-------|--------------|----------------|---------|------|
-| Phase 1-3 | 5 years | 2020-2024 | Pipeline validation | Current state. 2024 = validation; 2020-2023 = training/K-NN |
-| Phase 4 | 10 years | 2015-2024 | Regime diversity | Covers COVID crash (2020), bear market (2022), bull run (2021-2024) |
-| Phase 5+ | 15-25 years | 2000-2024 | Full cycle testing | Covers dot-com, financial crisis, multiple rate cycles |
-
-**Why this sequencing:** Adding historical data before the system is structurally stable wastes compute and risks tuning parameters to conditions that may not repeat. The 10-year expansion happens after Phase 3 (portfolio manager complete) when the system is stable enough that a parameter re-fit is meaningful.
-
-**Data source for expansion:** yfinance provides adjusted OHLCV going back to the early 2000s for most large-cap tickers. The current data pipeline already uses yfinance; the expansion is primarily a matter of changing the start date parameter and re-running the download. However: the K-NN training database will grow proportionally (from ~175k rows to ~700k rows for 10 years, or ~1.75M rows for 25 years). The candlestick categorization module (CANDLESTICK_CATEGORIZATION_DESIGN.md) becomes mandatory before the 10-year expansion — the K-NN index at 700k rows without pre-filtering will be 4× slower per query.
-
-**Ticker universe and data availability:** Not all current 52 tickers have 25 years of clean data. Some ETFs (e.g., QQQ, IWM) were created in the late 1990s and are fine. Others (e.g., sector ETFs like XLK) may have sparse early history. A data coverage audit is required before the 15-25 year expansion.
+**Historical data:** Current dataset 2010-2024 (~175k training rows). 10-year expansion (2015-2024) planned after Phase 4. HNSW index (SLE-47) makes 700k-row expansion feasible — ball_tree would require candlestick pre-filtering first.
 
 ### 5.3 Derived Data (computed by this system)
 
@@ -632,133 +447,27 @@ The current dataset covers 2020-2024 (5 years). This is sufficient for Phase 1 p
 
 ---
 
-## 6. Implementation Plan
+## 6. Implementation Status
 
-### Phase 1: Foundation — Prove the Pipeline (config.py + backtest_engine.py)
-
-Build the configuration module, the signal adapter, and a minimal backtester that processes signals, simulates execution at next-day open, applies the cost model, and produces a trade log + equity curve. Use **equal-weight fixed position sizing** (every trade gets 5% of equity) to validate the pipeline independent of risk/portfolio logic.
-
-**Deliverable:** Run backtest on 2024 validation data with equal-weight positions. Verify:
-- Trade log entries match expected signal-to-execution flow
-- Equity curve arithmetic is correct (spot-check 10 random trades manually)
-- Cost attribution (slippage + spread) is applied correctly on both entry and exit
-- Baseline comparisons (SPY, random, raw signals) all produce output
-
-**This phase intentionally uses 2024 as a demonstration slice, NOT a tuning dataset.** No parameters are optimized against 2024 results. The purpose is to verify mechanical correctness.
-
-### Phase 2: Risk Layer (risk_engine.py)
-
-Add volatility-based position sizing, stop-losses, and the drawdown brake. Replace equal-weight with dynamic sizing. Add re-entry cooldown logic.
-
-**Deliverable:** Re-run 2024 backtest with risk engine active. Compare:
-- Does dynamic sizing reduce max drawdown relative to Phase 1's equal-weight?
-- Are stop-losses firing at appropriate levels? Check for gap-through-stop cases.
-- Does the drawdown brake visibly reduce position sizes during losing streaks?
-- Rejection log: verify reasons are correct and constraints are binding.
-
-### Phase 3: Portfolio Layer (portfolio_manager.py)
-
-Add confidence-based signal ranking, sector diversification, and capital allocation. This resolves the multi-signal simultaneity problem.
-
-**Deliverable:** Verify:
-- On days with 5+ BUY signals, the allocator correctly ranks by confidence
-- Sector limits constrain the portfolio (visible in rejection log)
-- Capital exhaustion stops allocation (no over-commitment)
-- The system doesn't degrade vs. Phase 2 (portfolio layer should help, not hurt)
-
-### Phase 4: Evaluation Layer (strategy_evaluator.py)
-
-Add rolling metric computation, status signals, calibration tracking, and baseline comparisons.
-
-**Deliverable:** Complete output showing:
-- All metrics across 30/90/252-day/all-time windows
-- GREEN/YELLOW/RED status is correctly assigned
-- Calibration curve shows reasonable confidence-to-win-rate mapping
-- Baseline comparison table is populated and correct
-- Per-sector and per-ticker attribution identifies strongest/weakest contributors
-
-### Phase 5: Excel Dashboard
-
-Build an Excel reporting layer that reads from the Python output (CSV/JSON exports) and displays equity curves, trade logs, rolling metrics, baseline comparisons, and calibration charts.
-
-**Deliverable:** A single .xlsx file updated from the most recent backtest run.
-
-### Phase 6 (Future): v2 Additions
-
-After v1 passes its success criteria on out-of-sample data:
-- Add short selling (margin model, borrow fees, short-specific stops)
-- Add composite ranking score (confidence + correlation penalty + risk-adjusted return)
-- Add confidence-dependent holding periods (if data supports it)
-- Add partial exits (if capital base justifies it)
-- Evaluate VWAP or 30-min-after-open execution as alternative to raw open
+| Phase | Module | Status | Key Result |
+|-------|--------|--------|------------|
+| 1 | backtest_engine.py (equal-weight) | **DONE** | 22.3% annual, Sharpe 1.82, Max DD 6.9% |
+| 2 | risk_engine.py (ATR sizing) | **DONE** | $9.31 NE/trade, stops=28 at 3.0× ATR |
+| 3 | portfolio_manager.py | **DONE** | 37 PM rejections, matches Phase 2 exactly |
+| 3.5 | Research integration | **DONE** | ATR=3.0× locked, HNSW 54.5×, vectorized query |
+| **4** | **strategy_evaluator.py** | **NEXT** | Rolling metrics, RED/YELLOW/GREEN, TWRR |
+| 5 | Excel dashboard | Future | — |
+| v2 | Shorts, composite ranking, partial exits | Future | After v1 proven on OOS data |
 
 ---
 
-## 7. Known Risks & Mitigations
+## 7. Active Risks
 
-### 7.1 Thin Edge (Critical)
-
-FPPE's current BSS of +0.00103 and 56.6% accuracy means the system is operating very close to breakeven after costs. With the revised 26 bps round-trip friction (up from 16 bps in v0.1), the margin is even thinner. Every design decision in this system must prioritize edge preservation over feature richness.
-
-**Mitigation:** v1 is deliberately simple. Volatility-only sizing, confidence-only ranking, no leverage, no shorts. Complexity is added only after the simple version proves profitable.
-
-### 7.2 Overfitting Risk
-
-Two layers of overfitting risk: (1) FPPE was validated on 2024 data, and (2) the trading system will be demonstrated on 2024 data. If we tune trading parameters to improve 2024 results, we're fitting to a dataset that FPPE has already seen.
-
-**Mitigation:** The Phase 1 backtest on 2024 is a pipeline verification step only — no parameters are optimized against it. The v1 success criteria (Section 3.2) must be evaluated on 2025+ data, which remains untouched by both FPPE and the trading system.
-
-### 7.3 Open Execution Fragility
-
-Next-day open execution is the noisiest print of the day. Overnight gaps from earnings, macro news, or pre-market activity can invalidate the signal premise before the trade even executes.
-
-**Mitigation:** Increased slippage estimate to 10 bps per side (from 5 bps). Stop-losses assume exit at next open after trigger, not at stop price. Phase 6 includes evaluation of alternative execution timing (VWAP, 30-min delayed open).
-
-### 7.4 Capital Adequacy
-
-$10,000 with 2% minimum positions ($200 per trade) and 26 bps friction ($0.52 per round-trip) means per-trade friction is small in absolute terms but meaningful relative to expected per-trade profit at 56.6% accuracy.
-
-**Mitigation:** The model is percentage-based and fully scalable. $10k is the paper-trading proof. If v1 passes, the same model runs at $50k or $100k where friction becomes proportionally less impactful.
-
-### 7.5 Sparse Signal Risk
-
-The document does not yet define expected signal frequency. If FPPE's three-filter gate is highly selective, the system may produce too few trades for statistically meaningful evaluation. The v1 success criterion requires ≥50 trades.
-
-**Mitigation:** Track signal generation rate as a metric. If fewer than 50 trades occur in the 2024 backtest period, this needs to be flagged and addressed (either by relaxing FPPE's gate or extending the evaluation window).
+| Risk | Mitigation |
+|------|-----------|
+| Thin edge (BSS +0.00103) | v1 is deliberately simple — volatility sizing, confidence ranking, no leverage. Complexity only after edge is proven. |
+| Overfitting to 2024 | 2024 is pipeline verification only. v1 success criteria evaluated on 2025+ held-out data. |
+| Open execution noise | 10 bps slippage estimate; stops exit at next open, not stop price. |
 
 ---
 
-## 8. Resolved Design Questions
-
-These were open in v0.1. Resolutions incorporate both reviewer recommendations and project owner decisions.
-
-| Question | Resolution | Rationale |
-|----------|------------|-----------|
-| Max holding period | 10 trading days, fixed | Aligned with FPPE's ~7-day projection horizon; confidence-dependent holds deferred to v2 pending evidence |
-| Re-entry rules | 3-day cooldown after stop-loss or max-hold exit; re-entry on reversal requires +0.05 confidence margin | Prevents whipsaw churn while allowing genuine regime changes |
-| Partial exits | All-in/all-out for v1 | At $200 min position, partial exits multiply friction and destroy margin |
-| Cash management | Earn daily risk-free rate; report returns both with and without cash yield | Prevents cash yield from masking weak trading performance |
-| Dividends and splits | Use adjusted prices for v1 | Sufficient for paper-trading research; explicit corporate action handling in v2 if approaching real capital |
-
----
-
-## 9. Approval Checklist
-
-Before any code is written, confirm:
-
-- [ ] v1 scope (long-only, no leverage, no shorts) is accepted
-- [ ] Success criteria (Section 3.2 — edge preservation, not return targets) are accepted
-- [ ] Revised friction model (26 bps round-trip) is accepted
-- [ ] Confidence used once (ranking only, not sizing) is understood
-- [ ] Signal adapter for hybrid K-NN/DL output is correct
-- [ ] Implementation phasing (Section 6) is the right order
-- [ ] All resolved design questions (Section 8) are agreed upon
-- [ ] Known risks (Section 7) are acknowledged
-- [ ] Baseline comparisons (Section 3.3) are the right benchmarks
-
----
-
-*Version history:*
-- *v0.1 (2026-03-19): Initial draft*
-- *v0.2 (2026-03-19): Revised after two independent reviews. Major scope reduction for v1, fixed confidence double-counting, added baselines, revised friction model, added signal adapter for hybrid FPPE.*
-- *v0.3 (2026-03-19): Phase 1 backtest complete. Empirical parameter sweep results applied: confidence_threshold 0.65→0.60, max_holding_days 10→14. Phase 1 result: 22.3% annual, Sharpe 1.82, Max DD 6.9%. Candlestick categorization module designed (see CANDLESTICK_CATEGORIZATION_DESIGN.md).*

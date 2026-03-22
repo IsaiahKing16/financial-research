@@ -1,0 +1,155 @@
+{
+  "manifest_version": "1.0.0",
+  "created": "2026-03-21",
+  "description": "Phase 3Z baseline freeze — immutable reference for parity testing",
+  "git_sha": "HEAD",
+
+  "test_baseline": {
+    "total_tests": 596,
+    "all_passed": true,
+    "framework": "pytest",
+    "python_version": "3.12"
+  },
+
+  "backtest_baseline": {
+    "source": "results/backtest_summary.txt",
+    "annual_return_pct": 18.5,
+    "sharpe_ratio": 1.16,
+    "max_drawdown_pct": 6.7,
+    "total_trades": 191,
+    "win_rate_pct": 51.8,
+    "note": "Phase 3 aggressive profile, 2024 fold"
+  },
+
+  "engine_config": {
+    "top_k": 50,
+    "max_distance": 1.1019,
+    "distance_weighting": "uniform",
+    "distance_metric": "euclidean",
+    "nn_jobs": 1,
+    "batch_size": 256,
+    "use_hnsw": false,
+    "feature_set": "returns_only",
+    "projection_horizon": "fwd_7d_up",
+    "confidence_threshold": 0.65,
+    "agreement_spread": 0.1,
+    "min_matches": 10,
+    "same_sector_only": false,
+    "exclude_same_ticker": true,
+    "regime_filter": true,
+    "regime_mode": "binary",
+    "regime_fallback": true,
+    "adx_threshold": 25.0,
+    "calibration_method": "platt"
+  },
+
+  "trading_config": {
+    "capital": {
+      "initial_capital": 10000.0,
+      "fractional_shares": true,
+      "max_gross_exposure": 1.0
+    },
+    "costs": {
+      "slippage_bps": 10.0,
+      "spread_bps": 3.0,
+      "commission_per_share": 0.0,
+      "risk_free_annual_rate": 0.045,
+      "round_trip_bps": 26.0
+    },
+    "position_limits": {
+      "min_position_pct": 0.02,
+      "max_position_pct": 0.10,
+      "max_sector_pct": 0.30,
+      "max_positions_per_sector": 3
+    },
+    "signals": {
+      "confidence_threshold": 0.60,
+      "min_matches": 10,
+      "min_agreement": 0.10
+    },
+    "trade_management": {
+      "max_holding_days": 14,
+      "cooldown_after_stop_days": 3,
+      "cooldown_after_maxhold_days": 3,
+      "reentry_confidence_margin": 0.05,
+      "allow_same_day_churn": false
+    },
+    "risk": {
+      "volatility_lookback": 20,
+      "correlation_lookback": 60,
+      "stop_loss_atr_multiple": 3.0,
+      "max_loss_per_trade_pct": 0.02,
+      "drawdown_brake_threshold": 0.15,
+      "drawdown_halt_threshold": 0.20
+    },
+    "universe_size": 52,
+    "sector_count": 7
+  },
+
+  "dataset_hashes": {
+    "algorithm": "sha256",
+    "data/AAPL.csv": "29e98c1702f1a51d8051f95849f066474173b4a667ae00559a1d8f3d0d187929",
+    "data/ABBV.csv": "fb81e66f60129b6df00d0822006121606e8d001e942b3b3ab663772abf589a35",
+    "data/ADBE.csv": "dbc98e80aa6d0cae4dc6a0743b8123d9465260c1af72bea6c21f3a62cf91c074",
+    "data/AMD.csv": "9fb52a68b9d2d5064ae8507eb58c4d817f3294bacdfaec6c737ee5a0395cb52d",
+    "data/AMGN.csv": "fc34ee178543a0eb2667358ea2c691e858cd503b383b3f9a609e218888d585cb",
+    "data/AMZN.csv": "d3eb18f62f61f05c8df0e4ffe30b0f179844d93627af3fca83adc2446bef47ae",
+    "data/AVGO.csv": "8cf36fee1330f061599eb9fbbcc856b626eedde1710f7588584d65e13ebecc6b",
+    "data/AXP.csv": "2b927c8d17389438a5c3dee6dbaa571a3c664cb83dd5ba03b92b3abdb309c832",
+    "data/BA.csv": "8dcce9b3823edd9e9cd11939db962667818d0042f87948cd48bbd942c3e62b7c",
+    "data/BAC.csv": "0cc48a223f569d5e01f7fb89ff9e5df29a6a160709117c440200fe72e7af245f",
+    "data/BRK-B.csv": "6bd70b1a55542995215ab0b7e8416efc7a544c0b868cd7c35a0c7a7e0529eab8",
+    "data/CAT.csv": "4cfab011f4948fb864b248fb5cdebfdf0e502b350939b0131128f27b44b0ea29",
+    "data/COST.csv": "e99de17d67c2d9e34cef2a34f9af33016a77e689dc5c9ebe729df8845a62f913",
+    "data/CRM.csv": "397e7343c23f209bb8558cfd05e566272deeafc2d7895f54396d6c6bb51fbefd",
+    "data/CSCO.csv": "e0865ba4cc3564b716399659fbc2088d5c8ffcd8f43d3857c5971d5d4f787bbf",
+    "data/CVX.csv": "081affcd3205c42c5584c0d9024866896958770408ab14fe38e6e8fb2d63aebf",
+    "data/DIS.csv": "c8fda738043a8d2c5760b0cb91e62112e39451d7a606e7a10aa05b56f162a015",
+    "data/GE.csv": "977bfd843e8023ecccd3cd652614cad2a9923b73ce4e823a9e8957d867aa1d66",
+    "data/GILD.csv": "46ae399eeccad95e015672c0c2e97ac9b50026debef419522919c20427c762bc",
+    "data/GOOGL.csv": "a6ae636b8a48239a612db7e2c155353e3c84af5087bab06f7bab532b6dfd2986",
+    "data/GS.csv": "2677765d0d2edaa2c311523e1bb127f1cc8e9437ae649e12a9e947dd825eaf71",
+    "data/HD.csv": "61a3dc0157d9fcdbd113d1f2e543f28798cc16683e44ffc6dc9300af3cf5ea49",
+    "data/INTC.csv": "165e732be398c5eab1322d29abef96db12c97b6aeb07c82ae67c7c27e8c03e33",
+    "data/ISRG.csv": "d4a7090f631e3297597ed27349db6f5c82de9c86de6c56275e83eb1062b589af",
+    "data/JNJ.csv": "a2699fcabf17749c581ee2342afc2e3d7e8868db82694c06d432cb7fe6fd019a",
+    "data/JPM.csv": "483f403e1a6b179803f4da9cefd4e952796949d8410c5a78999a27882b37d3d4",
+    "data/KO.csv": "00a59e927643a54dc7c8e21ba804bdd6bdfa479feaecaa8a5d64539f938398fe",
+    "data/LLY.csv": "481d71774ec45c15ed2a8d4abe02e82f1af460563465baf2a4caca52ddfe87fe",
+    "data/MA.csv": "939a0c9f8455a8d4326bd3ff21f9b779d919c0d0af53ec6a1977e18d16fa2480",
+    "data/META.csv": "c452d4a03e9a540ceff8bda31265cb09af1935911548f20cb4e42dbc3d396c6a",
+    "data/MRK.csv": "b041361473ecf2de16923ff5bf665428a5b763ae02f3f92f14a112d1ba3951b0",
+    "data/MS.csv": "86b209bf49186b0bf7a052c8a1243af4c23ec3d868c6cbad32bf0d73abbd476a",
+    "data/MSFT.csv": "d71bfe1755593ab458fc321a4ac3daaf1f5f791b980732cd38e62a3b94ebf7eb",
+    "data/MU.csv": "534ab2e6d3318f920740c75b4605487bc7266d5ba63584be8f873b2c133cb019",
+    "data/NFLX.csv": "7d9800da4c2892a64b970620555c29c9c7732776002dc776ebd1f10dfad207d6",
+    "data/NVDA.csv": "c52dcb96efa37139380565d57ad82bf113e2642fef1988fd9a45803592dd2b35",
+    "data/ORCL.csv": "d544525ddc5a493a19790b3f96b4e20ac733fcd2be7a8f94fe2aa7037aee0db0",
+    "data/PEP.csv": "c5d9ebc0909495681b5190ca980bffbad6a9cd50f85d1fad4b8ff39f87f00217",
+    "data/PFE.csv": "5dcee8f70ddc93b84bc2f996b68a83bbb14bfc960ade4d584382e7b33b450c6a",
+    "data/PG.csv": "3f4f0d2feeab4d246ecae11dc03ead6c414bd3859e104ce6d7befad3fd80aa37",
+    "data/PYPL.csv": "ee0c299f310c83acdf902731bce471369ff782d1bff659084c85157b3b9b4e23",
+    "data/QCOM.csv": "1029ee707190814fc3314623103e874bab56322c5b9fdd2cd3f5f6c2aa097b71",
+    "data/QQQ.csv": "203ea14830f4525a438fef25c2384065038d0382ba02e880ca80d395994a7e4d",
+    "data/SPY.csv": "a5c5d5668469c8e22ccba56932e46fb7317847de4ff14477344dd641c59616d8",
+    "data/TMO.csv": "90d2bc3ca4ac245e5df0ae5b5316c99a04eaefc8b0b3e3e097e8b81a685998b9",
+    "data/TSLA.csv": "e4d6ea91fe4c5c4e7639d4a191daed73eafde8637479e4dda065c16462cf4b40",
+    "data/TXN.csv": "3ca7efdd10e92af7e6e72b543b8df6e27d07b64ad53347fb0ebe74c59dd8001d",
+    "data/UNH.csv": "386e3ca652a9f4840ed18551115904d6a1a2b2b070269972d1ea0a54714c2a4c",
+    "data/V.csv": "dbb5a4020964ebd615c739fe6b9b523c9f8825c8e04e12a83d167de21168f5b1",
+    "data/WFC.csv": "91070ca01652fb9486871d2a2b1e072cce0bad749b149b598d7ec4b19e8e2a2e",
+    "data/WMT.csv": "fb8f0221bec35666b65d67b7482984e290ca1cd964abe167859a1aaa03b423ac",
+    "data/XOM.csv": "4ef549f345f8342f840c7752acfc43bb84c21198d81a62ef131dcf9ce888ed07",
+    "results/cached_signals_2024.csv": "58e45d5abdcd9b8673fd03e83ce700c7cdbce10c806f47df92fb9152cb262ac1"
+  },
+
+  "parity_tolerances": {
+    "float_rtol": 1e-7,
+    "integer": "exact",
+    "categorical": "exact",
+    "signal_count": "exact",
+    "sharpe_ratio_rtol": 1e-4,
+    "return_pct_rtol": 1e-4,
+    "note": "Float tolerances account for cross-platform FP differences only. Any semantic change must be flagged."
+  }
+}

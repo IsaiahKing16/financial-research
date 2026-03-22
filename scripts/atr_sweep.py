@@ -10,7 +10,7 @@ Prerequisites (run once to generate):
     # → produces results/cached_signals_2024.csv
 
     python -m pattern_engine.data  (or any script that builds val_db.parquet)
-    # → produces data/val_db.parquet
+    # → produces data/processed/val_db.parquet
 
 Usage:
     python scripts/atr_sweep.py
@@ -37,7 +37,7 @@ from trading_system.signal_adapter import load_cached_signals
 # Pre-flight checks
 # ---------------------------------------------------------------------------
 SIGNALS_PATH = REPO_ROOT / "results" / "cached_signals_2024.csv"
-PRICE_PATH   = REPO_ROOT / "data" / "val_db.parquet"
+PRICE_PATH   = REPO_ROOT / "data" / "processed" / "val_db.parquet"
 
 if not SIGNALS_PATH.exists():
     print(f"ERROR: {SIGNALS_PATH} not found.")

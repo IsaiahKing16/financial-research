@@ -42,8 +42,8 @@ def generate_or_load_signals(use_cached: bool = False) -> pd.DataFrame:
         simulate_signals_from_val_db, save_signals,
     )
 
-    train_db = pd.read_parquet(REPO_ROOT / "data" / "train_db.parquet")
-    val_db = pd.read_parquet(REPO_ROOT / "data" / "val_db.parquet")
+    train_db = pd.read_parquet(REPO_ROOT / "data" / "processed" / "train_db.parquet")
+    val_db = pd.read_parquet(REPO_ROOT / "data" / "processed" / "val_db.parquet")
 
     signal_df = simulate_signals_from_val_db(
         val_db=val_db,
@@ -59,7 +59,7 @@ def generate_or_load_signals(use_cached: bool = False) -> pd.DataFrame:
 
 def build_price_df() -> pd.DataFrame:
     """Load OHLC price data for the validation period from the parquet database."""
-    val_db = pd.read_parquet(REPO_ROOT / "data" / "val_db.parquet")
+    val_db = pd.read_parquet(REPO_ROOT / "data" / "processed" / "val_db.parquet")
 
     # The val_db already has Date, Ticker, Open, High, Low, Close
     price_df = val_db[["Date", "Ticker", "Open", "High", "Low", "Close"]].copy()

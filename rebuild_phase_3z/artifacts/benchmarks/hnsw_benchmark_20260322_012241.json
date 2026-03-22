@@ -1,0 +1,12 @@
+{
+  "timestamp": "2026-03-22T01:22:41.067506Z",
+  "n_train": 50000,
+  "n_query": 1000,
+  "k": 50,
+  "batch_size": 256,
+  "balltree_batch_time_s": 0.3634578000055626,
+  "hnsw_batch_time_s": 0.014079299988225102,
+  "speedup_ratio": 25.815047645091173,
+  "gate_min_speedup": 20.0,
+  "gate_passed": true
+}

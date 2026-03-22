@@ -18,11 +18,19 @@ matching on return fingerprints. Generates probabilistic BUY/SELL/HOLD signals.
 - `pattern_engine/` — 21 modules, 300 tests (Python package)
 - `trading_system/` — 9 modules, 556 tests (Phase 1, 2 & 3 complete)
   - New in Phase 3: `portfolio_state.py`, `portfolio_manager.py`
+- `research/` — pluggable ABCs + Phase C modules (596 tests total)
+  - `hnsw_distance.py`: HNSWIndex, 54.5× speedup, recall@50=0.9996 (SLE-47 ✓)
+  - Enable: `EngineConfig(use_hnsw=True)` — default False (ball_tree unchanged)
+- `rebuild_phase_3z/` — Phase 3Z rebuild workspace (M1–M8 COMPLETE, 543 new tests)
+  - `fppe/pattern_engine/` — contracts, schemas, 5-stage PatternMatcher + Platt calibration
+  - `fppe/trading_system/` — SharedState, StrategyEvaluator, risk_overlays/, drift_monitor
+  - `artifacts/baselines/parity_snapshot.json` — frozen SLE-80-v1 snapshot
+  - Full campaign: `docs/campaigns/PHASE_3Z_CAMPAIGN.md`
 - `pattern-engine-v2.1.jsx` — React demo (standalone artifact)
 
 ## Critical Rules
 
-1. **Run tests first.** `python -m pytest tests/ -v` — all must pass before any commit.
+1. **Run tests first.** `python -m pytest tests/ rebuild_phase_3z/tests/ -q -m "not slow"` — 1139 tests, all must pass.
 2. **Numbers require provenance.** Any claimed metric must trace to walk-forward results
    or experiment logs. If it cannot be traced, it is fabricated. No exceptions.
 3. **Do NOT modify `prepare.py` or this file** unless explicitly asked.
@@ -35,7 +43,9 @@ matching on return fingerprints. Generates probabilistic BUY/SELL/HOLD signals.
 
 Distance=Euclidean, Weighting=uniform, Features=returns_only(8), Calibration=Platt,
 cal_frac=0.76, max_distance=1.1019, top_k=50, confidence_threshold=0.65,
-regime=binary, horizon=fwd_7d_up
+regime=binary, horizon=fwd_7d_up, stop_loss_atr_multiple=3.0
+# stop_loss_atr_multiple: swept 2.0–4.0 on 2024 fold (2026-03-21). 3.0× won:
+# Sharpe=1.53 (+32% vs 2.0×), MaxDD=5.7%, stops=28/171. Provenance: results/atr_sweep_results.tsv
 
 ## Key Design Docs (read before modifying related code)
 
@@ -46,8 +56,10 @@ regime=binary, horizon=fwd_7d_up
 
 ## Current Phase
 
-**Phase 3: Portfolio Manager** — COMPLETE. Signal ranking, sector allocation, capital queue.
-Phase 4 (strategy evaluator) is next. See `docs/FPPE_TRADING_SYSTEM_DESIGN.md` v0.4.
+**Phase 3Z Rebuild** — COMPLETE. All milestones M1–M8 done.
+- 1139 tests total (596 legacy + 543 new). Run: `python -m pytest tests/ rebuild_phase_3z/tests/ -q -m "not slow"`
+- Platt calibration wired into `PatternMatcher.fit()` (SLE-89 ✓). `calibration_method` in EngineConfig.
+- **Next phase:** M9 (data ingestion scale-up) or production migration of `rebuild_phase_3z/fppe/` → root.
 
 ## Session Protocol
 

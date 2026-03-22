@@ -1,0 +1,223 @@
+# ci.yml — Phase 3Z Full CI Pipeline (SLE-81)
+#
+# Runs on every push to main/master and every pull request.
+# All jobs must pass for the branch to be mergeable.
+#
+# Job layout:
+#   lint-requirements  — Verify requirements.lock.txt is present and parseable
+#   legacy-tests       — 596 legacy tests (pattern_engine + trading_system + research)
+#   rebuild-tests      — 376 rebuild tests (rebuild_phase_3z/tests/unit + parity)
+#   parity-gate        — End-to-end parity + regression snapshot tests
+#   hnsw-gate          — HNSW promotion gate script (advisory, non-blocking)
+#
+# Windows runner is mandatory:
+#   - nn_jobs=1 prevents Windows/Py3.12 joblib deadlock
+#   - tempfile ignore_cleanup_errors (SQLite WAL locking)
+#   - Backslash path handling in several modules
+#
+# Linear: SLE-81
+
+name: Phase 3Z CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+# Cancel in-progress runs for the same ref (saves CI minutes)
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── 1. Requirements lock verification ────────────────────────────────────────
+  lint-requirements:
+    name: Verify requirements.lock.txt
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check requirements.lock.txt exists
+        run: |
+          if (!(Test-Path "requirements.lock.txt")) {
+            Write-Error "requirements.lock.txt not found. Run: pip freeze > requirements.lock.txt"
+            exit 1
+          }
+          Write-Host "requirements.lock.txt found"
+          $count = (Get-Content requirements.lock.txt | Measure-Object -Line).Lines
+          Write-Host "Package count: $count"
+          if ($count -lt 80) {
+            Write-Error "requirements.lock.txt has fewer than 80 packages ($count). Possibly incomplete."
+            exit 1
+          }
+        shell: powershell
+
+      - name: Check parity snapshot exists
+        run: |
+          $snapshotPath = "rebuild_phase_3z\artifacts\baselines\parity_snapshot.json"
+          if (!(Test-Path $snapshotPath)) {
+            Write-Error "Parity snapshot missing: $snapshotPath"
+            Write-Error "Run: python scripts/generate_parity_snapshot.py && git add $snapshotPath"
+            exit 1
+          }
+          Write-Host "Parity snapshot found: $snapshotPath"
+          $content = Get-Content $snapshotPath | ConvertFrom-Json
+          Write-Host "Snapshot schema version: $($content.'_schema_version')"
+        shell: powershell
+
+  # ── 2. Legacy test suite ──────────────────────────────────────────────────────
+  legacy-tests:
+    name: Legacy Tests (596)
+    runs-on: windows-latest
+    needs: lint-requirements
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run legacy test suite
+        run: python -m pytest tests/ -v --tb=short -q
+        env:
+          PYTHONPATH: .
+
+      - name: Assert test count (guard against accidental deletion)
+        run: |
+          $result = python -m pytest tests/ --collect-only -q 2>&1
+          $collected = $result | Select-String '(\d+) tests? collected'
+          if ($null -eq $collected) { Write-Error "Could not parse test count"; exit 1 }
+          $count = [int]$collected.Matches[0].Groups[1].Value
+          Write-Host "Collected $count legacy tests"
+          $min_count = 556
+          if ($count -lt $min_count) {
+            Write-Error "GATE FAILED: only $count tests collected (minimum $min_count). Tests may have been accidentally deleted."
+            exit 1
+          }
+          Write-Host "Gate passed: $count >= $min_count"
+        shell: powershell
+
+  # ── 3. Rebuild test suite ─────────────────────────────────────────────────────
+  rebuild-tests:
+    name: Rebuild Tests (376)
+    runs-on: windows-latest
+    needs: lint-requirements
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run rebuild unit tests
+        run: python -m pytest rebuild_phase_3z/tests/unit/ -v --tb=short
+        env:
+          PYTHONPATH: .
+
+      - name: Run rebuild parity tests (fast, no data files)
+        run: |
+          python -m pytest rebuild_phase_3z/tests/parity/ -v --tb=short -m "not slow"
+        env:
+          PYTHONPATH: .
+
+      - name: Run rebuild regression tests (fast, snapshot-based)
+        run: |
+          python -m pytest rebuild_phase_3z/tests/regression/ -v --tb=short -m "not slow"
+        env:
+          PYTHONPATH: .
+
+  # ── 4. Parity gate ────────────────────────────────────────────────────────────
+  parity-gate:
+    name: Parity Gate
+    runs-on: windows-latest
+    needs: [legacy-tests, rebuild-tests]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run full test suite (legacy + rebuild combined)
+        run: |
+          python -m pytest tests/ rebuild_phase_3z/tests/ -q --tb=short -m "not slow"
+        env:
+          PYTHONPATH: .
+
+      - name: Verify parity snapshot matches current output
+        run: |
+          python -m pytest rebuild_phase_3z/tests/parity/test_end_to_end_parity.py::TestSnapshotRegression -v --tb=long
+        env:
+          PYTHONPATH: .
+
+      - name: Verify numeric drift detection
+        run: |
+          python -m pytest rebuild_phase_3z/tests/regression/test_numeric_drift.py::TestSnapshotDrift -v --tb=long
+        env:
+          PYTHONPATH: .
+
+  # ── 5. HNSW promotion gate (advisory) ─────────────────────────────────────────
+  hnsw-gate:
+    name: HNSW Promotion Gate (advisory)
+    runs-on: windows-latest
+    needs: rebuild-tests
+    # Non-blocking: gate script exit 1 = blocked (advisory warning, not CI failure)
+    # Change continue-on-error to false when HNSW promotion is ready
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run HNSW promotion gate
+        run: |
+          python scripts/check_hnsw_promotion_gate.py
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "HNSW promotion gate: APPROVED"
+          } else {
+            Write-Host "HNSW promotion gate: BLOCKED (advisory - not a CI failure)"
+          }
+        shell: powershell
+        env:
+          PYTHONPATH: .

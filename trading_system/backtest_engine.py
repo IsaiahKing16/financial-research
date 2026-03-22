@@ -1509,8 +1509,8 @@ class BacktestResults:
         if not self.stop_events_df.empty:
             self.stop_events_df.to_csv(out / "backtest_stop_events.csv", index=False)
 
-        # Save summary text
-        with open(out / "backtest_summary.txt", "w") as f:
+        # Save summary text (utf-8 explicit — summary contains non-cp1252 chars)
+        with open(out / "backtest_summary.txt", "w", encoding="utf-8") as f:
             f.write(self.summary())
 
         print(f"\n  Results saved to {out}/")

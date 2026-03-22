@@ -1,0 +1,44 @@
+{
+  "_schema_version": "SLE-80-v1",
+  "_generated_at": "2026-03-22T01:54:16.888655Z",
+  "_description": "Frozen parity snapshot \u2014 PatternMatcher on seeded synthetic data",
+  "dataset": {
+    "n_train": 2000,
+    "n_query": 400,
+    "rng_seed_train": 42,
+    "rng_seed_query": 99,
+    "feature_cols": [
+      "ret_1d",
+      "ret_3d",
+      "ret_7d",
+      "ret_14d",
+      "ret_30d",
+      "ret_45d",
+      "ret_60d",
+      "ret_90d"
+    ]
+  },
+  "config": {
+    "backend": "balltree",
+    "top_k": 50,
+    "max_distance": 4.5,
+    "confidence_threshold": 0.55,
+    "agreement_spread": 0.05,
+    "min_matches": 5
+  },
+  "metrics": {
+    "bss": -0.0038149006956347264,
+    "mean_probability": 0.49765,
+    "std_probability": 0.07046614435315729,
+    "buy_count": 93,
+    "sell_count": 104,
+    "hold_count": 203,
+    "mean_n_matches": 50.0,
+    "fraction_actionable": 0.4925
+  },
+  "tolerances": {
+    "bss_rtol": 1e-05,
+    "probability_rtol": 1e-07,
+    "signal_counts_exact": true
+  }
+}

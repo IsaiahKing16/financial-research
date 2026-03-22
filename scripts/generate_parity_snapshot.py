@@ -108,7 +108,7 @@ def _bss(probs: np.ndarray, y_true: np.ndarray) -> float:
 
 
 def generate_snapshot() -> dict:
-    from rebuild_phase_3z.fppe.pattern_engine.matcher import PatternMatcher
+    from pattern_engine.matcher import PatternMatcher
 
     print("Generating parity snapshot...")
     print(f"  Training rows: {N_TRAIN} (seed={RNG_SEED_TRAIN})")

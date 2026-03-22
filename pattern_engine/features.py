@@ -1,160 +1,85 @@
 """
-features.py — Feature sets and registry for pluggable feature selection.
+features.py — Feature column definitions and weighting utilities.
 
-FeatureRegistry allows swapping feature sets via a config string
-(e.g. feature_set="returns_candle") without touching engine code.
-Custom sets can be registered at runtime.
+Mirrors production pattern_engine/features.py but lives in the rebuild
+workspace. Imports from the production FeatureRegistry where available;
+falls back to hardcoded returns_only when running in isolation.
+
+Linear: SLE-60
 """
 
-from dataclasses import dataclass, field
+from __future__ import annotations
+
+import numpy as np
 
 
-# ============================================================
-# Column definitions
-# ============================================================
+# ─── Returns-only feature set (locked setting) ────────────────────────────────
 
-RETURN_WINDOWS = [1, 3, 7, 14, 30, 45, 60, 90]
-RETURN_COLS = [f"ret_{w}d" for w in RETURN_WINDOWS]
-
-SUPPLEMENT_COLS = [
-    "vol_10d", "vol_30d", "vol_ratio", "vol_abnormal",
-    "rsi_14", "atr_14", "price_vs_sma20", "price_vs_sma50",
-]
-
-VOL_COLS = ["vol_10d", "vol_30d", "vol_ratio", "vol_abnormal"]
-
-# Multi-timeframe candlestick features (5 per timeframe × 3 timeframes = 15)
-CANDLE_1D_COLS = [
-    "candle_1d_body_to_range", "candle_1d_upper_wick",
-    "candle_1d_lower_wick", "candle_1d_body_pos", "candle_1d_direction",
-]
-CANDLE_3D_COLS = [
-    "candle_3d_body_to_range", "candle_3d_upper_wick",
-    "candle_3d_lower_wick", "candle_3d_body_pos", "candle_3d_direction",
-]
-CANDLE_5D_COLS = [
-    "candle_5d_body_to_range", "candle_5d_upper_wick",
-    "candle_5d_lower_wick", "candle_5d_body_pos", "candle_5d_direction",
-]
-CANDLE_COLS = CANDLE_1D_COLS + CANDLE_3D_COLS + CANDLE_5D_COLS
-
-SECTOR_COLS = [
-    "sector_relative_return_7d", "spy_correlation_30d", "sector_rank_30d",
-]
-
-# Overnight/session decomposition features (research: Fed NY overnight drift)
-OVERNIGHT_COLS = [
-    "ret_overnight",        # Close[t-1] -> Open[t] (gap component)
-    "ret_intraday",         # Open[t] -> Close[t] (session component)
-    "gap_magnitude",        # |ret_overnight|
-    "gap_direction_streak", # Consecutive same-sign gaps
-]
-
-WEEKEND_COLS = [
-    "weekend_gap",           # Fri close -> Mon open
-    "weekend_gap_magnitude", # |weekend_gap|
-]
-
-# Forward targets
-FORWARD_WINDOWS = [1, 3, 7, 14, 30]
-FORWARD_RETURN_COLS = [f"fwd_{w}d" for w in FORWARD_WINDOWS]
-FORWARD_BINARY_COLS = [f"fwd_{w}d_up" for w in FORWARD_WINDOWS]
+RETURNS_ONLY_COLS: list[str] = [f"ret_{w}d" for w in [1, 3, 7, 14, 30, 45, 60, 90]]
+"""Canonical 8-feature return fingerprint. Locked setting — do not change."""
 
 
-# ============================================================
-# FeatureSet and Registry
-# ============================================================
+def get_feature_cols(feature_set: str) -> list[str]:
+    """Resolve feature column names for a given feature set.
 
-@dataclass
-class FeatureSet:
-    """A named set of feature columns for the matching engine."""
-    name: str
-    columns: list
-    description: str = ""
-    requires_network: bool = False  # True for sets needing a trained encoder
+    Delegates to production FeatureRegistry where available; falls back
+    to hardcoded sets for isolated testing.
 
+    Args:
+        feature_set: Feature set name (e.g. "returns_only").
 
-class FeatureRegistry:
-    """Registry of available feature sets.
+    Returns:
+        Ordered list of column names for that feature set.
 
-    Built-in sets are registered at import time. Custom sets can be
-    added via register(). Feature swapping is a config change:
-    EngineConfig(feature_set="returns_candle")
+    Raises:
+        ValueError: If the feature set is not registered and not hardcoded.
     """
+    try:
+        from pattern_engine.features import FeatureRegistry
+        return FeatureRegistry.get(feature_set).columns
+    except (ImportError, KeyError):
+        pass
 
-    _sets: dict[str, FeatureSet] = {}
+    # Hardcoded fallback for isolated rebuild workspace tests
+    if feature_set == "returns_only":
+        return RETURNS_ONLY_COLS
 
-    @classmethod
-    def register(cls, name: str, columns: list, description: str = "",
-                 requires_network: bool = False) -> None:
-        """Register a new feature set."""
-        cls._sets[name] = FeatureSet(name=name, columns=list(columns),
-                                     description=description,
-                                     requires_network=requires_network)
-
-    @classmethod
-    def get(cls, name: str) -> FeatureSet:
-        """Get a registered feature set by name.
-
-        Raises:
-            KeyError: if the feature set name is not registered.
-            NotImplementedError: if the feature set requires a trained
-                neural network encoder that has not been built yet.
-        """
-        if name not in cls._sets:
-            available = ", ".join(sorted(cls._sets.keys()))
-            raise KeyError(f"Unknown feature set: {name!r}. "
-                           f"Available: {available}")
-        fset = cls._sets[name]
-        if fset.requires_network:
-            raise NotImplementedError(
-                f"Feature set {name!r} requires a trained neural network "
-                f"encoder that is not yet implemented. "
-                f"See Phase 3 roadmap in PROJECT_GUIDE.md."
-            )
-        return cls._sets[name]
-
-    @classmethod
-    def list_sets(cls) -> list[str]:
-        """List all registered feature set names."""
-        return sorted(cls._sets.keys())
+    raise ValueError(
+        f"Unknown feature set '{feature_set}'. "
+        "Ensure FeatureRegistry is accessible or add a hardcoded fallback."
+    )
 
 
-# Register built-in feature sets
-FeatureRegistry.register(
-    "returns_only", RETURN_COLS,
-    "Proven 8-feature return baseline (locked from sweeps 2/3)"
-)
-FeatureRegistry.register(
-    "returns_candle", RETURN_COLS + CANDLE_COLS,
-    "Returns + continuous multi-timeframe candlestick encoding (1d/3d/5d)"
-)
-FeatureRegistry.register(
-    "returns_vol", RETURN_COLS + VOL_COLS,
-    "Returns + volatility/volume features"
-)
-FeatureRegistry.register(
-    "returns_sector", RETURN_COLS + SECTOR_COLS,
-    "Returns + cross-asset sector signals"
-)
-FeatureRegistry.register(
-    "full", RETURN_COLS + SUPPLEMENT_COLS + CANDLE_COLS + SECTOR_COLS,
-    "All features combined (experimental)"
-)
+# ─── Feature weighting ────────────────────────────────────────────────────────
 
-FeatureRegistry.register(
-    "returns_overnight", RETURN_COLS + OVERNIGHT_COLS,
-    "8 returns + 4 overnight/session decomposition (research-driven)"
-)
-FeatureRegistry.register(
-    "returns_session", RETURN_COLS + OVERNIGHT_COLS + WEEKEND_COLS,
-    "8 returns + 4 overnight + 2 weekend gap features"
-)
+def apply_feature_weights(
+    X: np.ndarray,
+    feature_cols: list[str],
+    weights: dict[str, float],
+) -> np.ndarray:
+    """Apply per-feature scalar weights to a feature matrix.
 
-# CONV_LSTM hybrid feature set placeholder (requires trained network)
-LSTM_LATENT_COLS = [f"lstm_latent_{i}" for i in range(16)]
-FeatureRegistry.register(
-    "returns_hybrid", RETURN_COLS + LSTM_LATENT_COLS,
-    "Returns + CONV_LSTM latent embeddings (requires trained network)",
-    requires_network=True,
-)
+    Weights are applied BEFORE NN index build AND query transform.
+    Higher weight = that feature influences matching distance more.
+    A weight of 1.0 means no change; 0.0 would zero out the feature.
+
+    The production convention (EngineConfig.feature_weights) uses
+    "uniform" weighting for the locked returns_only set (all 1.0),
+    so this function is a no-op in the baseline configuration.
+
+    Args:
+        X: (N, D) feature matrix — already scaled by StandardScaler.
+        feature_cols: Column names aligned to X columns (length D).
+        weights: Mapping of column name → weight scalar.
+                 Columns not in weights default to weight=1.0.
+
+    Returns:
+        X_weighted: (N, D) float64 array with weights applied.
+                    Always a copy — never modifies the input array.
+    """
+    X_weighted = X.copy()
+    for i, col in enumerate(feature_cols):
+        w = weights.get(col, 1.0)
+        if w != 1.0:
+            X_weighted[:, i] *= w
+    return X_weighted

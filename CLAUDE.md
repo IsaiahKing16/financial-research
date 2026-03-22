@@ -8,29 +8,31 @@
 matching on return fingerprints. Generates probabilistic BUY/SELL/HOLD signals.
 
 ## Commands
-- `python -m pytest tests/ -v` — Run full suite (always run before committing)
-- `python -m pattern_engine.live` — Production EOD signals
-- `python -m pattern_engine.overnight` — 6-hour overnight runner
+- `python -m pytest tests/ -q -m "not slow"` — Run full suite (always run before committing)
 - `venv\Scripts\activate` — Windows venv activation
 
 ## Codebases
 
-- `pattern_engine/` — 21 modules, 300 tests (Python package)
-- `trading_system/` — 9 modules, 556 tests (Phase 1, 2 & 3 complete)
-  - New in Phase 3: `portfolio_state.py`, `portfolio_manager.py`
-- `research/` — pluggable ABCs + Phase C modules (596 tests total)
+- `pattern_engine/` — Phase 3Z production core: PatternMatcher, Platt calibration, contracts
+  - `matcher.py`: 5-stage PatternMatcher (scale → search → filter → aggregate → calibrate)
+  - `contracts/`: Pydantic schemas, BaseMatcher ABC, EngineState, SignalDirection/Source
+  - `features.py`, `data.py`, `schema.py` — feature pipeline and data loading
+  - Research pilots (behind flags): `sax_filter.py`, `wfa_reranker.py`, `ib_compression.py`, `conformal_hooks.py`
+- `trading_system/` — Phase 3Z production layer: SharedState, StrategyEvaluator, risk overlays
+  - `strategy_evaluator.py`: signal → position decision with risk overlays
+  - `signal_adapter.py`: UnifiedSignal (Pydantic), KNN/DL adapters
+  - `risk_overlays/`: fatigue accumulation, liquidity congestion
+  - `drift_monitor.py`: feature drift detection
+- `research/` — pluggable ABCs + Phase C modules
   - `hnsw_distance.py`: HNSWIndex, 54.5× speedup, recall@50=0.9996 (SLE-47 ✓)
   - Enable: `EngineConfig(use_hnsw=True)` — default False (ball_tree unchanged)
-- `rebuild_phase_3z/` — Phase 3Z rebuild workspace (M1–M8 COMPLETE, 543 new tests)
-  - `fppe/pattern_engine/` — contracts, schemas, 5-stage PatternMatcher + Platt calibration
-  - `fppe/trading_system/` — SharedState, StrategyEvaluator, risk_overlays/, drift_monitor
+- `archive/legacy_v1/` — Pre-Phase-3Z legacy code (archived, do not modify)
+- `rebuild_phase_3z/` — Phase 3Z rebuild workspace (preserved for reference + parallel tests)
   - `artifacts/baselines/parity_snapshot.json` — frozen SLE-80-v1 snapshot
-  - Full campaign: `docs/campaigns/PHASE_3Z_CAMPAIGN.md`
-- `pattern-engine-v2.1.jsx` — React demo (standalone artifact)
 
 ## Critical Rules
 
-1. **Run tests first.** `python -m pytest tests/ rebuild_phase_3z/tests/ -q -m "not slow"` — 1139 tests, all must pass.
+1. **Run tests first.** `python -m pytest tests/ -q -m "not slow"` — 543 tests, all must pass.
 2. **Numbers require provenance.** Any claimed metric must trace to walk-forward results
    or experiment logs. If it cannot be traced, it is fabricated. No exceptions.
 3. **Do NOT modify `prepare.py` or this file** unless explicitly asked.
@@ -50,16 +52,17 @@ regime=binary, horizon=fwd_7d_up, stop_loss_atr_multiple=3.0
 ## Key Design Docs (read before modifying related code)
 
 - `docs/FPPE_TRADING_SYSTEM_DESIGN.md` v0.3 — Trading layer architecture
-- `docs/PHASE1_FILE_REVIEW.md` — Phase 1 bug audit (all fixed)
-- `docs/PHASE2_SYSTEM_DESIGN.md` — Phase 2 risk engine spec
+- `docs/campaigns/PHASE_3Z_CAMPAIGN.md` — Full Phase 3Z rebuild history (SLE-51–89)
 - `docs/CANDLESTICK_CATEGORIZATION_DESIGN.md` v0.2 — Future Phase 6
 
 ## Current Phase
 
-**Phase 3Z Rebuild** — COMPLETE. All milestones M1–M8 done.
-- 1139 tests total (596 legacy + 543 new). Run: `python -m pytest tests/ rebuild_phase_3z/tests/ -q -m "not slow"`
-- Platt calibration wired into `PatternMatcher.fit()` (SLE-89 ✓). `calibration_method` in EngineConfig.
-- **Next phase:** M9 (data ingestion scale-up) or production migration of `rebuild_phase_3z/fppe/` → root.
+**Production Migration** — COMPLETE. Phase 3Z rebuild promoted to root.
+- `pattern_engine/` and `trading_system/` are now the Phase 3Z production code.
+- Legacy code archived at `archive/legacy_v1/`. Operational scripts (live.py, overnight.py)
+  deferred to M9 (data ingestion scale-up).
+- Test suite: `python -m pytest tests/ -q -m "not slow"` → 543 tests.
+- **Next phase:** M9 (data ingestion scale-up — universe expansion to 8,000–12,000 tickers).
 
 ## Session Protocol
 

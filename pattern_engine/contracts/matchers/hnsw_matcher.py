@@ -130,7 +130,10 @@ class HNSWMatcher(BaseMatcher):
         k = n_neighbors if n_neighbors > 0 else self._n_neighbors
         k = min(k, self._n_samples)
 
-        # Set ef (query-time parameter): higher ef = better recall, slower query
+        # Set ef (query-time parameter): higher ef = better recall, slower query.
+        # k * 2 restored (was temporarily k * 4): M=32/ef=k*4 test 2026-03-24
+        # showed zero BSS improvement vs M=16/ef=k*2. Recall gap vs BallTree
+        # is statistical noise at current feature quality. Reverted to baseline.
         self._index.set_ef(max(k * 2, 100))
 
         # hnswlib requires float32

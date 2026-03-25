@@ -4,7 +4,7 @@
 
 **Goal:** Add four signal intelligence layers to FPPE — a Decision Journal (top-5/10/25 analogues), Sector Conviction Score, Momentum Agreement Filter, and Sentiment Veto — without changing the existing `query()` return signature or any locked settings.
 
-**Architecture:** All four features are flag-gated and non-intrusive: zero cost when disabled, no changes to the 6-tuple `query()` return, no locked-setting modifications. The Decision Journal adds a 5th training cache (`_train_dates_arr`) and a side-effect attribute (`matcher.last_journal`) populated after each `query()` call when `journal_top_n > 0`. The three signal filters (Sector Conviction, Momentum Agreement, Sentiment Veto) are post-processing steps that operate on the `query()` output tuple, keeping PatternMatcher itself unchanged.
+**Architecture:** All four features are flag-gated and non-intrusive: zero cost when disabled, no changes to the 6-tuple `query()` return, no locked-setting modifications. The Decision Journal adds a 5th training cache (`_train_dates_arr`) and a side-effect attribute (`matcher.last_journal`) populated after each `query()` call when `journal_top_n > 0`. The three signal filters (Sector Conviction, Momentum Agreement, Sentiment Veto) are post-processing steps that operate on the `query()` output tuple and all inherit from `SignalFilterBase` for a unified polymorphic `apply()` interface. `SignalPipeline` composes the active filters into a single dispatch point in `run_walkforward.py`, satisfying Single Responsibility: the script constructs the pipeline and calls `pipeline.run()`, with no per-filter branching logic.
 
 **Tech Stack:** Python 3.12, pandas, numpy, dataclasses, FMP MCP (sentiment veto only), pytest
 
@@ -14,13 +14,16 @@
 
 | File | Action | Responsibility |
 |------|--------|---------------|
-| `pattern_engine/journal.py` | CREATE | `JournalEntry` dataclass, Parquet/JSONL writer, `build_journal_entries()` helper |
-| `pattern_engine/sector_conviction.py` | CREATE | `SectorConvictionLayer` — per-sector base rate vs K-NN aggregate score |
-| `pattern_engine/momentum_signal.py` | CREATE | `MomentumSignalFilter` — ticker vs sector rolling return comparison |
-| `pattern_engine/sentiment_veto.py` | CREATE | `SentimentVetoFilter` — FMP news sentiment BUY veto |
+| `pattern_engine/signal_filter_base.py` | CREATE | `SignalFilterBase` ABC — unified `apply(probs, signals, val_db, **kwargs)` interface |
+| `pattern_engine/signal_pipeline.py` | CREATE | `SignalPipeline` — ordered filter chain runner; single dispatch point in `run_walkforward.py` |
+| `pattern_engine/journal.py` | CREATE | `JournalEntry` dataclass, `_normalize_date()` helper, Parquet writer, `build_journal_entries()` |
+| `pattern_engine/sector_conviction.py` | CREATE | `SectorConvictionLayer(SignalFilterBase)` — per-sector base rate vs K-NN aggregate score |
+| `pattern_engine/momentum_signal.py` | CREATE | `MomentumSignalFilter(SignalFilterBase)` — ticker vs sector rolling return comparison |
+| `pattern_engine/sentiment_veto.py` | CREATE | `SentimentVetoFilter(SignalFilterBase)` — FMP news sentiment BUY veto |
 | `pattern_engine/matcher.py` | MODIFY | Add `_train_dates_arr` cache in `_rebuild_caches()` + journal accumulation in `query()` loop |
-| `scripts/run_walkforward.py` | MODIFY | Add `journal_top_n=25` to `WalkForwardConfig`, write journal per fold, call sector conviction + momentum filters |
+| `scripts/run_walkforward.py` | MODIFY | `WalkForwardConfig` flags + per-fold journal write + `SignalPipeline` dispatch |
 | `scripts/query_journal.py` | CREATE | CLI inspection tool — filter by ticker/date/signal, show top-N analogues |
+| `tests/unit/test_signal_filter_base.py` | CREATE | Unit tests for `SignalFilterBase` ABC and `SignalPipeline` |
 | `tests/unit/test_journal.py` | CREATE | Unit tests for journal entry building, file output |
 | `tests/unit/test_sector_conviction.py` | CREATE | Unit tests for sector conviction layer |
 | `tests/unit/test_momentum_signal.py` | CREATE | Unit tests for momentum filter |
@@ -334,6 +337,21 @@ class JournalEntry:
     top_analogues: list[AnalogueRecord] = field(default_factory=list)
 
 
+def _normalize_date(val) -> date:
+    """Normalize any date-like value to datetime.date.
+
+    Handles pd.Timestamp, datetime.datetime, np.datetime64, datetime.date, and None.
+    Falls back to date(1900, 1, 1) for None or unrecognised types.
+    """
+    if hasattr(val, "date"):            # pd.Timestamp or datetime.datetime
+        return val.date()
+    if isinstance(val, np.datetime64):
+        return pd.Timestamp(val).date()
+    if val is None:
+        return date(1900, 1, 1)
+    return val                          # already a datetime.date
+
+
 def build_journal_entries(
     *,
     top_masks: np.ndarray,        # (B, n_probe) bool — survived filter
@@ -394,16 +412,7 @@ def build_journal_entries(
         analogues: list[AnalogueRecord] = []
         for rank, pos in enumerate(sorted_pos, start=1):
             train_idx = int(indices[i][pos])
-            raw_date = train_dates[train_idx]
-            # Normalize date to datetime.date
-            if hasattr(raw_date, "date"):
-                analogue_date: date = raw_date.date()
-            elif isinstance(raw_date, np.datetime64):
-                analogue_date = pd.Timestamp(raw_date).date()
-            elif raw_date is None:
-                analogue_date = date(1900, 1, 1)
-            else:
-                analogue_date = raw_date
+            analogue_date = _normalize_date(train_dates[train_idx])
 
             analogues.append(AnalogueRecord(
                 rank=rank,
@@ -414,16 +423,7 @@ def build_journal_entries(
                 fwd_return=float(train_returns[train_idx]),
             ))
 
-        # Normalize query date
-        raw_qdate = val_dates[i]
-        if hasattr(raw_qdate, "date"):
-            qdate: date = raw_qdate.date()
-        elif isinstance(raw_qdate, np.datetime64):
-            qdate = pd.Timestamp(raw_qdate).date()
-        elif raw_qdate is None:
-            qdate = date(1900, 1, 1)
-        else:
-            qdate = raw_qdate
+        qdate = _normalize_date(val_dates[i])
 
         entries.append(JournalEntry(
             query_date=qdate,
@@ -916,7 +916,246 @@ git commit -m "feat(journal): add query_journal.py CLI inspection tool"
 
 ---
 
-## Task 6: Sector Conviction Layer
+## Task 6: Create `SignalFilterBase` ABC and `SignalPipeline`
+
+**Context:** All three signal filters must share a common polymorphic interface so `SignalPipeline` can dispatch to any of them without knowing the concrete type (Interface Segregation Principle). `SignalPipeline` encapsulates the filter chain so `run_walkforward.py` only constructs and calls the pipeline rather than managing individual filter dispatches (Single Responsibility Principle).
+
+**Files:**
+- Create: `pattern_engine/signal_filter_base.py`
+- Create: `pattern_engine/signal_pipeline.py`
+- Create: `tests/unit/test_signal_filter_base.py`
+
+- [ ] **Step 1: Write failing tests**
+
+Create `tests/unit/test_signal_filter_base.py`:
+
+```python
+"""Tests for SignalFilterBase ABC and SignalPipeline."""
+import numpy as np
+import pandas as pd
+import pytest
+
+
+def test_signal_filter_base_is_abstract():
+    """SignalFilterBase cannot be instantiated directly."""
+    from pattern_engine.signal_filter_base import SignalFilterBase
+    with pytest.raises(TypeError):
+        SignalFilterBase()  # type: ignore
+
+
+def test_concrete_filter_without_apply_raises():
+    """Subclass that does not implement apply() raises TypeError on instantiation."""
+    from pattern_engine.signal_filter_base import SignalFilterBase
+
+    class IncompleteFilter(SignalFilterBase):
+        pass
+
+    with pytest.raises(TypeError):
+        IncompleteFilter()
+
+
+def test_signal_pipeline_applies_filters_in_order():
+    """SignalPipeline threads signals through each filter sequentially."""
+    from pattern_engine.signal_filter_base import SignalFilterBase
+    from pattern_engine.signal_pipeline import SignalPipeline
+
+    class NoOpFilter(SignalFilterBase):
+        def apply(self, probs, signals, val_db, **kwargs):
+            return list(signals), np.zeros(len(signals), dtype=bool)
+
+    class HoldAllFilter(SignalFilterBase):
+        def apply(self, probs, signals, val_db, **kwargs):
+            mask = np.array([s != "HOLD" for s in signals], dtype=bool)
+            return ["HOLD"] * len(signals), mask
+
+    pipeline = SignalPipeline(filters=[NoOpFilter(), HoldAllFilter()])
+    probs = np.array([0.70, 0.30])
+    signals = ["BUY", "SELL"]
+    val_db = pd.DataFrame({"Ticker": ["AAPL", "JPM"]})
+    filtered, mask = pipeline.run(probs, signals, val_db)
+    assert filtered == ["HOLD", "HOLD"]
+    assert mask.all()
+
+
+def test_signal_pipeline_combined_mask_is_union():
+    """combined_mask is the union of all per-filter masks."""
+    from pattern_engine.signal_filter_base import SignalFilterBase
+    from pattern_engine.signal_pipeline import SignalPipeline
+
+    class FilterFirst(SignalFilterBase):
+        def apply(self, probs, signals, val_db, **kwargs):
+            filtered = list(signals)
+            mask = np.zeros(len(signals), dtype=bool)
+            filtered[0] = "HOLD"
+            mask[0] = True
+            return filtered, mask
+
+    class FilterSecond(SignalFilterBase):
+        def apply(self, probs, signals, val_db, **kwargs):
+            filtered = list(signals)
+            mask = np.zeros(len(signals), dtype=bool)
+            filtered[1] = "HOLD"
+            mask[1] = True
+            return filtered, mask
+
+    pipeline = SignalPipeline(filters=[FilterFirst(), FilterSecond()])
+    probs = np.array([0.70, 0.68])
+    signals = ["BUY", "BUY"]
+    val_db = pd.DataFrame({"Ticker": ["AAPL", "JPM"]})
+    filtered, mask = pipeline.run(probs, signals, val_db)
+    assert filtered == ["HOLD", "HOLD"]
+    assert mask[0] and mask[1]
+```
+
+- [ ] **Step 2: Run tests — confirm failure**
+
+```bash
+PYTHONUTF8=1 py -3.12 -m pytest tests/unit/test_signal_filter_base.py -v 2>&1 | head -10
+```
+
+Expected: `ModuleNotFoundError: No module named 'pattern_engine.signal_filter_base'`
+
+- [ ] **Step 3: Implement `pattern_engine/signal_filter_base.py`**
+
+```python
+"""
+signal_filter_base.py — Abstract base class for all FPPE post-query signal filters.
+
+All signal filters (SectorConvictionLayer, MomentumSignalFilter, SentimentVetoFilter)
+inherit from SignalFilterBase and implement a unified apply() interface. This enables
+SignalPipeline to dispatch polymorphically without knowing the concrete filter type.
+
+Linear: M9 (Signal Intelligence Layer)
+"""
+from __future__ import annotations
+
+from abc import ABC, abstractmethod
+
+import numpy as np
+import pandas as pd
+
+
+class SignalFilterBase(ABC):
+    """Abstract base class for post-query signal filters.
+
+    Each filter receives the calibrated probabilities, current signals,
+    and the validation DataFrame, then returns a (possibly modified)
+    signal list alongside a boolean mask indicating changed positions.
+    """
+
+    @abstractmethod
+    def apply(
+        self,
+        probs: np.ndarray,
+        signals: list[str],
+        val_db: pd.DataFrame,
+        **kwargs,
+    ) -> tuple[list[str], np.ndarray]:
+        """Apply the filter to a set of signals.
+
+        Args:
+            probs:   (N,) calibrated probabilities from PatternMatcher.query().
+            signals: List of N signal strings ("BUY"/"SELL"/"HOLD").
+            val_db:  Validation DataFrame for this batch (must have Ticker).
+            **kwargs: Filter-specific extras (e.g. ``sentiment={}``).
+
+        Returns:
+            (filtered_signals, filter_mask):
+              filtered_signals: list[str] — signals after filtering.
+              filter_mask:      (N,) bool — True where this filter changed the signal.
+        """
+        ...
+```
+
+- [ ] **Step 4: Implement `pattern_engine/signal_pipeline.py`**
+
+```python
+"""
+signal_pipeline.py — Ordered filter chain for FPPE post-query signal processing.
+
+SignalPipeline runs a list of SignalFilterBase-compatible filters in sequence,
+accumulating a combined change mask. It is the single integration point between
+PatternMatcher.query() and the signal intelligence layer in run_walkforward.py.
+
+Usage:
+    pipeline = SignalPipeline(filters=[conviction_layer, mom_filter])
+    signals, combined_mask = pipeline.run(np.asarray(probs), signals, val_db)
+
+Linear: M9 (Signal Intelligence Layer)
+"""
+from __future__ import annotations
+
+import numpy as np
+import pandas as pd
+
+from pattern_engine.signal_filter_base import SignalFilterBase
+
+
+class SignalPipeline:
+    """Runs a sequence of SignalFilterBase filters in order.
+
+    Each filter receives the signals as modified by all prior filters.
+    The combined mask is the union of all per-filter change masks.
+
+    Args:
+        filters: Ordered list of SignalFilterBase instances.
+    """
+
+    def __init__(self, filters: list[SignalFilterBase]):
+        self.filters = filters
+
+    def run(
+        self,
+        probs: np.ndarray,
+        signals: list[str],
+        val_db: pd.DataFrame,
+        **kwargs,
+    ) -> tuple[list[str], np.ndarray]:
+        """Run all filters in sequence.
+
+        Args:
+            probs:   (N,) calibrated probabilities.
+            signals: Initial signal list.
+            val_db:  Validation DataFrame for this batch.
+            **kwargs: Forwarded to each filter's apply() call.
+
+        Returns:
+            (filtered_signals, combined_mask):
+              combined_mask is True wherever ANY filter changed a signal.
+        """
+        combined_mask = np.zeros(len(signals), dtype=bool)
+        for filt in self.filters:
+            signals, mask = filt.apply(probs, signals, val_db, **kwargs)
+            combined_mask |= mask
+        return signals, combined_mask
+```
+
+- [ ] **Step 5: Run tests — verify they pass**
+
+```bash
+PYTHONUTF8=1 py -3.12 -m pytest tests/unit/test_signal_filter_base.py -v 2>&1
+```
+
+Expected: `4 passed`
+
+- [ ] **Step 6: Run full suite**
+
+```bash
+PYTHONUTF8=1 py -3.12 -m pytest tests/ -q -m "not slow" 2>&1 | tail -5
+```
+
+Expected: `543 passed` (or 547 with new tests)
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add pattern_engine/signal_filter_base.py pattern_engine/signal_pipeline.py tests/unit/test_signal_filter_base.py
+git commit -m "feat(filters): add SignalFilterBase ABC and SignalPipeline"
+```
+
+---
+
+## Task 7: Sector Conviction Layer
 
 **Context:** For each K-NN query batch, compute the mean predicted probability per sector and compare to that sector's historical base rate. A sector where the K-NN engine agrees strongly (>2% above base rate) has "conviction". Sectors where K-NN barely beats the base rate can downgrade signal confidence.
 
@@ -931,6 +1170,8 @@ git commit -m "feat(journal): add query_journal.py CLI inspection tool"
 import numpy as np
 import pandas as pd
 import pytest
+
+# pd is used in test_conviction_filter_vetoes_weak_sector (val_db construction)
 
 
 def _make_train_db(n=100):
@@ -998,9 +1239,9 @@ def test_conviction_filter_vetoes_weak_sector():
     # JPM (Finance): prob=0.58 → lift=0.03 → below min_sector_lift → veto to HOLD
     probs = np.array([0.70, 0.58])
     signals = ["BUY", "BUY"]
-    tickers = np.array(["AAPL", "JPM"], dtype=object)
+    val_db = pd.DataFrame({"Ticker": ["AAPL", "JPM"]})
 
-    filtered_signals, veto_mask = layer.apply(probs, signals, tickers)
+    filtered_signals, veto_mask = layer.apply(probs, signals, val_db)
     assert filtered_signals[0] == "BUY"
     assert filtered_signals[1] == "HOLD"
     assert veto_mask[1] is True
@@ -1039,8 +1280,10 @@ import numpy as np
 import pandas as pd
 from typing import Dict, Tuple
 
+from pattern_engine.signal_filter_base import SignalFilterBase
 
-class SectorConvictionLayer:
+
+class SectorConvictionLayer(SignalFilterBase):
     """Post-query filter that vetoes signals in low-conviction sectors.
 
     A sector has conviction when the K-NN aggregate predicted probability
@@ -1090,18 +1333,15 @@ class SectorConvictionLayer:
         Returns:
             Dict mapping sector name -> mean probability for tickers in that sector.
         """
-        sectors = np.array([self.sector_map.get(str(t), "Unknown") for t in tickers])
-        result: Dict[str, float] = {}
-        for sector in np.unique(sectors):
-            mask = sectors == sector
-            result[sector] = float(np.mean(probs[mask]))
-        return result
+        sectors = pd.Series([self.sector_map.get(str(t), "Unknown") for t in tickers])
+        return pd.Series(probs).groupby(sectors).mean().to_dict()
 
     def apply(
         self,
         probs: np.ndarray,
         signals: list[str],
-        tickers: np.ndarray,
+        val_db: pd.DataFrame,
+        **kwargs,
     ) -> Tuple[list[str], np.ndarray]:
         """Veto BUY/SELL signals where sector conviction is insufficient.
 
@@ -1112,7 +1352,7 @@ class SectorConvictionLayer:
         Args:
             probs:   (N,) calibrated probabilities.
             signals: List of N signal strings ("BUY"/"SELL"/"HOLD").
-            tickers: (N,) ticker strings.
+            val_db:  Validation DataFrame (must have Ticker column).
 
         Returns:
             (filtered_signals, veto_mask):
@@ -1122,8 +1362,9 @@ class SectorConvictionLayer:
         if not self.sector_base_rates_:
             return signals, np.zeros(len(signals), dtype=bool)
 
+        tickers = val_db["Ticker"].values
         sector_scores = self.sector_scores(probs, tickers)
-        sectors = np.array([self.sector_map.get(str(t), "Unknown") for t in tickers])
+        sectors = pd.Series([self.sector_map.get(str(t), "Unknown") for t in tickers]).values
 
         filtered = list(signals)
         veto_mask = np.zeros(len(signals), dtype=bool)
@@ -1159,7 +1400,7 @@ git commit -m "feat(sector-conviction): add SectorConvictionLayer post-query fil
 
 ---
 
-## Task 7: Momentum Signal Filter
+## Task 8: Momentum Signal Filter
 
 **Context:** Require that the ticker's recent return is outperforming (for BUY) or underperforming (for SELL) its sector average. This is an independent confirmatory signal alongside K-NN.
 
@@ -1266,8 +1507,10 @@ from typing import Dict, Tuple
 import numpy as np
 import pandas as pd
 
+from pattern_engine.signal_filter_base import SignalFilterBase
 
-class MomentumSignalFilter:
+
+class MomentumSignalFilter(SignalFilterBase):
     """Filters signals where ticker momentum disagrees with the K-NN direction.
 
     For BUY: require ticker's lookback_col return > sector avg + min_outperformance.
@@ -1373,7 +1616,7 @@ git commit -m "feat(momentum): add MomentumSignalFilter K-NN agreement check"
 
 ---
 
-## Task 8: Sentiment Veto Filter
+## Task 9: Sentiment Veto Filter
 
 **Context:** Veto BUY signals for tickers with recent negative news sentiment from FMP MCP. For backtesting, accepts pre-fetched sentiment; for live trading, calls FMP MCP directly.
 
@@ -1435,6 +1678,20 @@ def test_missing_ticker_sentiment_neutral():
         np.array([0.70]), ["BUY"], ["UNKNOWN_TICKER"], {}
     )
     assert filtered[0] == "BUY"
+
+
+def test_apply_unified_interface():
+    """apply() satisfies SignalFilterBase interface — neutral sentiment means no veto."""
+    from pattern_engine.sentiment_veto import SentimentVetoFilter
+    import pandas as pd
+    filt = SentimentVetoFilter(veto_threshold=-0.20)
+    probs = np.array([0.70, 0.68])
+    signals = ["BUY", "BUY"]
+    val_db = pd.DataFrame({"Ticker": ["AAPL", "META"]})
+    # No sentiment kwarg provided → empty dict → neutral → no vetos
+    filtered, mask = filt.apply(probs, signals, val_db)
+    assert filtered == ["BUY", "BUY"]
+    assert not mask.any()
 ```
 
 - [ ] **Step 2: Implement `pattern_engine/sentiment_veto.py`**
@@ -1469,13 +1726,17 @@ Linear: M9 (Signal Intelligence Layer)
 """
 from __future__ import annotations
 
+import logging
 from datetime import date, timedelta
 from typing import Dict, Optional
 
 import numpy as np
+import pandas as pd
+
+from pattern_engine.signal_filter_base import SignalFilterBase
 
 
-class SentimentVetoFilter:
+class SentimentVetoFilter(SignalFilterBase):
     """Vetoes BUY signals when recent news sentiment is strongly negative.
 
     Negative sentiment confirms bearish thesis for SELL signals — those
@@ -1534,7 +1795,8 @@ class SentimentVetoFilter:
                 # and average the sentimentScore field over lookback_days
                 # This is a placeholder — wire to FMP MCP in live runner
                 scores[ticker] = 0.0  # neutral default until FMP wired
-            except Exception:
+            except (ConnectionError, TimeoutError, OSError, ValueError) as exc:
+                logging.warning("SentimentVetoFilter: failed to fetch %s: %s", ticker, exc)
                 scores[ticker] = 0.0  # neutral on error
 
         return scores
@@ -1574,6 +1836,35 @@ class SentimentVetoFilter:
                 filtered[i] = "HOLD"
 
         return filtered
+
+    def apply(
+        self,
+        probs: np.ndarray,
+        signals: list[str],
+        val_db: pd.DataFrame,
+        **kwargs,
+    ) -> tuple[list[str], np.ndarray]:
+        """Unified SignalFilterBase interface.
+
+        Wraps apply_with_sentiment() using sentiment from kwargs.
+        Pass sentiment={ticker: score} for live mode; omit for neutral (no veto).
+
+        Args:
+            probs:    (N,) calibrated probabilities.
+            signals:  List of N signal strings.
+            val_db:   Validation DataFrame (must have Ticker).
+            **kwargs: Optional ``sentiment`` dict override.
+
+        Returns:
+            (filtered_signals, veto_mask).
+        """
+        tickers = list(val_db["Ticker"].values)
+        sentiment: Dict[str, float] = kwargs.get("sentiment", {})
+        filtered = self.apply_with_sentiment(probs, signals, tickers, sentiment)
+        veto_mask = np.array(
+            [filtered[i] != signals[i] for i in range(len(signals))], dtype=bool
+        )
+        return filtered, veto_mask
 ```
 
 - [ ] **Step 3: Run tests**
@@ -1593,7 +1884,7 @@ git commit -m "feat(sentiment-veto): add SentimentVetoFilter with FMP MCP stub"
 
 ---
 
-## Task 9: Integration — wire filters into walk-forward script
+## Task 10: Integration — wire filters into walk-forward script
 
 **Context:** Add optional filter chain after `matcher.query()` in `run_walkforward.py`. Each filter is off by default (false/0 flags). Enable via config flags to test BSS impact.
 
@@ -1613,13 +1904,14 @@ sector_conviction_lift: float = 0.03  # min sector lift threshold
 momentum_min_outperformance: float = 0.015  # min ticker vs sector delta
 ```
 
-- [ ] **Step 2: Add filter chain in `run_fold()`**
+- [ ] **Step 2: Add `SignalPipeline` dispatch in `run_fold()`**
 
 After `probs, signals, _, n_matches, _, _ = matcher.query(val_db, verbose=0)`, add:
 
 ```python
-    # ── Optional signal intelligence filters ──────────────────────────────
+    # ── Optional signal intelligence filters (via SignalPipeline) ──────────
     signals = list(signals)  # ensure mutable list
+    _active_filters = []
 
     if getattr(cfg, 'use_sector_conviction', False):
         from pattern_engine.sector_conviction import SectorConvictionLayer
@@ -1629,16 +1921,12 @@ After `probs, signals, _, n_matches, _, _ = matcher.query(val_db, verbose=0)`, a
             min_sector_lift=getattr(cfg, 'sector_conviction_lift', 0.03),
         )
         conviction_layer.fit(train_db, target_col=cfg.projection_horizon)
-        val_tickers = np.asarray(val_db["Ticker"], dtype=object)
-        signals, _veto_mask = conviction_layer.apply(
-            np.asarray(probs), signals, val_tickers
-        )
+        _active_filters.append(conviction_layer)
 
     if getattr(cfg, 'use_momentum_filter', False):
         from pattern_engine.momentum_signal import MomentumSignalFilter
         from pattern_engine.sector import SECTOR_MAP
         # Use ret_7d if present (raw return), else ret_7d_norm (M9 vol-norm pipeline).
-        # Both exist in prepare.py output; ret_7d_norm is more comparable across tickers.
         _mom_col = "ret_7d" if "ret_7d" in val_db.columns else "ret_7d_norm"
         mom_filter = MomentumSignalFilter(
             SECTOR_MAP,
@@ -1646,7 +1934,12 @@ After `probs, signals, _, n_matches, _, _ = matcher.query(val_db, verbose=0)`, a
             min_outperformance=getattr(cfg, 'momentum_min_outperformance', 0.015),
         )
         mom_filter.fit(train_db)
-        signals, _agreed = mom_filter.apply(np.asarray(probs), signals, val_db)
+        _active_filters.append(mom_filter)
+
+    if _active_filters:
+        from pattern_engine.signal_pipeline import SignalPipeline
+        pipeline = SignalPipeline(filters=_active_filters)
+        signals, _ = pipeline.run(np.asarray(probs), signals, val_db)
 ```
 
 - [ ] **Step 3: Add filter count fields to result dict (keep existing keys)**
@@ -1690,25 +1983,25 @@ Expected: all tests pass (≥543)
 
 ```bash
 git add scripts/run_walkforward.py
-git commit -m "feat(filters): wire SectorConviction and MomentumFilter into walk-forward"
+git commit -m "feat(filters): wire SectorConviction and MomentumFilter via SignalPipeline"
 ```
 
 ---
 
-## Task 10: Final validation — run fwd_14d_up with journal enabled
+## Task 11: Final validation — run complete walk-forward with journal enabled
 
-**Context:** The background walk-forward is running (or has completed). This task validates the full pipeline end-to-end with `journal_top_n=25` enabled and verifies journal files are written correctly.
+**Context:** This task validates the full pipeline end-to-end with `journal_top_n=25` enabled and verifies journal files are written correctly.
 
 **Files:**
 - No new code — validation only
 
-- [ ] **Step 1: Verify current walk-forward output (check background task result)**
+- [ ] **Step 1: Verify all prior tasks are committed**
 
-Check if the background fwd_14d_up walk-forward completed. If not, run a quick Fold 6 test only.
+Run `git log --oneline -10` and confirm Tasks 2–10 commits are present.
 
-- [ ] **Step 2: Update `run_walkforward.py` projection_horizon (if fwd_14d_up not already set)**
+- [ ] **Step 2: Confirm locked horizon setting**
 
-Confirm `WalkForwardConfig.projection_horizon = "fwd_14d_up"` (set in previous session).
+Confirm `WalkForwardConfig.projection_horizon = "fwd_7d_up"` (locked setting per CLAUDE.md).
 
 - [ ] **Step 3: Run Fold 6 only to validate journal output (fast test, ~400s)**
 
@@ -1739,7 +2032,7 @@ Revert `FOLDS` to all 6 folds if modified. Run full walk-forward.
 
 ```bash
 git add docs/session-logs/
-git commit -m "feat(M9-signal-intelligence): complete decision journal, sector conviction, momentum filter, sentiment veto stub"
+git commit -m "feat(M9-signal-intelligence): complete journal, SignalFilterBase, SignalPipeline, sector conviction, momentum filter, sentiment veto"
 ```
 
 ---
@@ -1748,12 +2041,13 @@ git commit -m "feat(M9-signal-intelligence): complete decision journal, sector c
 
 | Module | Test File | Tests |
 |--------|-----------|-------|
+| signal_filter_base.py + signal_pipeline.py | tests/unit/test_signal_filter_base.py | 4 (abstract, incomplete, pipeline_order, pipeline_mask) |
 | journal.py | tests/unit/test_journal.py | 5 (entry, build_basic, top_n_cap, parquet_io, matcher_integration) |
 | sector_conviction.py | tests/unit/test_sector_conviction.py | 3 (fit, scores, filter_veto) |
 | momentum_signal.py | tests/unit/test_momentum_signal.py | 3 (fit, agree, disagree) |
-| sentiment_veto.py | tests/unit/test_sentiment_veto.py | 4 (negative, sell_pass, hold_pass, missing_neutral) |
+| sentiment_veto.py | tests/unit/test_sentiment_veto.py | 5 (negative, sell_pass, hold_pass, missing_neutral, apply_interface) |
 
-Total new tests: **15**. All existing 543 tests must continue to pass.
+Total new tests: **20**. All existing 543 tests must continue to pass.
 
 ---
 

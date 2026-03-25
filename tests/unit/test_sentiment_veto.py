@@ -62,3 +62,58 @@ def test_apply_unified_interface():
     filtered, mask = filt.apply(probs, signals, val_db)
     assert filtered == ["BUY", "BUY"]
     assert not mask.any()
+
+
+def test_fetch_sentiment_stub_returns_neutral():
+    """fetch_sentiment() delegates to _fetch_ticker() and returns 0.0 per ticker (stub)."""
+    from pattern_engine.sentiment_veto import SentimentVetoFilter
+    from datetime import date
+    filt = SentimentVetoFilter()
+    scores = filt.fetch_sentiment(["AAPL", "MSFT"], query_date=date(2024, 1, 5))
+    assert scores == {"AAPL": 0.0, "MSFT": 0.0}
+
+
+def test_circuit_breaker_raises_when_error_rate_exceeds_threshold():
+    """RuntimeError is raised when FMP failure rate exceeds circuit_breaker_threshold."""
+    from pattern_engine.sentiment_veto import SentimentVetoFilter
+    from datetime import date
+    from unittest.mock import patch
+    import pytest
+
+    filt = SentimentVetoFilter(circuit_breaker_threshold=0.30)
+
+    def always_fail(ticker, since_date):
+        raise ConnectionError("FMP MCP unreachable")
+
+    with patch.object(filt, "_fetch_ticker", side_effect=always_fail):
+        with pytest.raises(RuntimeError, match="Halting execution"):
+            filt.fetch_sentiment(
+                ["AAPL", "MSFT", "GOOG", "META"],
+                query_date=date(2024, 1, 5),
+            )
+
+
+def test_circuit_breaker_passes_when_error_rate_below_threshold():
+    """No exception raised when error rate is below threshold."""
+    from pattern_engine.sentiment_veto import SentimentVetoFilter
+    from datetime import date
+    from unittest.mock import patch
+
+    filt = SentimentVetoFilter(circuit_breaker_threshold=0.30)
+
+    call_count = {"n": 0}
+
+    def fail_first_only(ticker, since_date):
+        call_count["n"] += 1
+        if call_count["n"] == 1:
+            raise ConnectionError("one transient error")
+        return 0.0
+
+    # 1 failure in 4 tickers = 25% < 30% threshold — should NOT raise
+    with patch.object(filt, "_fetch_ticker", side_effect=fail_first_only):
+        scores = filt.fetch_sentiment(
+            ["AAPL", "MSFT", "GOOG", "META"],
+            query_date=date(2024, 1, 5),
+        )
+    assert scores["AAPL"] == 0.0
+    assert scores["MSFT"] == 0.0

@@ -57,48 +57,70 @@ class SentimentVetoFilter(SignalFilterBase):
         self,
         veto_threshold: float = -0.20,
         lookback_days: int = 3,
+        circuit_breaker_threshold: float = 0.30,
     ):
         self.veto_threshold = veto_threshold
         self.lookback_days = lookback_days
+        self.circuit_breaker_threshold = circuit_breaker_threshold
+
+    def _fetch_ticker(self, ticker: str, since_date) -> float:
+        """Fetch sentiment score for a single ticker.
+
+        Stub implementation returns 0.0 (neutral) until FMP MCP is wired.
+        In live usage, replace with:
+            news = mcp__fmp__stock_news(symbol=ticker, limit=20)
+            recent = [n for n in news if n["date"] >= str(since_date)]
+            return mean([n["sentimentScore"] for n in recent]) if recent else 0.0
+
+        Raises:
+            ConnectionError, TimeoutError, OSError, ValueError: on fetch failure.
+        """
+        return 0.0  # neutral default until FMP wired
 
     def fetch_sentiment(
         self,
         tickers: list[str],
         query_date: Optional[date] = None,
     ) -> Dict[str, float]:
-        """Fetch news sentiment scores from FMP MCP for a list of tickers.
+        """Fetch news sentiment scores for a list of tickers.
 
-        Queries the FMP stock-news endpoint for each ticker, averaging
-        sentiment over the past lookback_days. Returns a dict mapping
-        ticker -> mean sentiment score [-1.0, +1.0].
-
-        NOTE: This method requires FMP MCP to be configured. For backtesting,
-        use apply_with_sentiment() directly with pre-fetched data instead.
+        Calls _fetch_ticker() for each ticker and aggregates results.
+        If the failure rate exceeds circuit_breaker_threshold, raises
+        RuntimeError rather than silently returning all-neutral scores.
 
         Args:
             tickers:    List of ticker symbols (uppercase).
             query_date: Date to fetch sentiment for (defaults to today).
 
         Returns:
-            Dict[str, float]: ticker -> mean sentiment score.
-            Tickers with no news return 0.0 (neutral).
+            Dict[str, float]: ticker -> mean sentiment score [-1.0, +1.0].
+            Tickers with no news or transient errors return 0.0 (neutral),
+            provided the overall error rate stays below circuit_breaker_threshold.
+
+        Raises:
+            RuntimeError: If error_count / len(tickers) > circuit_breaker_threshold.
         """
         if query_date is None:
             query_date = date.today()
 
         since_date = query_date - timedelta(days=self.lookback_days)
         scores: Dict[str, float] = {}
+        error_count = 0
 
         for ticker in tickers:
             try:
-                # FMP MCP call — stock-news endpoint
-                # In live usage: call mcp__fmp__stock_news(symbol=ticker, limit=20)
-                # and average the sentimentScore field over lookback_days
-                # This is a placeholder — wire to FMP MCP in live runner
-                scores[ticker] = 0.0  # neutral default until FMP wired
+                scores[ticker] = self._fetch_ticker(ticker, since_date)
             except (ConnectionError, TimeoutError, OSError, ValueError) as exc:
                 logging.warning("SentimentVetoFilter: failed to fetch %s: %s", ticker, exc)
-                scores[ticker] = 0.0  # neutral on error
+                scores[ticker] = 0.0  # neutral on individual error
+                error_count += 1
+
+        if tickers and error_count / len(tickers) > self.circuit_breaker_threshold:
+            raise RuntimeError(
+                f"SentimentVetoFilter circuit breaker: {error_count}/{len(tickers)} "
+                f"fetch failures ({error_count / len(tickers):.0%}) exceed threshold "
+                f"{self.circuit_breaker_threshold:.0%}. Halting execution pipeline."
+            )
 
         return scores
 

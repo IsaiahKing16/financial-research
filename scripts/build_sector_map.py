@@ -180,9 +180,19 @@ def fetch_sp500() -> dict[str, str]:
 
 
 def validate_midcaps(candidates: list[str], batch_size: int = 100) -> list[str]:
-    """Bulk-validate tickers via yfinance 5-day download. Fast: 1 call per batch."""
-    print(f"\nValidating {len(candidates)} mid-cap candidates via yfinance...")
-    valid: list[str] = []
+    """Bulk-validate tickers via yfinance.
+
+    Two-pass gate:
+      1. Recent activity: 5-day download confirms ticker is currently trading.
+      2. 2010 historical depth: must have >= 14 rows in 2010-H1 so ATR(window=14)
+         works in prepare.py step 2/4.  Post-2010 IPOs (ABBV, META, PYPL, etc.)
+         are excluded here rather than crashing prepare.py.
+    """
+    MIN_2010_ROWS = 14
+
+    # ── Pass 1: currently active ──────────────────────────────────────────────
+    print(f"\nValidating {len(candidates)} mid-cap candidates via yfinance (pass 1: active)...")
+    active: list[str] = []
     for i in range(0, len(candidates), batch_size):
         batch = candidates[i:i + batch_size]
         try:
@@ -196,11 +206,36 @@ def validate_midcaps(candidates: list[str], batch_size: int = 100) -> list[str]:
                 cols = data["Close"].dropna(how="all", axis=1).columns.tolist()
             else:
                 cols = []
-            valid.extend(cols)
-            print(f"  Batch {i // batch_size + 1}: {len(cols)}/{len(batch)} valid")
+            active.extend(cols)
+            print(f"  Batch {i // batch_size + 1}: {len(cols)}/{len(batch)} active")
         except Exception as exc:
             print(f"  Batch {i // batch_size + 1} error: {exc}")
-    print(f"Valid mid-cap tickers: {len(valid)}")
+    print(f"Active mid-cap tickers: {len(active)}")
+
+    # ── Pass 2: 2010 historical depth ─────────────────────────────────────────
+    print(f"\nPass 2: 2010 depth gate (need >= {MIN_2010_ROWS} rows in 2010-H1)...")
+    valid: list[str] = []
+    for i in range(0, len(active), batch_size):
+        batch = active[i:i + batch_size]
+        try:
+            data = yf.download(
+                batch, start="2010-01-01", end="2010-06-30",
+                auto_adjust=True, progress=False, threads=True,
+            )
+            if data.empty:
+                cols = []
+            elif len(batch) == 1:
+                cols = batch if len(data) >= MIN_2010_ROWS else []
+            elif "Close" in data.columns:
+                close = data["Close"]
+                cols = close.columns[close.count() >= MIN_2010_ROWS].tolist()
+            else:
+                cols = []
+            valid.extend(cols)
+            print(f"  Batch {i // batch_size + 1}: {len(cols)}/{len(batch)} have 2010 data")
+        except Exception as exc:
+            print(f"  Batch {i // batch_size + 1} error: {exc}")
+    print(f"Valid mid-cap tickers (both gates): {len(valid)}")
     return valid
 
 

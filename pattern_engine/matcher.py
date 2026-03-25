@@ -134,6 +134,9 @@ class PatternMatcher:
         self._X_train_weighted: Optional[np.ndarray] = None   # stored for SAX
         self._active_overlays: list = []  # list[BaseRiskOverlay] — caller-managed
 
+        # Decision journal (populated after query() when journal_top_n > 0)
+        self.last_journal: list = []   # list[JournalEntry]
+
     # ──────────────────────────────────────────────────────────────────────────
     # Stage 1 — Feature preparation
     # ──────────────────────────────────────────────────────────────────────────
@@ -663,6 +666,9 @@ class PatternMatcher:
         all_mean_returns: list[float] = []
         all_ensembles: list = []
 
+        _j_top_n = getattr(cfg, 'journal_top_n', 0)
+        _batch_meta: list = []   # stores (top_mask, dist, idx, tickers_b, dates_b, raw_probs_b, start, end)
+
         start_time = time.time()
 
         for batch_start in range(0, n_val, cfg.batch_size):
@@ -709,6 +715,19 @@ class PatternMatcher:
             all_mean_returns.extend(ret_b.tolist())
             all_ensembles.extend(ens_b)
 
+            # Store batch metadata for journal (second pass after calibration)
+            if _j_top_n > 0:
+                _batch_meta.append((
+                    top_mask.copy(),
+                    distances_b.copy(),
+                    indices_b.copy(),
+                    val_tickers_arr[batch_start:batch_end].copy(),
+                    val_dates_arr[batch_start:batch_end].copy(),
+                    np.array(prob_b.tolist()),
+                    batch_start,
+                    batch_end,
+                ))
+
             # Progress reporting (matches production Matcher output format)
             if verbose and batch_end % 2000 < cfg.batch_size:
                 elapsed = time.time() - start_time
@@ -753,6 +772,32 @@ class PatternMatcher:
             out_probs = cal_probs
         else:
             out_probs = raw_probs
+
+        # Build decision journal from post-calibration signals (correct final state)
+        self.last_journal = []
+        if _j_top_n > 0 and _batch_meta:
+            from pattern_engine.journal import build_journal_entries
+            for (_tm, _dist, _idx, _tickers_b, _dates_b, _raw_b, _s, _e) in _batch_meta:
+                _final_sigs_b = list(all_signals)[_s:_e]
+                _cal_b = out_probs[_s:_e]
+                _nm_b = all_n_matches[_s:_e]
+                _entries = build_journal_entries(
+                    top_masks=_tm,
+                    distances=_dist,
+                    indices=_idx,
+                    val_tickers=_tickers_b,
+                    val_dates=_dates_b,
+                    raw_probs=_raw_b,
+                    cal_probs=_cal_b,
+                    signals=_final_sigs_b,
+                    n_matches=_nm_b,
+                    train_tickers=self._train_tickers_arr,
+                    train_dates=self._train_dates_arr,
+                    train_targets=self._train_target_arr,
+                    train_returns=self._train_ret_arr,
+                    top_n=_j_top_n,
+                )
+                self.last_journal.extend(_entries)
 
         return (
             out_probs,

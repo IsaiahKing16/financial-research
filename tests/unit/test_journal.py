@@ -146,3 +146,67 @@ def test_write_and_read_journal_parquet(tmp_path):
     assert len(view3) == 1
     with pytest.raises(ValueError):
         top_n_view(df, n=0)
+
+
+def test_matcher_populates_last_journal():
+    """PatternMatcher.last_journal is populated when journal_top_n > 0."""
+    import numpy as np
+    import pandas as pd
+    from datetime import date
+    from dataclasses import dataclass, field
+
+    @dataclass
+    class MockConfig:
+        top_k: int = 5
+        max_distance: float = 999.0
+        distance_weighting: str = "uniform"
+        feature_weights: dict = field(default_factory=dict)
+        batch_size: int = 256
+        confidence_threshold: float = 0.55
+        agreement_spread: float = 0.01
+        min_matches: int = 1
+        exclude_same_ticker: bool = False
+        same_sector_only: bool = False
+        regime_filter: bool = False
+        regime_fallback: bool = False
+        projection_horizon: str = "fwd_7d_up"
+        calibration_method: str = "none"
+        use_hnsw: bool = False
+        use_sax_filter: bool = False
+        use_wfa_rerank: bool = False
+        use_ib_compression: bool = False
+        journal_top_n: int = 5   # enable journal
+
+    from pattern_engine.matcher import PatternMatcher
+    rng = np.random.RandomState(0)
+    n = 20
+    train_db = pd.DataFrame({
+        "Ticker": ["AAPL"] * n,
+        "Date": pd.date_range("2020-01-01", periods=n),
+        "ret_1d": rng.randn(n) * 0.01,
+        "ret_3d": rng.randn(n) * 0.02,
+        "fwd_7d_up": (rng.rand(n) > 0.5).astype(int),
+        "fwd_7d": rng.randn(n) * 0.03,
+    })
+    val_db = pd.DataFrame({
+        "Ticker": ["MSFT"] * 3,
+        "Date": pd.date_range("2024-01-01", periods=3),
+        "ret_1d": rng.randn(3) * 0.01,
+        "ret_3d": rng.randn(3) * 0.02,
+        "fwd_7d_up": [1, 0, 1],
+        "fwd_7d": [0.02, -0.01, 0.03],
+    })
+
+    cfg = MockConfig()
+    matcher = PatternMatcher(cfg)
+    matcher.fit(train_db, ["ret_1d", "ret_3d"])
+    matcher.query(val_db, verbose=0)
+
+    assert hasattr(matcher, "last_journal")
+    # last_journal contains only BUY/SELL entries (HOLDs are skipped)
+    for entry in matcher.last_journal:
+        assert entry.signal in ("BUY", "SELL")
+        assert len(entry.top_analogues) <= 5
+        for a in entry.top_analogues:
+            assert a.rank >= 1
+            assert a.ticker == "AAPL"

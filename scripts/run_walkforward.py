@@ -99,6 +99,12 @@ class WalkForwardConfig:
     use_wfa_rerank: bool = False
     use_ib_compression: bool = False
     journal_top_n: int = 25   # 0=disabled, 5/10/25=capture top-N analogues per BUY/SELL
+    # Signal intelligence filters (M9)
+    use_sector_conviction: bool = False   # SectorConvictionLayer
+    use_momentum_filter: bool = False     # MomentumSignalFilter
+    use_sentiment_veto: bool = False      # SentimentVetoFilter (live only)
+    sector_conviction_lift: float = 0.03  # min sector lift threshold
+    momentum_min_outperformance: float = 0.015  # min ticker vs sector delta
 
 
 # ── Walk-forward fold definitions (expanding training window) ─────────────────
@@ -149,7 +155,8 @@ def run_fold(full_db: pd.DataFrame, fold: dict, cfg: WalkForwardConfig) -> dict:
     if len(val_db) == 0:
         return {"label": fold["label"], "bss": float("nan"), "accuracy": float("nan"),
                 "n_train": len(train_db), "n_val": 0, "avg_k": 0.0,
-                "buy": 0, "sell": 0, "hold": 0}
+                "buy": 0, "sell": 0, "hold": 0,
+                "buy_after_filter": 0, "sell_after_filter": 0, "hold_after_filter": 0}
 
     matcher = PatternMatcher(cfg)
     matcher.fit(train_db, FEATURE_COLS)
@@ -166,6 +173,37 @@ def run_fold(full_db: pd.DataFrame, fold: dict, cfg: WalkForwardConfig) -> dict:
         write_journal_parquet(matcher.last_journal, _jpath)
         print(f"  Journal: {len(matcher.last_journal)} BUY/SELL entries -> {_jpath.name}")
 
+    # ── Optional signal intelligence filters (via SignalPipeline) ──────────
+    signals = list(signals)  # ensure mutable list
+    _active_filters = []
+
+    if getattr(cfg, 'use_sector_conviction', False):
+        from pattern_engine.sector_conviction import SectorConvictionLayer
+        from pattern_engine.sector import SECTOR_MAP
+        conviction_layer = SectorConvictionLayer(
+            SECTOR_MAP,
+            min_sector_lift=getattr(cfg, 'sector_conviction_lift', 0.03),
+        )
+        conviction_layer.fit(train_db, target_col=cfg.projection_horizon)
+        _active_filters.append(conviction_layer)
+
+    if getattr(cfg, 'use_momentum_filter', False):
+        from pattern_engine.momentum_signal import MomentumSignalFilter
+        from pattern_engine.sector import SECTOR_MAP
+        _mom_col = "ret_7d" if "ret_7d" in val_db.columns else "ret_7d_norm"
+        mom_filter = MomentumSignalFilter(
+            SECTOR_MAP,
+            lookback_col=_mom_col,
+            min_outperformance=getattr(cfg, 'momentum_min_outperformance', 0.015),
+        )
+        mom_filter.fit(train_db)
+        _active_filters.append(mom_filter)
+
+    if _active_filters:
+        from pattern_engine.signal_pipeline import SignalPipeline
+        pipeline = SignalPipeline(filters=_active_filters)
+        signals, _ = pipeline.run(np.asarray(probs), signals, val_db)
+
     probs_arr = np.asarray(probs)
     y_true    = val_db[cfg.projection_horizon].values.astype(np.float64)
 
@@ -179,6 +217,10 @@ def run_fold(full_db: pd.DataFrame, fold: dict, cfg: WalkForwardConfig) -> dict:
         "buy":      int(np.sum(np.array(signals) == "BUY")),
         "sell":     int(np.sum(np.array(signals) == "SELL")),
         "hold":     int(np.sum(np.array(signals) == "HOLD")),
+        # post-filter counts (same as buy/sell/hold when filters are off)
+        "buy_after_filter":  int(np.sum(np.array(signals) == "BUY")),
+        "sell_after_filter": int(np.sum(np.array(signals) == "SELL")),
+        "hold_after_filter": int(np.sum(np.array(signals) == "HOLD")),
     }
 
 

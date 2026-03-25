@@ -121,6 +121,7 @@ class PatternMatcher:
         self._train_sector_arr: Optional[np.ndarray] = None
         self._train_target_arr: Optional[np.ndarray] = None
         self._train_ret_arr: Optional[np.ndarray] = None
+        self._train_dates_arr: Optional[np.ndarray] = None
 
         # Platt calibrator (SLE-89): None until fit() runs the double-pass.
         # query() returns raw probs if None; applies transform() otherwise.
@@ -191,7 +192,11 @@ class PatternMatcher:
 
         if cfg.use_hnsw:
             from pattern_engine.contracts.matchers.hnsw_matcher import HNSWMatcher
-            self._backend = HNSWMatcher(n_neighbors=n_probe)
+            # M=16 (default). M=32 tested 2026-03-24: +39% build time, zero BSS
+            # improvement (D: -0.000099 unchanged). Recall gap vs BallTree is
+            # statistical noise, not missing neighbours. Revert to M=16.
+            _hnsw_M = getattr(cfg, 'hnsw_M', 16)
+            self._backend = HNSWMatcher(n_neighbors=n_probe, M=_hnsw_M)
         else:
             self._backend = BallTreeMatcher(n_neighbors=n_probe)
 
@@ -521,10 +526,33 @@ class PatternMatcher:
         _cal_method = getattr(cfg, 'calibration_method', 'platt')
         self._calibrator = None  # sentinel: self.query() returns raw probs below
         if _cal_method not in ('none', None):
+            # cal_frac (default 0.76): sample a fraction of training rows for the
+            # calibration double-pass.  Platt scaling (logistic regression) reaches
+            # stable estimates with ~10k–50k samples; querying the full training set
+            # costs proportionally more time with negligible calibration benefit.
+            # cal_max_samples (default 100_000): absolute cap so the calibration
+            # cost stays constant regardless of universe size.  cal_frac was locked
+            # at 0.76 for a 52-ticker universe (~110k training rows → ~83k cal rows);
+            # at 585 tickers the same ratio produces 1.9M cal rows — 23× more than
+            # needed for stable Platt estimates.
+            _cal_frac = getattr(cfg, 'cal_frac', 0.76)
+            _cal_max = getattr(cfg, 'cal_max_samples', 100_000)
+            _n_train = len(train_db)
+            _n_cal = max(1000, min(int(_cal_frac * _n_train), _cal_max))
+            if _n_cal < _n_train:
+                _rng = np.random.RandomState(42)
+                _cal_idx = _rng.choice(_n_train, size=_n_cal, replace=False)
+                _cal_db = train_db.iloc[_cal_idx]
+            else:
+                _cal_db = train_db
             _cal_raw_probs, _, _, _, _, _ = self.query(
-                train_db, regime_labeler=regime_labeler, verbose=0
+                _cal_db, regime_labeler=regime_labeler, verbose=0
             )
-            _y_true = self._train_target_arr
+            _y_true = (
+                _cal_db[cfg.projection_horizon].values.astype(np.float64)
+                if cfg.projection_horizon in _cal_db.columns
+                else np.zeros(_n_cal, dtype=np.float64)
+            )
             self._calibrator = _PlattCalibrator().fit(_cal_raw_probs, _y_true)
 
         return self
@@ -557,6 +585,11 @@ class PatternMatcher:
             train_db[ret_col].values.astype(np.float64)
             if ret_col in train_db.columns
             else np.zeros(len(train_db), dtype=np.float64)
+        )
+        self._train_dates_arr = (
+            train_db["Date"].values
+            if "Date" in train_db.columns
+            else np.array([None] * len(train_db))
         )
 
     def query(

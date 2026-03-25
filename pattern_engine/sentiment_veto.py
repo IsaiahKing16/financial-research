@@ -63,7 +63,7 @@ class SentimentVetoFilter(SignalFilterBase):
         self.lookback_days = lookback_days
         self.circuit_breaker_threshold = circuit_breaker_threshold
 
-    def _fetch_ticker(self, ticker: str, since_date) -> float:
+    def _fetch_ticker(self, ticker: str, since_date: date) -> float:
         """Fetch sentiment score for a single ticker.
 
         Stub implementation returns 0.0 (neutral) until FMP MCP is wired.

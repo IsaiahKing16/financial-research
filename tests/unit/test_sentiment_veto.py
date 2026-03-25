@@ -78,7 +78,6 @@ def test_circuit_breaker_raises_when_error_rate_exceeds_threshold():
     from pattern_engine.sentiment_veto import SentimentVetoFilter
     from datetime import date
     from unittest.mock import patch
-    import pytest
 
     filt = SentimentVetoFilter(circuit_breaker_threshold=0.30)
 
@@ -117,3 +116,5 @@ def test_circuit_breaker_passes_when_error_rate_below_threshold():
         )
     assert scores["AAPL"] == 0.0
     assert scores["MSFT"] == 0.0
+    assert scores["GOOG"] == 0.0
+    assert scores["META"] == 0.0

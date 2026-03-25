@@ -160,7 +160,6 @@ def run_fold(full_db: pd.DataFrame, fold: dict, cfg: WalkForwardConfig) -> dict:
     _j_top_n = getattr(cfg, 'journal_top_n', 0)
     if _j_top_n > 0 and matcher.last_journal:
         from pattern_engine.journal import write_journal_parquet
-        from pathlib import Path
         _jdir = REPO_ROOT / "results" / "journals"
         _jdir.mkdir(parents=True, exist_ok=True)
         _jpath = _jdir / f"journal_fold_{fold['label'].replace(' ', '_')}.parquet"

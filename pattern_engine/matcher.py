@@ -723,7 +723,7 @@ class PatternMatcher:
                     indices_b.copy(),
                     val_tickers_arr[batch_start:batch_end].copy(),
                     val_dates_arr[batch_start:batch_end].copy(),
-                    np.array(prob_b.tolist()),
+                    prob_b.copy(),
                     batch_start,
                     batch_end,
                 ))
@@ -778,7 +778,7 @@ class PatternMatcher:
         if _j_top_n > 0 and _batch_meta:
             from pattern_engine.journal import build_journal_entries
             for (_tm, _dist, _idx, _tickers_b, _dates_b, _raw_b, _s, _e) in _batch_meta:
-                _final_sigs_b = list(all_signals)[_s:_e]
+                _final_sigs_b = all_signals[_s:_e]
                 _cal_b = out_probs[_s:_e]
                 _nm_b = all_n_matches[_s:_e]
                 _entries = build_journal_entries(

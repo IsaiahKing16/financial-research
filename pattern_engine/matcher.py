@@ -551,7 +551,7 @@ class PatternMatcher:
             _y_true = (
                 _cal_db[cfg.projection_horizon].values.astype(np.float64)
                 if cfg.projection_horizon in _cal_db.columns
-                else np.zeros(_n_cal, dtype=np.float64)
+                else np.zeros(len(_cal_db), dtype=np.float64)
             )
             self._calibrator = _PlattCalibrator().fit(_cal_raw_probs, _y_true)
 

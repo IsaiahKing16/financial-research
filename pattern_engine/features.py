@@ -18,6 +18,15 @@ import numpy as np
 RETURNS_ONLY_COLS: list[str] = [f"ret_{w}d" for w in [1, 3, 7, 14, 30, 45, 60, 90]]
 """Canonical 8-feature return fingerprint. Locked setting — do not change."""
 
+VOL_NORM_COLS: list[str] = [f"ret_{w}d_norm" for w in [1, 3, 7, 14, 30, 45, 60, 90]]
+"""Volatility-normalized return fingerprint (M9).
+
+Each feature = ret_Xd / rolling_std(daily_returns, window=X).
+Dimensionless Sharpe-like ratio — comparable across tickers with different
+volatility regimes (large-cap vs mid-cap). Requires prepare.py re-run.
+Candidate to replace RETURNS_ONLY_COLS once walk-forward confirms improvement.
+"""
+
 
 def get_feature_cols(feature_set: str) -> list[str]:
     """Resolve feature column names for a given feature set.

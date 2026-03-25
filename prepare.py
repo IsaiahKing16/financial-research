@@ -49,23 +49,9 @@ DATA_DIR = Path("data")
 MODEL_DIR = Path("models")
 RESULTS_DIR = Path("results")
 
-# 52 tickers across 6 sectors
-TICKERS = [
-    # Tech (21)
-    "SPY", "QQQ", "AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META", "TSLA",
-    "AVGO", "ORCL", "ADBE", "CRM", "AMD", "NFLX", "INTC", "CSCO", "QCOM",
-    "TXN", "MU", "PYPL",
-    # Finance (9)
-    "JPM", "BAC", "WFC", "GS", "MS", "V", "MA", "AXP", "BRK-B",
-    # Healthcare (10)
-    "LLY", "UNH", "JNJ", "ABBV", "MRK", "PFE", "TMO", "ISRG", "AMGN", "GILD",
-    # Consumer (6)
-    "WMT", "COST", "PG", "KO", "PEP", "HD",
-    # Industrial (4)
-    "DIS", "CAT", "BA", "GE",
-    # Energy (2)
-    "XOM", "CVX",
-]
+# Load from sector.py (800 tickers, Russell 1000 scope)
+from pattern_engine.sector import TICKERS
+
 
 # Multi-timeframe return windows (the core of the analogue matching)
 RETURN_WINDOWS = [1, 3, 7, 14, 30, 45, 60, 90]
@@ -189,6 +175,42 @@ def compute_supplementary_features(df):
     return df
 
 
+def compute_vol_normalized_features(df):
+    """
+    Volatility-normalized return fingerprint (M9 feature set).
+
+    Divides each ret_Xd by its own-window realized daily volatility,
+    producing a dimensionless Sharpe-like ratio that is directly
+    comparable across tickers with different volatility regimes.
+
+    Formula: ret_Xd_norm = ret_Xd / (rolling_std(daily_returns, window=X) + 1e-8)
+
+    Motivation: raw ret_Xd = +3% means "normal day" for NVDA (high-vol) but
+    "exceptional event" for JNJ (low-vol). K-NN matching on raw magnitudes
+    produces spurious cross-ticker analogues. The normalized version ensures
+    two tickers with the same fingerprint truly experienced analogous momentum
+    profiles relative to their own volatility baseline.
+
+    Diagnostic provenance: diagnose_signal.py 2026-03-24 — all conditions
+    (platt/none × 585T/52T) showed negative BSS; root cause identified as
+    raw magnitude features not normalizing across heterogeneous market caps.
+    """
+    df = df.copy()
+    daily_returns = df["Close"].pct_change()
+
+    for w in RETURN_WINDOWS:
+        # Use max(w, 5) as minimum window: rolling(1).std(ddof=1) is always NaN
+        # (std undefined for n=1). A 5-day minimum gives a stable vol estimate
+        # for the short windows (ret_1d, ret_3d) while keeping per-window
+        # normalization for longer windows (ret_7d and above).
+        vol_window = max(w, 5)
+        rolling_vol = daily_returns.rolling(vol_window, min_periods=2).std()
+        raw_norm = df[f"ret_{w}d"] / (rolling_vol + 1e-8)
+        df[f"ret_{w}d_norm"] = raw_norm.clip(-10.0, 10.0)
+
+    return df
+
+
 def compute_candlestick_features(df):
     """
     Continuous proportional candlestick microstructure encoding.
@@ -243,6 +265,7 @@ def compute_candlestick_features(df):
 
 # The full feature vector used for matching
 RETURN_COLS = [f"ret_{w}d" for w in RETURN_WINDOWS]
+VOL_NORM_COLS = [f"ret_{w}d_norm" for w in RETURN_WINDOWS]  # M9: vol-normalized fingerprint
 SUPPLEMENT_COLS = ["vol_10d", "vol_30d", "vol_ratio", "vol_abnormal",
                    "rsi_14", "atr_14", "price_vs_sma20", "price_vs_sma50"]
 CANDLE_COLS = ["candle_body_to_range", "candle_upper_wick_ratio",
@@ -250,7 +273,8 @@ CANDLE_COLS = ["candle_body_to_range", "candle_upper_wick_ratio",
                "candle_body_lower_ratio", "candle_direction"]
 FEATURE_COLS = RETURN_COLS + SUPPLEMENT_COLS
 # CANDLE_COLS are available but NOT in FEATURE_COLS by default.
-# To test: pass feature_cols_override=RETURN_COLS + CANDLE_COLS in strategy.py sweeps.
+# VOL_NORM_COLS stored in parquet for PatternMatcher to use with VOL_NORM_COLS feature set.
+# To test: set FEATURE_COLS = VOL_NORM_COLS in scripts/run_walkforward.py.
 NUM_FEATURES = len(FEATURE_COLS)
 
 # Forward target columns
@@ -278,11 +302,12 @@ def build_analogue_database(all_data):
         print(f"  Processing {ticker}...")
         df = compute_return_vector(df, ticker)
         df = compute_supplementary_features(df)
-        df = compute_candlestick_features(df)  # intra-bar microstructure (Gemini rec)
+        df = compute_vol_normalized_features(df)   # M9: vol-normalized fingerprint
+        df = compute_candlestick_features(df)      # intra-bar microstructure (Gemini rec)
 
         # Keep only rows with complete data (need 90 days trailing + forward windows)
-        # Open/High/Low saved for candlestick feature computation in strategy.py sweeps
-        required_cols = (FEATURE_COLS + CANDLE_COLS + FORWARD_RETURN_COLS +
+        # VOL_NORM_COLS and CANDLE_COLS stored for PatternMatcher feature-set switching.
+        required_cols = (FEATURE_COLS + VOL_NORM_COLS + CANDLE_COLS + FORWARD_RETURN_COLS +
                          FORWARD_BINARY_COLS + ["Date", "Ticker", "Open", "High", "Low", "Close"])
         subset = df[required_cols].dropna().reset_index(drop=True)
 

@@ -98,7 +98,7 @@ class WalkForwardConfig:
     use_sax_filter: bool = False
     use_wfa_rerank: bool = False
     use_ib_compression: bool = False
-    journal_top_n: int = 0   # 0=disabled, 5/10/25=capture top-N analogues per BUY/SELL
+    journal_top_n: int = 25   # 0=disabled, 5/10/25=capture top-N analogues per BUY/SELL
 
 
 # ── Walk-forward fold definitions (expanding training window) ─────────────────
@@ -155,6 +155,18 @@ def run_fold(full_db: pd.DataFrame, fold: dict, cfg: WalkForwardConfig) -> dict:
     matcher.fit(train_db, FEATURE_COLS)
 
     probs, signals, _, n_matches, _, _ = matcher.query(val_db, verbose=0)
+
+    # Write decision journal for this fold (BUY/SELL signals only)
+    _j_top_n = getattr(cfg, 'journal_top_n', 0)
+    if _j_top_n > 0 and matcher.last_journal:
+        from pattern_engine.journal import write_journal_parquet
+        from pathlib import Path
+        _jdir = REPO_ROOT / "results" / "journals"
+        _jdir.mkdir(parents=True, exist_ok=True)
+        _jpath = _jdir / f"journal_fold_{fold['label'].replace(' ', '_')}.parquet"
+        write_journal_parquet(matcher.last_journal, _jpath)
+        print(f"  Journal: {len(matcher.last_journal)} BUY/SELL entries -> {_jpath.name}")
+
     probs_arr = np.asarray(probs)
     y_true    = val_db[cfg.projection_horizon].values.astype(np.float64)
 

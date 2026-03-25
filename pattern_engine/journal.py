@@ -48,7 +48,11 @@ def _normalize_date(val) -> date:
         return pd.Timestamp(val).date()
     if val is None:
         return date(1900, 1, 1)
-    return val
+    if isinstance(val, date):
+        return val
+    raise RuntimeError(
+        f"_normalize_date: unrecognized type {type(val)!r} — value={val!r}"
+    )
 
 
 def build_journal_entries(
@@ -92,6 +96,11 @@ def build_journal_entries(
         analogues: list[AnalogueRecord] = []
         for rank, pos in enumerate(sorted_pos, start=1):
             train_idx = int(indices[i][pos])
+            if train_idx >= len(train_tickers):
+                raise RuntimeError(
+                    f"build_journal_entries: train_idx={train_idx} out of bounds "
+                    f"(len={len(train_tickers)}) at query row {i}, probe pos {pos}"
+                )
             analogues.append(AnalogueRecord(
                 rank=rank,
                 ticker=str(train_tickers[train_idx]),
@@ -141,6 +150,15 @@ def write_journal_parquet(entries: list[JournalEntry], path: Path | str) -> None
             "analogue_date", "analogue_distance", "analogue_label",
             "analogue_fwd_return",
         ])
+        df = df.astype({
+            "raw_prob": "float64",
+            "calibrated_prob": "float64",
+            "n_matches": "int64",
+            "analogue_rank": "int64",
+            "analogue_distance": "float64",
+            "analogue_label": "int64",
+            "analogue_fwd_return": "float64",
+        })
     else:
         df = pd.DataFrame(rows)
 

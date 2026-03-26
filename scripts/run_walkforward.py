@@ -103,7 +103,7 @@ class WalkForwardConfig:
     use_sector_conviction: bool = False   # SectorConvictionLayer
     use_momentum_filter: bool = False     # MomentumSignalFilter
     use_sentiment_veto: bool = False      # SentimentVetoFilter (live only)
-    sector_conviction_lift: float = 0.03  # min sector lift threshold
+    sector_conviction_lift: float = 0.005  # min sector lift threshold (calibrated: 585T universe)
     momentum_min_outperformance: float = 0.015  # min ticker vs sector delta
 
 
@@ -182,7 +182,7 @@ def run_fold(full_db: pd.DataFrame, fold: dict, cfg: WalkForwardConfig) -> dict:
         from pattern_engine.sector import SECTOR_MAP
         conviction_layer = SectorConvictionLayer(
             SECTOR_MAP,
-            min_sector_lift=getattr(cfg, 'sector_conviction_lift', 0.03),
+            min_sector_lift=getattr(cfg, 'sector_conviction_lift', 0.005),
         )
         conviction_layer.fit(train_db, target_col=cfg.projection_horizon)
         _active_filters.append(conviction_layer)

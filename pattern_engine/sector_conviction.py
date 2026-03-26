@@ -10,7 +10,7 @@ on individual ticker signals alone, require that the sector context supports
 the direction.
 
 Usage (post-query filter):
-    layer = SectorConvictionLayer(SECTOR_MAP, min_sector_lift=0.03)
+    layer = SectorConvictionLayer(SECTOR_MAP, min_sector_lift=0.005)
     layer.fit(train_db, target_col=cfg.projection_horizon)
     filtered_signals, veto_mask = layer.apply(probs, signals, val_tickers)
 
@@ -36,10 +36,10 @@ class SectorConvictionLayer(SignalFilterBase):
     Args:
         sector_map:       ticker -> sector name mapping (SECTOR_MAP from sector.py).
         min_sector_lift:  Minimum excess probability over base rate required
-                          to retain signals. Default 0.03 (3 percentage points).
+                          to retain signals. Default 0.005 (0.5pp — calibrated for 585T universe).
     """
 
-    def __init__(self, sector_map: Dict[str, str], min_sector_lift: float = 0.03):
+    def __init__(self, sector_map: Dict[str, str], min_sector_lift: float = 0.005):
         self.sector_map = sector_map
         self.min_sector_lift = min_sector_lift
         self.sector_base_rates_: Dict[str, float] = {}

@@ -282,6 +282,19 @@ class TestRegimeLabeler:
         labels = labeler.label(query_db)
         assert labels[0] == 0
 
+    # ── fit raises when spy_ticker missing ───────────────────────────
+
+    def test_fit_raises_when_spy_ticker_missing(self):
+        """fit() raises RuntimeError when spy_ticker not in reference_db."""
+        labeler = RegimeLabeler(spy_ticker="SPY")
+        db_no_spy = pd.DataFrame({
+            "Ticker": ["AAPL", "MSFT"],
+            "Date": pd.to_datetime(["2023-01-03", "2023-01-03"]),
+            "ret_90d": [0.05, 0.03],
+        })
+        with pytest.raises(RuntimeError, match="no rows found"):
+            labeler.fit(db_no_spy)
+
     # ── fit returns self ──────────────────────────────────────────────
 
     def test_fit_returns_self(self):

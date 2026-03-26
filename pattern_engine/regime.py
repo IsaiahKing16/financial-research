@@ -3,8 +3,9 @@ regime.py — Multi-factor market regime labeler for FPPE pattern matching.
 
 Labels each observation as Bull (1) or Bear (0) using:
   Base signal:  SPY 90-day trailing return (positive → Bull, negative → Bear)
-  Override 1:   VIX daily change z-score > vix_spike_zscore → Bear
-                (detects volatility regime shifts independent of SPY trend)
+  Override 1: VIX daily change z-score relative to rolling mean+std > vix_spike_zscore → Bear
+    (rolling mean normalizes for trending VIX; detects sudden spikes above recent baseline)
+    NOTE: vix_spike_zscore=1.0 default is not walk-forward validated — tune before production use.
   Override 2:   10Y-2Y yield spread < 0 → Bear
                 (inverted yield curve as recession/risk-off signal)
 
@@ -18,6 +19,9 @@ Usage:
     labeler.fit(train_db)
     labels = labeler.label(val_db)
     # Pass to PatternMatcher.fit()/query() to enable regime filtering
+
+Known limitation: SPY regime for out-of-sample dates is forward-filled from the
+last training date. Ensure validation dates are close to the training cutoff.
 
 Linear: M9 (Signal Intelligence Layer)
 """
@@ -62,9 +66,12 @@ class RegimeLabeler:
         provided, activates the yield-curve override and sets
         ``mode = "multi_factor"``.
     vix_spike_zscore:
-        Z-score threshold for the VIX-spike override.  Daily VIX changes whose
-        rolling z-score exceeds this value trigger a Bear override.
-        Default ``1.0``.
+        Z-score threshold for VIX daily-change spike detection.
+        A day's VIX change is z-scored against the rolling (mean, std) of the
+        prior `vix_spike_window` days' changes. If z-score > this threshold,
+        the regime is overridden to Bear regardless of SPY direction.
+        Default 1.0 is a suggested starting point — not yet walk-forward validated.
+        Tune via experiment before enabling in production (regime_filter=True).
     vix_spike_window:
         Rolling window (in trading days) used to compute the VIX-change
         z-score.  Default ``20``.
@@ -117,6 +124,11 @@ class RegimeLabeler:
         """
         # Extract SPY ret_90d series indexed by Date
         spy_rows = reference_db[reference_db["Ticker"] == self.spy_ticker].copy()
+        if spy_rows.empty:
+            raise RuntimeError(
+                f"RegimeLabeler.fit(): no rows found for spy_ticker={self.spy_ticker!r} "
+                "in reference_db. Verify the ticker is present in the training database."
+            )
         spy_rows["Date"] = pd.to_datetime(spy_rows["Date"])
         spy_rows = spy_rows.set_index("Date").sort_index()
         self._spy_ret90 = spy_rows["ret_90d"]
@@ -185,6 +197,12 @@ class RegimeLabeler:
         # ── Stage 1: Base signal — SPY ret_90d ────────────────────────────
         # Map ret_90d → 0 (Bear) if negative, 1 (Bull) if ≥ 0
         spy_regime = self._spy_ret90.map(lambda r: 0 if r < 0 else 1)
+
+        if not self._spy_ret90.index.is_monotonic_increasing:
+            raise RuntimeError(
+                "RegimeLabeler: _spy_ret90 index is not monotonically sorted. "
+                "This is an internal error — fit() should sort on construction."
+            )
 
         # Reindex to the dates in db using nearest-neighbour fill (handles
         # weekends and gaps without introducing look-ahead bias at daily level)

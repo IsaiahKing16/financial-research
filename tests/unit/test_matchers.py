@@ -189,3 +189,71 @@ class TestHNSWMatcher:
         matcher.fit(X_train)
         distances, indices = matcher.kneighbors(X_query, n_neighbors=50)
         assert distances.shape == (3, 20)
+
+    def test_save_index_creates_files(self, tmp_path):
+        """save_index creates both binary and companion .meta.json files."""
+        X_train = _random_data(200, 8)
+        matcher = HNSWMatcher(n_neighbors=50)
+        matcher.fit(X_train)
+
+        index_path = tmp_path / "test.index"
+        matcher.save_index(index_path)
+
+        assert index_path.exists(), "Binary index file was not created"
+        assert (tmp_path / "test.index.meta.json").exists(), "Companion .meta.json was not created"
+
+    def test_save_before_fit_raises(self, tmp_path):
+        """save_index on unfitted matcher raises RuntimeError."""
+        matcher = HNSWMatcher()
+        index_path = tmp_path / "test.index"
+        with pytest.raises(RuntimeError, match="save_index\\(\\) called on unfitted"):
+            matcher.save_index(index_path)
+
+    def test_load_index_round_trip(self, tmp_path):
+        """save then load produces same kneighbors results as original."""
+        X_train = _random_data(200, 8)
+        X_query = _random_data(10, 8, seed=99)
+        original = HNSWMatcher(n_neighbors=50)
+        original.fit(X_train)
+
+        index_path = tmp_path / "test.index"
+        original.save_index(index_path)
+
+        distances_orig, indices_orig = original.kneighbors(X_query, n_neighbors=50)
+
+        loaded = HNSWMatcher()
+        loaded.load_index(index_path)
+
+        assert loaded.is_fitted, "Loaded matcher should report is_fitted == True"
+
+        distances_loaded, indices_loaded = loaded.kneighbors(X_query, n_neighbors=50)
+
+        assert distances_loaded.shape == distances_orig.shape
+        assert indices_loaded.shape == indices_orig.shape
+        np.testing.assert_array_equal(indices_loaded, indices_orig)
+
+    def test_load_nonexistent_raises(self, tmp_path):
+        """load_index raises RuntimeError when companion .meta.json missing."""
+        matcher = HNSWMatcher()
+        missing_path = tmp_path / "nonexistent.index"
+        with pytest.raises(RuntimeError, match="Companion metadata file not found"):
+            matcher.load_index(missing_path)
+
+    def test_loaded_matcher_kneighbors_works(self, tmp_path):
+        """Loaded matcher returns valid distances (non-negative) and correct shape."""
+        X_train = _random_data(200, 8)
+        X_query = _random_data(5, 8, seed=77)
+        original = HNSWMatcher(n_neighbors=50)
+        original.fit(X_train)
+
+        index_path = tmp_path / "test.index"
+        original.save_index(index_path)
+
+        loaded = HNSWMatcher()
+        loaded.load_index(index_path)
+
+        distances, indices = loaded.kneighbors(X_query, n_neighbors=50)
+
+        assert distances.shape == (5, 50)
+        assert indices.shape == (5, 50)
+        assert np.all(distances >= 0), "All distances must be non-negative"

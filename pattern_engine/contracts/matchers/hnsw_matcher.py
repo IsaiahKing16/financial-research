@@ -148,6 +148,80 @@ class HNSWMatcher(BaseMatcher):
 
         return distances, labels
 
+    def save_index(self, path) -> None:
+        """Persist the fitted HNSW index to disk.
+
+        Writes the hnswlib binary index and a companion .meta.json containing
+        the metadata required to reload the index (dimension, capacity, and
+        constructor parameters).
+
+        Args:
+            path: Destination path for the binary index file (str or Path).
+                  A companion file at ``str(path) + ".meta.json"`` is also written.
+
+        Raises:
+            RuntimeError: If the matcher has not been fitted yet.
+        """
+        if not self.is_fitted:
+            raise RuntimeError(
+                "save_index() called on unfitted HNSWMatcher. Call fit() first."
+            )
+
+        import json
+        from pathlib import Path  # noqa: F401 (inline import per spec)
+
+        path_str = str(path)
+        self._index.save_index(path_str)
+
+        meta = {
+            "n_features": self._n_features,
+            "n_samples": self._n_samples,
+            "ef_construction": self._ef_construction,
+            "M": self._M,
+            "n_neighbors": self._n_neighbors,
+            "num_threads": self._num_threads,
+        }
+        meta_path = path_str + ".meta.json"
+        with open(meta_path, "w", encoding="utf-8") as f:
+            json.dump(meta, f)
+
+    def load_index(self, path) -> None:
+        """Load a previously saved HNSW index from disk.
+
+        Reads the companion .meta.json first (raises RuntimeError if missing),
+        then reconstructs the hnswlib index and updates matcher state so that
+        ``is_fitted`` returns ``True`` and ``kneighbors`` works immediately.
+
+        Args:
+            path: Path to the binary index file (str or Path). The companion
+                  file is expected at ``str(path) + ".meta.json"``.
+
+        Raises:
+            RuntimeError: If the companion .meta.json file does not exist.
+        """
+        import json
+        import hnswlib
+        from pathlib import Path as _Path  # noqa: F401 (inline import per spec)
+
+        path_str = str(path)
+        meta_path = path_str + ".meta.json"
+
+        if not _Path(meta_path).exists():
+            raise RuntimeError(
+                f"Companion metadata file not found: {meta_path}. "
+                "Index may be corrupt or was not saved with save_index()."
+            )
+
+        with open(meta_path, "r", encoding="utf-8") as f:
+            meta = json.load(f)
+
+        index = hnswlib.Index(space="l2", dim=meta["n_features"])
+        index.load_index(path_str, max_elements=meta["n_samples"])
+
+        self._index = index
+        self._n_features = meta["n_features"]
+        self._n_samples = meta["n_samples"]
+
     def get_params(self) -> Dict[str, object]:
         return {
             "backend": "hnsw",

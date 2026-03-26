@@ -257,3 +257,18 @@ class TestHNSWMatcher:
         assert distances.shape == (5, 50)
         assert indices.shape == (5, 50)
         assert np.all(distances >= 0), "All distances must be non-negative"
+
+    def test_load_restores_all_params(self, tmp_path):
+        """load_index restores n_neighbors, ef_construction, M, num_threads from meta."""
+        matcher = HNSWMatcher(n_neighbors=10, ef_construction=100, M=8)
+        matcher.fit(_random_data(100, 8))
+        path = tmp_path / "idx"
+        matcher.save_index(path)
+
+        loaded = HNSWMatcher()  # default n_neighbors=50
+        loaded.load_index(path)
+
+        params = loaded.get_params()
+        assert params["n_neighbors"] == 10
+        assert params["ef_construction"] == 100
+        assert params["M"] == 8

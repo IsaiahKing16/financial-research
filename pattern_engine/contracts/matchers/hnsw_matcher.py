@@ -168,7 +168,6 @@ class HNSWMatcher(BaseMatcher):
             )
 
         import json
-        from pathlib import Path  # noqa: F401 (inline import per spec)
 
         path_str = str(path)
         self._index.save_index(path_str)
@@ -200,13 +199,13 @@ class HNSWMatcher(BaseMatcher):
             RuntimeError: If the companion .meta.json file does not exist.
         """
         import json
+        import os
         import hnswlib
-        from pathlib import Path as _Path  # noqa: F401 (inline import per spec)
 
         path_str = str(path)
         meta_path = path_str + ".meta.json"
 
-        if not _Path(meta_path).exists():
+        if not os.path.exists(meta_path):
             raise RuntimeError(
                 f"Companion metadata file not found: {meta_path}. "
                 "Index may be corrupt or was not saved with save_index()."
@@ -215,12 +214,22 @@ class HNSWMatcher(BaseMatcher):
         with open(meta_path, "r", encoding="utf-8") as f:
             meta = json.load(f)
 
+        if not os.path.exists(path_str):
+            raise RuntimeError(
+                f"HNSW index file not found: {path_str}. "
+                "The binary index may have been deleted or the path is wrong."
+            )
+
         index = hnswlib.Index(space="l2", dim=meta["n_features"])
         index.load_index(path_str, max_elements=meta["n_samples"])
 
         self._index = index
         self._n_features = meta["n_features"]
         self._n_samples = meta["n_samples"]
+        self._n_neighbors = meta["n_neighbors"]
+        self._ef_construction = meta["ef_construction"]
+        self._M = meta["M"]
+        self._num_threads = meta["num_threads"]
 
     def get_params(self) -> Dict[str, object]:
         return {

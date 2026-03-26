@@ -425,6 +425,8 @@ HNSW disk persistence implemented. 54.5× speedup confirmed. Vol-norm epsilon gu
 - BSS > 0 on ≥ 3/6 folds at 1500T
 - Full pipeline (data → features → index → query → signals) < 2 hours overnight
 - LiveRunner 4:00 PM execution < 3 minutes with pre-built index
+- **Peak memory < 24 GB** during index build (leaves 8 GB headroom on 32 GB machine)
+- **Overnight build completes < 2 hours** wall-clock (pre-declared infrastructure budget)
 - No unmapped sectors, no NaN/inf in feature matrix
 
 ### 8.6 Fallback
@@ -624,12 +626,17 @@ Compare every fill price to assumed entry. Log `actual_slippage_bps` per trade. 
 ### 11.7 Tax Tracking & Reporting
 
 **Capital Gains Tax Tracker** (`trading_system/tax_tracker.py`):
+
+**Launch-critical (required for Phase 9 go-live):**
 - Classifies every closed trade as short-term (≤ 365 days) or long-term (> 365 days)
 - Tracks realized gains/losses per tax lot (FIFO default, specific-lot identification option)
-- Running YTD tallies: short-term gains, long-term gains, total tax liability estimate (configurable federal + state brackets)
+- Running YTD tallies: short-term gains, long-term gains, total realized P&L
 - **Wash sale detection:** flags re-entry into same ticker within 30 days of a loss; adjusts cost basis on replacement lot per IRS rules
-- **Tax-loss harvesting signals:** when unrealized loss exceeds configurable threshold and no wash sale conflict, emit YELLOW alert to weekly review
 - Trade log export compatible with tax software (CSV matching TurboTax/TaxAct import schema)
+
+**Deferred reporting (post-launch, after trading loop is stable):**
+- Total tax liability estimate (configurable federal + state brackets)
+- **Tax-loss harvesting signals:** when unrealized loss exceeds configurable threshold and no wash sale conflict, emit YELLOW alert to weekly review
 - Quarterly estimated tax liability report (for estimated tax payment planning)
 
 ### 11.8 Diagnostic Protocol
@@ -823,7 +830,7 @@ Settings locked by experiment evidence. Do NOT change without new walk-forward r
 | Broker API instability | 5, 9 | Medium | Medium | Alpaca fallback; retry with backoff |
 | Regime shift during paper trading | 8 | Medium | Medium | Compare to historical fold; transient check |
 | Slippage exceeds model | 8, 9 | Medium | Low | Adjust parameter; VWAP window |
-| Memory limit (32GB) at 1500T | 6, 8 | Low | Medium | Sector pre-filtering; chunked processing |
+| Memory limit (32GB) at 1500T | 6, 8 | Low | Medium | Peak RAM < 24 GB gate; sector pre-filtering; chunked processing |
 | Tax lot tracking edge cases | 9 | Low | Low | Manual override + tax advisor review |
 
 ### 14.1 Intentionally Deferred Items

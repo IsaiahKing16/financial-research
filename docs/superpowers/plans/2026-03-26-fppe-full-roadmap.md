@@ -20,6 +20,35 @@
 
 ---
 
+## Execution Contract
+
+Before coding starts, all implementers must know these integration points:
+
+**Walk-forward runner entrypoint:**
+- `pattern_engine/matcher.py` → `PatternMatcher.walk_forward()` is the canonical runner
+- Input: feature DataFrame from `prepare.py` (DO NOT modify `prepare.py`)
+- Fold artifacts: `results/fold_<N>/` directories contain per-fold predictions, metrics
+- Target column: `fwd_7d_up` (binary, 1 = price up after 7 trading days). **Not** `y_up_7d`.
+
+**Expected input artifacts for Phase 1 diagnostics:**
+- Walk-forward fold results: `results/walkforward_results.tsv` (or fold-level CSVs in `results/`)
+- Each row has: `ticker`, `date`, `fold`, `predicted_prob`, `actual` (0/1), `distance_to_nearest`
+- If fold artifacts don't exist in this format, the first diagnostic task must run a walk-forward to generate them
+
+**Results directory layout:**
+- `results/` — all experiment outputs with provenance
+- `results/fold_<N>/` — per-fold artifacts
+- `results/<experiment_name>_<date>.tsv` — sweep/experiment results
+
+**Locked settings source of truth:** `CLAUDE.md` → "Locked Settings" section. Any change requires new experiment evidence logged in `results/`.
+
+**Memory/infrastructure budgets (hard gates):**
+- Peak RAM during HNSW index build: < 24 GB (32 GB machine, 8 GB headroom)
+- Overnight build pipeline: < 2 hours wall-clock
+- LiveRunner 4:00 PM execution: < 3 minutes with pre-built index
+
+---
+
 ## File Structure Map
 
 ### New Files (Created Across All Phases)
@@ -242,7 +271,7 @@ def compute_base_rates(val_db: pd.DataFrame, fold_col: str = "fold") -> pd.DataF
     rows = []
     for fold_name, group in val_db.groupby(fold_col):
         n = len(group)
-        n_pos = (group["y_up_7d"] == 1).sum()
+        n_pos = (group["fwd_7d_up"] == 1).sum()
         rows.append({
             "fold": fold_name,
             "n_rows": n,
@@ -724,7 +753,9 @@ class HalfKellySizer:
         # Clamp to position limits
         min_size = self.min_position_pct * current_equity
         max_size = self.max_position_pct * current_equity
-        return max(min(raw_size, max_size), min_size) if raw_size >= min_size else raw_size if raw_size > 0 else 0.0
+        if raw_size <= 0:
+            return 0.0
+        return max(min(raw_size, max_size), min_size)
 ```
 
 - [ ] **Step 2: Run tests to verify they pass**
@@ -1344,7 +1375,7 @@ Connection health monitoring, auto-reconnect, REST JSON payloads.
 
 ## Phase 6: Universe Expansion (Can Start After Phase 1 Gate)
 
-**Gate:** HNSW recall@50 ≥ 0.9999, BSS > 0 on ≥ 3/6 folds at 1500T, pipeline < 2hr
+**Gate:** HNSW recall@50 ≥ 0.9999, BSS > 0 on ≥ 3/6 folds at 1500T, pipeline < 2hr, peak RAM < 24 GB
 **Duration:** 3 weeks
 **Prerequisite:** Phase 1 gate passed
 
@@ -1907,6 +1938,8 @@ Expected: all pass
 git add trading_system/tax_tracker.py
 git commit -m "feat(tax): implement capital gains tracker — FIFO lots, wash sale detection, YTD summary"
 ```
+
+> **Note:** Tasks 9.1-9.2 cover **launch-critical** tax tracking (FIFO lots, short/long-term classification, wash sale detection, CSV export). **Deferred reporting** (tax liability estimates, tax-loss harvesting alerts, quarterly estimated tax reports) should be added post-launch after the trading loop is stable. See spec Section 11.7.
 
 ### Task 9.3: Kill Switch
 

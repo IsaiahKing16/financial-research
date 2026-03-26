@@ -62,28 +62,27 @@ All of the following must hold on out-of-sample data before real capital is depl
 ### 2.2 Phase Dependency Graph
 
 ```
-Phase 1 (BSS Fix) ──► Phase 2 (Half-Kelly) ──► Phase 3 (Risk Engine)
+Phase 1 (BSS Fix) ──► Phase 2 (Half-Kelly) ──► Phase 3 (Risk Engine) ──► Phase 4 (Portfolio Mgr)
+       │                                              │                          │
+       │                                              │                          │
+       ▼                                              ▼                          ▼
+  Phase 6 (Universe)                          Phase 5 (Live Plumbing)    Phase 7 (Model Enhancements)
+       │                                              │                          │
+       └──────────────────────────────────────────────┴──────────────────────────┘
                                                       │
-                                                      ▼
-                                              Phase 4 (Portfolio Mgr)
-                                                 │          │
-                                                 │    [parallel start]
-                                                 ▼          ▼
-                                          Phase 6      Phase 5
-                                        (Universe)   (Live Plumbing)
-                                                 │          │
-                                                 ▼          ▼
-                                              Phase 7 (Model Enhancements)
-                                                      │
-                                                      ▼
                                               Phase 8 (Paper Trading 3mo)
                                                       │
-                                                      ▼
                                               Phase 9 (Live Deploy)
                                                       │
-                                                      ▼
                                            Phase 10 (Options Foundation)
 ```
+
+**Dependency notes:**
+- **Phase 6 (Universe Expansion)** depends only on Phase 1 gate (BSS fix). It can run in parallel with Phases 2-5 since it's purely data/index work.
+- **Phase 5 (Live Plumbing)** depends on Phase 3 gate (Risk Engine). It mocks Layer 3 (Portfolio Manager) output during development using `AllocationDecision` test fixtures. Phase 4 completion is NOT required — Phase 5 integrates with Phase 4 output at the Phase 7 merge point.
+- **Phase 7 (Model Enhancements)** waits for all three parallel tracks (4, 5, 6) to complete before starting, ensuring a stable integrated baseline for enhancement experiments.
+
+**Note:** This spec supersedes the phase numbering in `FPPE_TRADING_SYSTEM_DESIGN.md` v0.5. That document lists Phase 4 as `strategy_evaluator.py` — which is already implemented (see Appendix A). This roadmap picks up from the current state.
 
 ### 2.3 Timeline Allocation
 
@@ -93,8 +92,8 @@ Phase 1 (BSS Fix) ──► Phase 2 (Half-Kelly) ──► Phase 3 (Risk Engine)
 | 2 — Half-Kelly | 2 weeks | Mid May 2026 | Phase 1 gate |
 | 3 — Risk Engine | 3 weeks | Early June 2026 | Phase 2 gate |
 | 4 — Portfolio Manager | 3 weeks | Late June 2026 | Phase 3 gate |
-| 5 — Live Plumbing | 4 weeks | Late July 2026 | Phase 3 gate (parallel w/ 4, 6) |
-| 6 — Universe Expansion | 3 weeks | Mid July 2026 | Phase 1 gate (parallel w/ 4, 5) |
+| 5 — Live Plumbing | 4 weeks | Late July 2026 | Phase 3 gate (mocks Layer 3; parallel w/ 4, 6) |
+| 6 — Universe Expansion | 3 weeks | Mid May 2026 | Phase 1 gate only (parallel w/ 2, 3, 4, 5) |
 | 7 — Model Enhancements | 4 weeks | Late August 2026 | Phases 4, 5, 6 gates |
 | 8 — Paper Trading | 12 weeks | Late November 2026 | Phase 7 gate |
 | 9 — Live Deploy | 4 weeks | January 2027 | Phase 8 gate |
@@ -164,22 +163,32 @@ Phase 1 gate passed (BSS > 0 on ≥ 3/6 folds).
 
 ### 4.3 Design
 
+**Sizing pipeline (final formula, used across Phases 2 and 3):**
+
 ```
+# Step 1: ATR-based weight (risk budget approach)
+stop_distance = stop_loss_atr_multiple × ATR%      # 3.0× locked
+atr_weight = max_loss_per_trade_pct / stop_distance  # 2% equity risk per trade
+
+# Step 2: Kelly scaling (edge-proportional multiplier)
 kelly_fraction = (p * b - q) / b
   where p = calibrated win probability (from Platt)
         q = 1 - p
         b = avg_win / avg_loss (from historical walk-forward data)
+half_kelly = 0.5 * kelly_fraction
 
-half_kelly = 0.5 * kelly_fraction  # conservative scaling
-position_size = half_kelly * current_equity
+# Step 3: Combined position size
+position_size = atr_weight × half_kelly × current_equity
 
-# Safety clamps (from existing config):
+# Step 4: Safety clamps
 position_size = clamp(position_size, min=2% equity, max=10% equity)
 ```
 
+**Phase 2 builds the Kelly computation** (`position_sizer.py`). During Phase 2 testing, `atr_weight` is set to a flat constant (matching current flat sizing) so Kelly's impact can be isolated. In Phase 3, the real ATR-based `atr_weight` replaces the flat constant — no refactoring needed, just swapping the input source.
+
 ### 4.4 Integration Point
 
-New module `trading_system/position_sizer.py` sits between Layer 2 (risk engine) and Layer 3 (portfolio manager). Receives raw volatility-based size from risk engine, scales by Kelly fraction.
+New module `trading_system/position_sizer.py` receives `atr_weight` from Layer 2 (risk engine) and `kelly_fraction` from Platt calibration. Outputs final `position_size` to Layer 3 (portfolio manager). During Phase 2 (before risk engine activation), `atr_weight` defaults to a flat value.
 
 ### 4.5 Diagnostic Protocol
 
@@ -217,13 +226,15 @@ Activate existing risk engine research pilots into production: ATR stops, volati
 
 ### 5.3 Scope
 
-1. **Activate ATR position sizing:**
+1. **Activate ATR position sizing** — Replace the flat `atr_weight` constant from Phase 2 with the real ATR-based computation:
    ```
    stop_distance = 3.0 × ATR%
-   raw_weight = max_loss_per_trade_pct (2%) / stop_distance
-   final_weight = clamp(raw_weight × drawdown_scalar, 2%, 10%)
+   atr_weight = max_loss_per_trade_pct (2%) / stop_distance
+   # This feeds into the combined formula from Phase 2:
+   # position_size = atr_weight × half_kelly × current_equity
+   # Then: final_weight = clamp(position_size × drawdown_scalar, 2%, 10%)
    ```
-   Replaces flat sizing as base layer; Half-Kelly from Phase 2 applied as multiplier on top.
+   This is a parameter swap in `position_sizer.py`, not a refactor. The Kelly multiplier from Phase 2 remains unchanged.
 
 2. **Wire drawdown brake** — Linear scalar 1.0 → 0.0 as drawdown goes 15% → 20%. At 20%, halt all new trades.
 
@@ -502,6 +513,8 @@ If no enhancement passes, deploy with Phases 1-6 baseline.
 ### 10.1 Goal
 
 Run FPPE live against real market data for 3 months without capital at risk. Validate all v1 success criteria in real-time.
+
+**Expected signal frequency (post-Phase 1 fix):** At threshold 0.55 on the 585T universe, historical walk-forward produced ~7.5 actionable signals/day (per design doc Section 3.7). Over 3 months (~63 trading days), this yields ~470 candidate signals before PM filtering. Even with 80% rejection rate, ~94 trades clear the pipeline — well above the 50-trade gate. If Phase 6 expands to 1500T before paper trading, signal count increases proportionally.
 
 ### 10.2 Daily Execution Cycle
 
@@ -812,6 +825,16 @@ Settings locked by experiment evidence. Do NOT change without new walk-forward r
 | Slippage exceeds model | 8, 9 | Medium | Low | Adjust parameter; VWAP window |
 | Memory limit (32GB) at 1500T | 6, 8 | Low | Medium | Sector pre-filtering; chunked processing |
 | Tax lot tracking edge cases | 9 | Low | Low | Manual override + tax advisor review |
+
+### 14.1 Intentionally Deferred Items
+
+The following items from `next_steps_plan.md` and `confidence_improvements.md` are **intentionally excluded** from this roadmap. They may be revisited post-launch:
+
+- **SlipDeficit Overlay** (`research/slip_deficit.py`) — slippage microstructure tracking. Deferred until real execution data is available from Phase 9.
+- **Global Circuit Breaker for `sentiment_veto.py`** — already implemented (commit `5e6e75e`, circuit breaker at 30% error threshold). No further work needed.
+- **Earth Mover's Distance** (`research/emd_distance.py`) — stub exists. Lower priority than DTW (Enhancement 3). Revisit if DTW doesn't improve BSS.
+- **Hawkes Process contagion modeling** — research concept from `confidence_improvements.md`. Requires external event data feeds not currently available.
+- **Short selling (v2)** — deferred per design doc until long-only proves positive expectancy.
 
 ---
 

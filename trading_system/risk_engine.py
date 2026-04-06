@@ -102,3 +102,126 @@ def drawdown_brake_scalar(
     # Linear interpolation: at warn → 1.0, at halt → 0.0
     span = halt - warn
     return max(0.0, 1.0 - (drawdown - warn) / span)
+
+
+# ─── Result dataclass ─────────────────────────────────────────────────────────
+
+@dataclass(frozen=True)
+class AdjustedSizing:
+    """Output of apply_risk_adjustments.
+
+    Attrs:
+        original: The pre-adjustment SizingResult from position_sizer.
+        final_position_pct: Position size after DD brake and overlays.
+        dd_scalar: Drawdown brake scalar in [0, 1].
+        overlay_multiplier: Product of all overlay multipliers in [0, 1].
+        blocked: True if final_position_pct == 0 (cannot trade).
+        block_reason: Structured reason string when blocked, else None.
+            Formats:
+              - "sizing_rejected:<original_reason>"
+              - "dd_brake:<drawdown>"
+              - "overlay:<OverlayClassName>"
+    """
+    original: SizingResult
+    final_position_pct: float
+    dd_scalar: float
+    overlay_multiplier: float
+    blocked: bool
+    block_reason: Optional[str]
+
+
+# ─── Orchestrator ─────────────────────────────────────────────────────────────
+
+def apply_risk_adjustments(
+    sizing: SizingResult,
+    drawdown: float,
+    overlays: Optional[List[BaseRiskOverlay]] = None,
+    dd_warn: float = 0.15,
+    dd_halt: float = 0.20,
+) -> AdjustedSizing:
+    """Compose Phase 2 sizing with DD brake and risk overlays.
+
+    Pipeline:
+      1. If sizing was rejected → propagate as blocked.
+      2. Compute DD brake scalar from current drawdown.
+      3. Compute overlay multiplier as product of all overlay
+         signal multipliers (1.0 if no overlays).
+      4. final = sizing.position_pct × dd_scalar × overlay_multiplier.
+      5. If final == 0 → blocked, with structured reason indicating
+         which component caused the block.
+
+    Block reason priority (first match wins):
+      sizing_rejected → dd_brake → overlay:<name>
+
+    Phase 3 contract: overlays multiply POSITION SIZE in this orchestrator,
+    not signal confidence as the original BaseRiskOverlay docstring stated.
+    Half-Kelly already incorporates confidence; re-throttling it would
+    double-count.
+
+    Args:
+        sizing: SizingResult from position_sizer.size_position().
+        drawdown: Current portfolio drawdown from peak [0, 1].
+        overlays: Optional list of BaseRiskOverlay instances.  Each must
+            have already been updated for the current trading day.
+        dd_warn: Drawdown brake warn threshold (default 0.15).
+        dd_halt: Drawdown brake halt threshold (default 0.20).
+
+    Returns:
+        AdjustedSizing with composed final_position_pct and diagnostic fields.
+
+    Raises:
+        RuntimeError: if drawdown > 1.0 (catches upstream data bugs).
+    """
+    if drawdown > 1.0:
+        raise RuntimeError(f"drawdown must be <= 1.0, got {drawdown}")
+
+    # Case 1: Phase 2 rejected the sizing — propagate
+    if not sizing.approved:
+        return AdjustedSizing(
+            original=sizing,
+            final_position_pct=0.0,
+            dd_scalar=0.0,
+            overlay_multiplier=0.0,
+            blocked=True,
+            block_reason=f"sizing_rejected:{sizing.rejection_reason}",
+        )
+
+    # Case 2: compute scalars
+    dd_scalar = drawdown_brake_scalar(drawdown, warn=dd_warn, halt=dd_halt)
+
+    overlay_multiplier = 1.0
+    blocking_overlay: Optional[BaseRiskOverlay] = None
+    if overlays:
+        for overlay in overlays:
+            m = overlay.get_signal_multiplier()
+            overlay_multiplier *= m
+            if m == 0.0 and blocking_overlay is None:
+                blocking_overlay = overlay
+
+    final_position_pct = sizing.position_pct * dd_scalar * overlay_multiplier
+
+    # Determine block status + structured reason (priority order)
+    if final_position_pct == 0.0:
+        if dd_scalar == 0.0:
+            reason = f"dd_brake:{drawdown}"
+        elif blocking_overlay is not None:
+            reason = f"overlay:{type(blocking_overlay).__name__}"
+        else:
+            reason = "unknown"  # should not happen given the above cases
+        return AdjustedSizing(
+            original=sizing,
+            final_position_pct=0.0,
+            dd_scalar=dd_scalar,
+            overlay_multiplier=overlay_multiplier,
+            blocked=True,
+            block_reason=reason,
+        )
+
+    return AdjustedSizing(
+        original=sizing,
+        final_position_pct=final_position_pct,
+        dd_scalar=dd_scalar,
+        overlay_multiplier=overlay_multiplier,
+        blocked=False,
+        block_reason=None,
+    )

@@ -244,6 +244,12 @@ class TestAtrPctOverride:
         assert not result.approved
         assert "atr_pct" in (result.rejection_reason or "")
 
+    def test_atr_pct_exactly_one_rejected(self):
+        """atr_pct=1.0 is on the open boundary — also rejected."""
+        result = size_position(confidence=0.65, b_ratio=1.18, atr_pct=1.0)
+        assert not result.approved
+        assert "atr_pct" in (result.rejection_reason or "")
+
     def test_atr_pct_none_uses_flat(self):
         """atr_pct=None → uses config.flat_atr_pct (Phase 2 backward compat)."""
         cfg = SizingConfig(flat_atr_pct=0.025)

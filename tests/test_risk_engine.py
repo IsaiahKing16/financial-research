@@ -41,3 +41,45 @@ class TestComputeAtrPct:
         """close<0 → RuntimeError."""
         with pytest.raises(RuntimeError, match="close must be > 0"):
             compute_atr_pct(atr_14=2.0, close=-1.0)
+
+
+from trading_system.risk_engine import drawdown_brake_scalar
+
+
+class TestDrawdownBrakeScalar:
+    def test_no_drawdown(self):
+        """dd=0 → 1.0 (full sizing)."""
+        assert drawdown_brake_scalar(0.0) == pytest.approx(1.0)
+
+    def test_below_warn(self):
+        """dd=10% → 1.0 (still below 15% warn)."""
+        assert drawdown_brake_scalar(0.10) == pytest.approx(1.0)
+
+    def test_at_warn(self):
+        """dd=15% → 1.0 (boundary; brake just starts)."""
+        assert drawdown_brake_scalar(0.15) == pytest.approx(1.0)
+
+    def test_midpoint(self):
+        """dd=17.5% → 0.5 (linear midpoint between 15% and 20%)."""
+        assert drawdown_brake_scalar(0.175) == pytest.approx(0.5)
+
+    def test_at_halt(self):
+        """dd=20% → 0.0 (full halt)."""
+        assert drawdown_brake_scalar(0.20) == pytest.approx(0.0)
+
+    def test_above_halt(self):
+        """dd=25% → 0.0 (clamp at zero)."""
+        assert drawdown_brake_scalar(0.25) == pytest.approx(0.0)
+
+    def test_negative_drawdown_treated_as_zero(self):
+        """dd<0 (impossible but defensive) → 1.0."""
+        assert drawdown_brake_scalar(-0.05) == pytest.approx(1.0)
+
+    def test_invalid_thresholds(self):
+        """warn >= halt → RuntimeError."""
+        with pytest.raises(RuntimeError, match="warn .* < halt"):
+            drawdown_brake_scalar(0.10, warn=0.20, halt=0.15)
+
+    def test_custom_thresholds(self):
+        """Custom thresholds: warn=10%, halt=15%, dd=12.5% → 0.5."""
+        assert drawdown_brake_scalar(0.125, warn=0.10, halt=0.15) == pytest.approx(0.5)

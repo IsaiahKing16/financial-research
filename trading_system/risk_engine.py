@@ -60,3 +60,45 @@ def compute_atr_pct(atr_14: float, close: float) -> float:
             f"atr_14 must be > 0, got {atr_14}; ticker has no volatility data"
         )
     return atr_14 / close
+
+
+def drawdown_brake_scalar(
+    drawdown: float,
+    warn: float = 0.15,
+    halt: float = 0.20,
+) -> float:
+    """Linear drawdown brake scalar.
+
+    Returns a scalar in [0.0, 1.0] used to throttle position sizing as
+    portfolio drawdown approaches the halt threshold.
+
+    Schedule:
+        drawdown < warn          → 1.0  (full sizing, no brake)
+        warn ≤ drawdown < halt   → linear interpolation 1.0 → 0.0
+        drawdown ≥ halt          → 0.0  (halt; no new positions)
+
+    Defaults match the roadmap spec: warn=15%, halt=20%.
+
+    Args:
+        drawdown: Current drawdown from peak equity, in [0, 1].  Negative
+            values (impossible in practice) are treated as zero.
+        warn: Drawdown threshold where the brake starts engaging.
+        halt: Drawdown threshold where the brake reaches zero.
+
+    Returns:
+        Scalar in [0.0, 1.0] to multiply against `position_pct`.
+
+    Raises:
+        RuntimeError: if `warn >= halt`.
+    """
+    if warn >= halt:
+        raise RuntimeError(
+            f"warn must be < halt, got warn={warn}, halt={halt}"
+        )
+    if drawdown <= warn:
+        return 1.0
+    if drawdown >= halt:
+        return 0.0
+    # Linear interpolation: at warn → 1.0, at halt → 0.0
+    span = halt - warn
+    return max(0.0, 1.0 - (drawdown - warn) / span)

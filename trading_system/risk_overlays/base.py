@@ -7,10 +7,15 @@ Every risk overlay follows the same contract:
      signal confidence before thresholding.  1.0 = no throttle, 0.0 = block.
   3. reset() — reset all accumulated state.
 
-Signal integration:
-    effective_confidence = raw_confidence × overlay.get_signal_multiplier()
-    A signal that would normally be BUY at confidence=0.70 becomes HOLD if
-    the overlay returns multiplier=0.0 (full block).
+Signal integration (Phase 3 contract):
+    final_position_pct = sizing.position_pct × overlay.get_signal_multiplier()
+    Overlays multiply POSITION SIZE in the risk_engine orchestrator, not
+    signal confidence.  Reason: Half-Kelly position_sizer already incorporates
+    confidence into position size, so re-throttling confidence would
+    double-count the same input.
+
+    Phase 1/2 historical contract (deprecated):
+        effective_confidence = raw_confidence × overlay.get_signal_multiplier()
 
 Feature flag pattern:
     All overlays are guarded by a flag in ResearchFlagsConfig:

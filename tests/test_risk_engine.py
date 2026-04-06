@@ -151,7 +151,6 @@ class TestApplyRiskAdjustments:
         sizing = _make_approved_sizing(0.05)
         fatigue = FatigueAccumulationOverlay(decay_rate=0.15)
         # Build up some fatigue: 4 BULL days
-        d = date(2024, 1, 1)
         for i in range(4):
             fatigue.update(date(2024, 1, i + 1), regime_label="BULL")
         mult = fatigue.get_signal_multiplier()
@@ -217,6 +216,21 @@ class TestApplyRiskAdjustments:
         prefix, value = adj.block_reason.split(":", 1)
         assert prefix == "dd_brake"
         assert float(value) == pytest.approx(0.22)
+
+    def test_dd_brake_priority_over_overlay(self):
+        """When DD halt fires AND an overlay also blocks, dd_brake reason wins."""
+        sizing = _make_approved_sizing(0.05)
+        gate = LiquidityCongestionGate(
+            window=2,
+            congestion_threshold=0.025,
+            block_threshold=0.05,
+        )
+        gate.update(date(2024, 1, 1), atr_price_ratio=0.06)
+        gate.update(date(2024, 1, 2), atr_price_ratio=0.06)
+        # Both DD halt and overlay block fire simultaneously
+        adj = apply_risk_adjustments(sizing, drawdown=0.22, overlays=[gate])
+        assert adj.blocked
+        assert adj.block_reason.startswith("dd_brake:")
 
 
 class TestEndToEndIntegration:

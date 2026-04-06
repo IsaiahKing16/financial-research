@@ -113,8 +113,10 @@ class AdjustedSizing:
     Attrs:
         original: The pre-adjustment SizingResult from position_sizer.
         final_position_pct: Position size after DD brake and overlays.
-        dd_scalar: Drawdown brake scalar in [0, 1].
+        dd_scalar: Drawdown brake scalar in [0, 1].  NaN if sizing was
+            rejected (not computed in that branch).
         overlay_multiplier: Product of all overlay multipliers in [0, 1].
+            NaN if sizing was rejected.
         blocked: True if final_position_pct == 0 (cannot trade).
         block_reason: Structured reason string when blocked, else None.
             Formats:
@@ -180,8 +182,8 @@ def apply_risk_adjustments(
         return AdjustedSizing(
             original=sizing,
             final_position_pct=0.0,
-            dd_scalar=0.0,
-            overlay_multiplier=0.0,
+            dd_scalar=float("nan"),
+            overlay_multiplier=float("nan"),
             blocked=True,
             block_reason=f"sizing_rejected:{sizing.rejection_reason}",
         )

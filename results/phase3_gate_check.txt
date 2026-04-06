@@ -1,0 +1,9 @@
+Phase 3 Gate Check -- FAIL
+==================================================
+
+  [X] DD brake fires correctly
+  [X] Max DD <= 10%
+  [ ] Sharpe >= 1.0
+  [X] Stops <= 35% of trades
+
+Sharpe=-0.368, MaxDD=1.1%, stops=0/278 (0.0%), blocked=0/278

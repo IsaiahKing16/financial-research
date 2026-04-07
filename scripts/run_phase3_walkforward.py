@@ -67,6 +67,18 @@ TRADE_DAYS_YEAR  = 252
 RISK_FREE_ANNUAL = 0.045
 SPY_THRESHOLD    = 0.05  # H7 locked
 
+# Phase 3 overlay flags.
+# FatigueAccumulationOverlay (SLE-75) saturates in sustained-BULL regimes:
+# with decay_rate=0.15 and no regime transitions across 181 BULL days in the
+# 2024 fold, the multiplier collapses to ~1e-13 and destroys positive PnL
+# (diagnostic: results/phase3_throttling_diagnostic.csv — median overlay
+# multiplier 0.0019, mean 0.136). The overlay was designed for short, choppy
+# regimes with frequent transitions; the H7 BULL definition is too sticky
+# for that model. Disabled by default until SLE-75 is redesigned.
+# LiquidityCongestionGate stays on — diagnostic confirmed congestion_mult=1.0
+# across all 278 trades, so it contributes zero drag and costs nothing.
+USE_FATIGUE_OVERLAY = False
+
 SIZING_CFG = SizingConfig()
 
 
@@ -123,8 +135,9 @@ def _rescale_trades_phase3(
     out["exit_date"]  = pd.to_datetime(out["exit_date"])
     out = out.sort_values("entry_date").reset_index(drop=True)
 
-    fatigue = FatigueAccumulationOverlay(decay_rate=0.15)
+    fatigue = FatigueAccumulationOverlay(decay_rate=0.15) if USE_FATIGUE_OVERLAY else None
     congestion = LiquidityCongestionGate()
+    overlays = [congestion] + ([fatigue] if fatigue is not None else [])
 
     # Running equity for DD computation. Sample only on exit dates (when PnL realizes).
     running_equity = INITIAL_EQUITY
@@ -155,9 +168,10 @@ def _rescale_trades_phase3(
         # Update overlays at entry_dt with SPY market data
         spy_row = atr_lookup.get((entry_dt, "SPY"))
         if spy_row is not None:
-            ret_90d = spy_row.get("ret_90d", 0.0) or 0.0
-            regime = "BULL" if ret_90d > SPY_THRESHOLD else "BEAR"
-            fatigue.update(entry_dt, regime_label=regime)
+            if fatigue is not None:
+                ret_90d = spy_row.get("ret_90d", 0.0) or 0.0
+                regime = "BULL" if ret_90d > SPY_THRESHOLD else "BEAR"
+                fatigue.update(entry_dt, regime_label=regime)
             congestion.update(entry_dt, atr=spy_row["atr_14"], close=spy_row["Close"])
 
         # Lookup ATR for this ticker on entry_dt
@@ -188,7 +202,7 @@ def _rescale_trades_phase3(
         adj = apply_risk_adjustments(
             sizing,
             drawdown=dd,
-            overlays=[fatigue, congestion],
+            overlays=overlays,
         )
         if adj.blocked:
             blocked_log.append({"date": entry_dt, "ticker": ticker, "reason": adj.block_reason})

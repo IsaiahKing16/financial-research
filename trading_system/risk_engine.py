@@ -73,9 +73,16 @@ def drawdown_brake_scalar(
     portfolio drawdown approaches the halt threshold.
 
     Schedule:
-        drawdown < warn          → 1.0  (full sizing, no brake)
-        warn ≤ drawdown < halt   → linear interpolation 1.0 → 0.0
+        drawdown ≤ warn          → 1.0  (full sizing, no brake)
+        warn  < drawdown <  halt → linear interpolation 1.0 → 0.0
         drawdown ≥ halt          → 0.0  (halt; no new positions)
+
+    Boundary contract (symmetric-inclusive):
+        At exactly `warn`, the brake has NOT engaged yet → returns 1.0.
+        At exactly `halt`, the brake is fully engaged     → returns 0.0.
+        Both boundaries are inclusive on the "safe" side — i.e. you get
+        full sizing at warn and full halt at halt. Do not change this
+        without updating TestDrawdownBoundaryContract in test_risk_engine.py.
 
     Defaults match the roadmap spec: warn=15%, halt=20%.
 
@@ -106,6 +113,13 @@ def drawdown_brake_scalar(
 
 # ─── Result dataclass ─────────────────────────────────────────────────────────
 
+# Tolerance threshold for "blocked" detection on `final_position_pct`.
+# Phase 3 contract: overlays should return exactly 0.0 to block, but redesigned
+# overlays (e.g. SLE-75 fatigue) may saturate to ~1e-13. Anything below this
+# bound is treated as an effective block so audit/reporting stays correct.
+_BLOCKED_TOLERANCE: float = 1e-9
+
+
 @dataclass(frozen=True)
 class AdjustedSizing:
     """Output of apply_risk_adjustments.
@@ -117,12 +131,15 @@ class AdjustedSizing:
             rejected (not computed in that branch).
         overlay_multiplier: Product of all overlay multipliers in [0, 1].
             NaN if sizing was rejected.
-        blocked: True if final_position_pct == 0 (cannot trade).
+        blocked: True if the caller cannot open a new position. Detected via
+            `final_position_pct < _BLOCKED_TOLERANCE` (not exact `== 0.0`)
+            so overlays that saturate to ~1e-13 are treated as blocked.
         block_reason: Structured reason string when blocked, else None.
             Formats:
               - "sizing_rejected:<original_reason>"
               - "dd_brake:<drawdown>"
               - "overlay:<OverlayClassName>"
+              - "position_below_threshold"  (fallback: collapsed w/o attribution)
     """
     original: SizingResult
     final_position_pct: float
@@ -188,6 +205,20 @@ def apply_risk_adjustments(
             block_reason=f"sizing_rejected:{sizing.rejection_reason}",
         )
 
+    # Case 1b: approved=True but position_pct is malformed (<= 0).
+    # This is a category error from upstream sizing; log it with a
+    # structured reason so the caller's blocked_log captures the
+    # audit trail instead of silently producing final_position_pct=0.
+    if sizing.position_pct <= 0.0:
+        return AdjustedSizing(
+            original=sizing,
+            final_position_pct=0.0,
+            dd_scalar=float("nan"),
+            overlay_multiplier=float("nan"),
+            blocked=True,
+            block_reason="invalid_original_pct",
+        )
+
     # Case 2: compute scalars
     dd_scalar = drawdown_brake_scalar(drawdown, warn=dd_warn, halt=dd_halt)
 
@@ -202,17 +233,22 @@ def apply_risk_adjustments(
 
     final_position_pct = sizing.position_pct * dd_scalar * overlay_multiplier
 
-    # Determine block status + structured reason (priority order)
-    if final_position_pct == 0.0:
+    # Determine block status + structured reason (priority order).
+    # Tolerance-based detection catches redesigned overlays that saturate to
+    # ~1e-13 instead of returning exactly 0.0 (see _BLOCKED_TOLERANCE note).
+    if final_position_pct < _BLOCKED_TOLERANCE:
         if dd_scalar == 0.0:
             reason = f"dd_brake:{drawdown}"
         elif blocking_overlay is not None:
             reason = f"overlay:{type(blocking_overlay).__name__}"
         else:
-            reason = "unknown"  # should not happen given the above cases
+            # Fallback: neither DD halt nor an overlay returned exactly 0.0,
+            # yet the composed position collapsed below the tolerance
+            # (e.g. an overlay returned a microscopic positive value).
+            reason = "position_below_threshold"
         return AdjustedSizing(
             original=sizing,
-            final_position_pct=0.0,
+            final_position_pct=final_position_pct,
             dd_scalar=dd_scalar,
             overlay_multiplier=overlay_multiplier,
             blocked=True,

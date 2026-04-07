@@ -85,6 +85,46 @@ class TestDrawdownBrakeScalar:
         assert drawdown_brake_scalar(0.125, warn=0.10, halt=0.15) == pytest.approx(0.5)
 
 
+class TestDrawdownBoundaryContract:
+    """Phase 3 Hardening Finding 4: boundary symmetry contract.
+
+    Documents the explicit symmetric-inclusive boundary behavior of
+    `drawdown_brake_scalar` so a future refactor cannot silently introduce
+    asymmetry (brake-inclusive vs halt-exclusive or vice versa).
+    """
+
+    def test_warn_boundary_inclusive_returns_one(self):
+        """At exactly warn, brake has NOT engaged → scalar = 1.0."""
+        assert drawdown_brake_scalar(0.15, warn=0.15, halt=0.20) == 1.0
+
+    def test_halt_boundary_inclusive_returns_zero(self):
+        """At exactly halt, brake is fully engaged → scalar = 0.0."""
+        assert drawdown_brake_scalar(0.20, warn=0.15, halt=0.20) == 0.0
+
+    def test_just_above_warn_starts_braking(self):
+        """An infinitesimal crossing past warn produces scalar < 1."""
+        import math
+        val = drawdown_brake_scalar(0.15 + 1e-6, warn=0.15, halt=0.20)
+        assert val < 1.0
+        assert val > 0.999
+        assert not math.isnan(val)
+
+    def test_just_below_halt_is_positive(self):
+        """Just below halt, scalar is > 0 (brake hasn't reached full halt)."""
+        val = drawdown_brake_scalar(0.20 - 1e-6, warn=0.15, halt=0.20)
+        assert 0.0 < val < 0.001
+
+    def test_negative_drawdown_explicit_handling(self):
+        """Negative drawdown (defensive) returns 1.0, matching docstring.
+
+        This is the explicit contract: negative drawdown is impossible in
+        practice but is treated as 'no drawdown' rather than raising, so
+        callers never crash on rounding artifacts near peak equity.
+        """
+        assert drawdown_brake_scalar(-1e-9) == 1.0
+        assert drawdown_brake_scalar(-0.05) == 1.0
+
+
 from datetime import date
 
 from trading_system.position_sizer import SizingResult, size_position
@@ -263,3 +303,114 @@ class TestEndToEndIntegration:
             adj = apply_risk_adjustments(sizing, drawdown=dd)
             assert adj.dd_scalar == pytest.approx(expected_scalar), f"dd={dd}"
             assert adj.blocked == expected_blocked, f"dd={dd}"
+
+
+# ─── Phase 3 Hardening: Finding 1 (HIGH) ─────────────────────────────────────
+# Block detection must be tolerance-based, not exact-zero float comparison.
+# A future overlay returning ~1e-13 must be treated as blocked.
+
+from trading_system.risk_overlays.base import BaseRiskOverlay
+
+
+class _ConstantOverlay(BaseRiskOverlay):
+    """Test helper: overlay that always returns a fixed (validated) multiplier."""
+
+    def __init__(self, value: float) -> None:
+        self._value = value
+
+    def update(self, current_date, **market_data):
+        pass
+
+    def _compute_multiplier(self) -> float:
+        return self._value
+
+    def reset(self) -> None:
+        pass
+
+
+class TestBlockDetection:
+    """HIGH fix: blocked field must use tolerance, not exact float comparison."""
+
+    def test_exact_zero_is_blocked(self):
+        """Overlay returning 0.0 → final_position_pct=0.0 → blocked=True."""
+        sizing = _make_approved_sizing(0.05)
+        overlay = _ConstantOverlay(0.0)
+        adj = apply_risk_adjustments(sizing, drawdown=0.0, overlays=[overlay])
+        assert adj.final_position_pct == 0.0
+        assert adj.blocked is True
+
+    def test_near_zero_is_blocked(self):
+        """Overlay returning 1e-13 → final ≈ 5e-15 < 1e-9 → blocked=True."""
+        sizing = _make_approved_sizing(0.05)
+        overlay = _ConstantOverlay(1e-13)
+        adj = apply_risk_adjustments(sizing, drawdown=0.0, overlays=[overlay])
+        assert adj.blocked is True
+        assert adj.block_reason is not None
+
+    def test_above_threshold_not_blocked(self):
+        """Healthy sizing stays not blocked."""
+        sizing = _make_approved_sizing(0.05)
+        adj = apply_risk_adjustments(sizing, drawdown=0.0)
+        assert adj.final_position_pct == pytest.approx(0.05)
+        assert adj.blocked is False
+
+    def test_block_reason_fallback_near_zero(self):
+        """Near-zero final without overlay==0 / dd halt → 'position_below_threshold'."""
+        sizing = _make_approved_sizing(0.05)
+        overlay = _ConstantOverlay(1e-13)
+        adj = apply_risk_adjustments(sizing, drawdown=0.0, overlays=[overlay])
+        # Overlay did not return exactly 0 (so no overlay:<name> attribution),
+        # dd_scalar=1.0 (no dd_brake attribution) — fallback reason must be
+        # the structured sentinel, not "unknown".
+        assert adj.block_reason == "position_below_threshold"
+
+
+# ─── Phase 3 Hardening: Finding 3 (MEDIUM) ───────────────────────────────────
+# approved=True with position_pct <= 0 is a malformed upstream input. It must
+# produce a blocked AdjustedSizing with a structured "invalid_original_pct"
+# reason so the caller's blocked_log captures it (no silent audit-trail gap).
+
+class TestInvalidOriginalPct:
+    """MEDIUM fix: approved=True + position_pct<=0 → 'invalid_original_pct'."""
+
+    def test_zero_original_pct_blocked(self):
+        """approved=True, position_pct=0.0 → blocked with structured reason."""
+        sizing = SizingResult(
+            approved=True,
+            position_pct=0.0,
+            kelly_fraction=0.30,
+            scaled_kelly=0.15,
+            atr_weight=0.333,
+            rejection_reason=None,
+        )
+        adj = apply_risk_adjustments(sizing, drawdown=0.0)
+        assert adj.blocked is True
+        assert adj.block_reason == "invalid_original_pct"
+
+    def test_negative_original_pct_blocked(self):
+        """approved=True, position_pct<0 → blocked with structured reason."""
+        sizing = SizingResult(
+            approved=True,
+            position_pct=-0.01,
+            kelly_fraction=0.30,
+            scaled_kelly=0.15,
+            atr_weight=0.333,
+            rejection_reason=None,
+        )
+        adj = apply_risk_adjustments(sizing, drawdown=0.0)
+        assert adj.blocked is True
+        assert adj.block_reason == "invalid_original_pct"
+
+    def test_invalid_original_pct_preserves_original(self):
+        """AdjustedSizing.original must round-trip the malformed input."""
+        sizing = SizingResult(
+            approved=True,
+            position_pct=-0.5,
+            kelly_fraction=0.30,
+            scaled_kelly=0.15,
+            atr_weight=0.333,
+            rejection_reason=None,
+        )
+        adj = apply_risk_adjustments(sizing, drawdown=0.0)
+        assert adj.original is sizing
+        assert adj.original.position_pct == -0.5

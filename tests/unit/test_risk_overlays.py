@@ -37,7 +37,7 @@ class TestBaseRiskOverlay:
         class PartialOverlay(BaseRiskOverlay):
             def update(self, current_date, **kw):
                 pass
-            def get_signal_multiplier(self):
+            def _compute_multiplier(self):
                 return 1.0
             # Missing reset()
 
@@ -47,7 +47,7 @@ class TestBaseRiskOverlay:
     def test_name_defaults_to_class_name(self):
         class MyOverlay(BaseRiskOverlay):
             def update(self, current_date, **kw): pass
-            def get_signal_multiplier(self): return 1.0
+            def _compute_multiplier(self): return 1.0
             def reset(self): pass
 
         assert MyOverlay().name == "MyOverlay"
@@ -55,7 +55,7 @@ class TestBaseRiskOverlay:
     def test_repr_includes_multiplier(self):
         class TrivialOverlay(BaseRiskOverlay):
             def update(self, current_date, **kw): pass
-            def get_signal_multiplier(self): return 0.5
+            def _compute_multiplier(self): return 0.5
             def reset(self): pass
 
         r = repr(TrivialOverlay())
@@ -285,3 +285,61 @@ class TestResearchFlagsM6:
         assert cfg2.use_liquidity_congestion_gate is True
         assert cfg2.use_fatigue_accumulation is False
         assert cfg2.use_drift_monitor is False
+
+
+# ─── Phase 3 Hardening: Finding 2 (MEDIUM) ───────────────────────────────────
+# BaseRiskOverlay must validate that subclass-computed multipliers are in
+# [0.0, 1.0] at runtime. Values outside this range are category errors and
+# must raise RuntimeError (not a silent clamp).
+
+class _StubOverlay(BaseRiskOverlay):
+    """Test stub: subclass returns whatever value we set."""
+
+    def __init__(self, value: float) -> None:
+        self._value = value
+
+    def update(self, current_date, **market_data):
+        pass
+
+    def _compute_multiplier(self) -> float:
+        return self._value
+
+    def reset(self) -> None:
+        pass
+
+
+class TestOverlayMultiplierValidation:
+    """MEDIUM fix: overlay multiplier must be in [0, 1] — enforced in base."""
+
+    def test_multiplier_above_one_raises(self):
+        """Overlay returning 1.5 raises RuntimeError."""
+        overlay = _StubOverlay(1.5)
+        with pytest.raises(RuntimeError, match=r"must be in \[0\.0, 1\.0\]"):
+            overlay.get_signal_multiplier()
+
+    def test_multiplier_negative_raises(self):
+        """Overlay returning -0.1 raises RuntimeError."""
+        overlay = _StubOverlay(-0.1)
+        with pytest.raises(RuntimeError, match=r"must be in \[0\.0, 1\.0\]"):
+            overlay.get_signal_multiplier()
+
+    def test_multiplier_at_lower_boundary_ok(self):
+        """0.0 is valid and returned as-is."""
+        overlay = _StubOverlay(0.0)
+        assert overlay.get_signal_multiplier() == 0.0
+
+    def test_multiplier_at_upper_boundary_ok(self):
+        """1.0 is valid and returned as-is."""
+        overlay = _StubOverlay(1.0)
+        assert overlay.get_signal_multiplier() == 1.0
+
+    def test_multiplier_normal_value_ok(self):
+        """0.5 passes through without error."""
+        overlay = _StubOverlay(0.5)
+        assert overlay.get_signal_multiplier() == 0.5
+
+    def test_error_message_contains_class_name(self):
+        """Error message names the offending overlay class."""
+        overlay = _StubOverlay(2.0)
+        with pytest.raises(RuntimeError, match=r"_StubOverlay"):
+            overlay.get_signal_multiplier()

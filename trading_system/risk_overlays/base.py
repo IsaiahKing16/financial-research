@@ -56,15 +56,43 @@ class BaseRiskOverlay(ABC):
         """
 
     @abstractmethod
+    def _compute_multiplier(self) -> float:
+        """Subclass hook: compute the raw multiplier.
+
+        Must return a float in [0.0, 1.0]. Values outside this range are
+        considered category errors and will be rejected by the base class
+        (see `get_signal_multiplier`). Subclasses should not clamp — if
+        you need to clamp, do so explicitly inside this method, but
+        returning out-of-range values is a bug worth surfacing.
+
+        Returns:
+            Raw multiplier float. Validated by base class before return.
+        """
+
     def get_signal_multiplier(self) -> float:
-        """Return the current signal throttle factor.
+        """Return the current signal throttle factor, validated to [0.0, 1.0].
+
+        Template method: delegates to subclass `_compute_multiplier`, then
+        guards the post-condition that the returned value is in [0.0, 1.0].
+        A value outside this range raises `RuntimeError` — amplification
+        (>1) or negative sizing is always a bug, never graceful degradation.
 
         Returns:
             float in [0.0, 1.0]:
                 1.0 — no throttle; signals are unchanged.
                 0.0 — full block; all signals become HOLD.
-                (0, 1) — partial throttle; confidence is reduced.
+                (0, 1) — partial throttle; position size is reduced.
+
+        Raises:
+            RuntimeError: if the subclass returns a value outside [0.0, 1.0].
         """
+        value = self._compute_multiplier()
+        if not (0.0 <= value <= 1.0):
+            raise RuntimeError(
+                f"{type(self).__name__}._compute_multiplier() returned "
+                f"{value}, must be in [0.0, 1.0]"
+            )
+        return value
 
     @abstractmethod
     def reset(self) -> None:

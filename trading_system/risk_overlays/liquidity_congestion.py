@@ -134,8 +134,10 @@ class LiquidityCongestionGate(BaseRiskOverlay):
         elif self._cooldown_remaining > 0:
             self._cooldown_remaining -= 1
 
-    def get_signal_multiplier(self) -> float:
+    def _compute_multiplier(self) -> float:
         """Return throttle factor based on current congestion level.
+
+        Template-method hook (see BaseRiskOverlay.get_signal_multiplier).
 
         Returns:
             1.0  — no congestion; signals pass through unchanged.

@@ -129,8 +129,10 @@ class FatigueAccumulationOverlay(BaseRiskOverlay):
             self._fatigue_score = min(1.0, self._fatigue_score)
             self._regime_duration += 1
 
-    def get_signal_multiplier(self) -> float:
+    def _compute_multiplier(self) -> float:
         """Return 1 - fatigue_score, floored at min_multiplier.
+
+        Template-method hook (see BaseRiskOverlay.get_signal_multiplier).
 
         Returns:
             float in [min_multiplier, 1.0]:

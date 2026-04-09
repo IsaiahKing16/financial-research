@@ -50,6 +50,10 @@ class OrderManager:
         quantity = decision.capital_allocated / price.
         Side is always BUY (AllocationDecisions are entry-only from PM).
         """
+        if price <= 0.0:
+            raise RuntimeError(
+                f"create_order_from_decision: price must be > 0, got {price} for {decision.ticker}"
+            )
         quantity = decision.capital_allocated / price
         return Order(
             order_id=str(uuid.uuid4()),

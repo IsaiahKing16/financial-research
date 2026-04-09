@@ -57,6 +57,11 @@ class TestCreateOrderFromDecision:
         o2 = om.create_order_from_decision(_decision(ticker="MSFT"), price=300.0)
         assert o1.order_id != o2.order_id
 
+    def test_zero_price_raises(self):
+        om = OrderManager(broker=_broker())
+        with pytest.raises(RuntimeError, match="price must be > 0"):
+            om.create_order_from_decision(_decision(), price=0.0)
+
 
 class TestCreateExitOrder:
     def test_creates_sell_order(self):
@@ -123,6 +128,13 @@ class TestSubmitBatch:
         results = om.submit_batch(orders)
         assert results[0].status == OrderStatus.REJECTED
         assert results[1].status == OrderStatus.FILLED
+
+
+class TestCancel:
+    def test_cancel_unknown_raises(self):
+        om = OrderManager(broker=_broker())
+        with pytest.raises(RuntimeError, match="Unknown order_id"):
+            om.cancel("nonexistent-id")
 
 
 class TestSummary:

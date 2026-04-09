@@ -126,3 +126,22 @@ class TestReconciliationResult:
         result = reconcile(snap, broker)
         assert result.n_expected == 2
         assert result.n_actual == 2
+
+
+class TestReconcileCLIGuard:
+    def test_cli_script_raises_not_configured(self):
+        """reconcile.py CLI should refuse to run with placeholder values."""
+        import os
+        import subprocess
+        import sys
+        worktree = r"C:\Users\Isaia\.claude\financial-research\.worktrees\fix-phase5-mockbroker-review-items"
+        env = os.environ.copy()
+        env["PYTHONPATH"] = worktree
+        result = subprocess.run(
+            [sys.executable, "scripts/reconcile.py"],
+            capture_output=True, text=True,
+            cwd=worktree,
+            env=env,
+        )
+        assert result.returncode != 0
+        assert "placeholder" in result.stderr.lower() or "not configured" in result.stderr.lower()

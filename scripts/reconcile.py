@@ -38,6 +38,12 @@ def _snapshot_from_shared_state(state: SharedState) -> PortfolioSnapshot:
 
 
 def main() -> int:
+    raise RuntimeError(
+        "reconcile.py CLI uses placeholder values (position_pct=0.05, "
+        "entry_price=100.0) and is not configured for production use. "
+        "Wire up real portfolio state loading before running. "
+        "See Phase 8 roadmap for real broker adapter integration."
+    )
     parser = argparse.ArgumentParser(description="Reconcile positions vs broker")
     parser.add_argument("checkpoint", help="Path to SharedState JSON checkpoint")
     parser.add_argument(

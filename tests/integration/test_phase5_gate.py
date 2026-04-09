@@ -274,3 +274,85 @@ class TestPhase5Gate:
             f"\n[G3] PASS — {elapsed:.2f}s elapsed | "
             f"reconciled {recon.n_actual} positions | Orders: {summary}"
         )
+
+
+@pytest.mark.slow
+class TestPhase5ReconciliationFailureDetection:
+    """Verify reconciliation actually catches mismatches (not just happy path)."""
+
+    def test_g2_detects_missing_position(self):
+        """Reconciliation should fail if broker has a position the snapshot doesn't."""
+        from trading_system.broker.mock import MockBroker, MockBrokerConfig
+        from trading_system.broker.base import Order
+        from trading_system.order_manager import OrderManager
+        from trading_system.contracts.trades import OrderSide
+        from trading_system.portfolio_state import PortfolioSnapshot
+        from trading_system.reconciliation import reconcile
+        from datetime import datetime, timezone, date
+
+        broker = MockBroker(MockBrokerConfig(
+            initial_cash=100_000.0, slippage_bps=0.0, fill_fraction=1.0,
+        ))
+        broker.set_prices({"AAPL": 150.0, "MSFT": 300.0})
+        om = OrderManager(broker=broker)
+
+        # Buy both tickers
+        for ticker in ["AAPL", "MSFT"]:
+            order = Order(
+                order_id=f"buy-{ticker}", ticker=ticker, side=OrderSide.BUY,
+                quantity=10.0, timestamp=datetime(2024, 1, 2, tzinfo=timezone.utc),
+            )
+            om.submit(order)
+
+        # Build snapshot with NO positions (empty) — both broker positions are "unexpected"
+        snap = PortfolioSnapshot(
+            as_of_date=date(2024, 1, 2),
+            equity=broker.get_account().total_value,
+            cash=broker.get_account().cash,
+            open_positions=tuple(),
+        )
+        result = reconcile(snap, broker)
+        assert not result.passed, "Should detect unexpected broker positions"
+        assert len(result.unexpected_positions) >= 1
+
+    def test_g2_detects_quantity_mismatch(self):
+        """Reconciliation should fail if snapshot qty differs from broker qty."""
+        from trading_system.broker.mock import MockBroker, MockBrokerConfig
+        from trading_system.broker.base import Order
+        from trading_system.order_manager import OrderManager
+        from trading_system.contracts.trades import OrderSide
+        from trading_system.portfolio_state import PortfolioSnapshot, OpenPosition
+        from trading_system.reconciliation import reconcile
+        from datetime import datetime, timezone, date
+
+        broker = MockBroker(MockBrokerConfig(
+            initial_cash=100_000.0, slippage_bps=0.0, fill_fraction=1.0,
+        ))
+        broker.set_prices({"AAPL": 150.0})
+        om = OrderManager(broker=broker)
+
+        # Buy 10 shares of AAPL
+        order = Order(
+            order_id="buy-aapl", ticker="AAPL", side=OrderSide.BUY,
+            quantity=10.0, timestamp=datetime(2024, 1, 2, tzinfo=timezone.utc),
+        )
+        om.submit(order)
+
+        equity = broker.get_account().total_value
+        # Build snapshot claiming we hold 50 shares (wrong — actually hold 10)
+        snap = PortfolioSnapshot(
+            as_of_date=date(2024, 1, 2),
+            equity=equity,
+            cash=broker.get_account().cash,
+            open_positions=(
+                OpenPosition(
+                    ticker="AAPL", sector="Tech",
+                    entry_date=date(2024, 1, 2),
+                    position_pct=(50 * 150.0) / equity,  # claims 50 shares
+                    entry_price=150.0,
+                ),
+            ),
+        )
+        result = reconcile(snap, broker)
+        assert not result.passed, "Should detect quantity mismatch (50 vs 10)"
+        assert len(result.mismatches) >= 1

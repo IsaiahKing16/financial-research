@@ -42,7 +42,7 @@ matching on return fingerprints. Generates probabilistic BUY/SELL/HOLD signals.
 
 ## Critical Rules
 
-1. **Run tests first.** `PYTHONUTF8=1 py -3.12 -m pytest tests/ -q -m "not slow"` — 801 tests, all must pass.
+1. **Run tests first.** `PYTHONUTF8=1 py -3.12 -m pytest tests/ -q -m "not slow"` — 807 tests, all must pass.
 2. **Numbers require provenance.** Any claimed metric must trace to walk-forward results
    or experiment logs. If it cannot be traced, it is fabricated. No exceptions.
 3. **Do NOT modify `prepare.py` or this file** unless explicitly asked.

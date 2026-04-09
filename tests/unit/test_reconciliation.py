@@ -126,3 +126,21 @@ class TestReconciliationResult:
         result = reconcile(snap, broker)
         assert result.n_expected == 2
         assert result.n_actual == 2
+
+
+class TestReconcileCLIGuard:
+    def test_cli_script_raises_not_configured(self):
+        """reconcile.py CLI should refuse to run with placeholder values."""
+        import subprocess
+        import sys
+        from pathlib import Path
+
+        project_root = Path(__file__).parents[2]
+        script = project_root / "scripts" / "reconcile.py"
+        result = subprocess.run(
+            [sys.executable, str(script)],
+            capture_output=True, text=True,
+            env={**__import__("os").environ, "PYTHONPATH": str(project_root)},
+        )
+        assert result.returncode != 0
+        assert "placeholder" in result.stderr.lower() or "not configured" in result.stderr.lower()

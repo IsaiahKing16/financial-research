@@ -206,3 +206,145 @@ class TestMockBrokerCancel:
     def test_cancel_returns_false_unknown(self):
         b = MockBroker()
         assert b.cancel_order("nonexistent") is False
+
+
+class TestMockBrokerOverSellGuard:
+    """Tests for oversell clamping (Codex P1 fix)."""
+
+    def test_sell_more_than_held_clamps_to_position(self):
+        """Hold 10 shares, try to sell 20 → fills 10, PARTIAL status."""
+        from trading_system.broker.mock import MockBroker, MockBrokerConfig
+        from trading_system.broker.base import Order
+        from trading_system.contracts.trades import OrderStatus, OrderSide
+        from datetime import datetime, timezone
+
+        broker = MockBroker(MockBrokerConfig(
+            initial_cash=100_000.0, slippage_bps=0.0, fill_fraction=1.0,
+        ))
+        broker.set_prices({"AAPL": 150.0})
+
+        buy = Order(
+            order_id="buy-1", ticker="AAPL", side=OrderSide.BUY,
+            quantity=10.0, timestamp=datetime(2024, 1, 2, tzinfo=timezone.utc),
+        )
+        broker.submit_order(buy)
+
+        sell = Order(
+            order_id="sell-1", ticker="AAPL", side=OrderSide.SELL,
+            quantity=20.0, timestamp=datetime(2024, 1, 2, tzinfo=timezone.utc),
+        )
+        result = broker.submit_order(sell)
+
+        assert result.filled_quantity == 10.0, (
+            f"Should clamp to held quantity, got {result.filled_quantity}"
+        )
+        assert result.status == OrderStatus.PARTIAL
+
+    def test_sell_clamped_cash_is_correct(self):
+        """Hold 5 @ $100, sell 10 → cash increases by $500 (5 shares), not $1000."""
+        from trading_system.broker.mock import MockBroker, MockBrokerConfig
+        from trading_system.broker.base import Order
+        from trading_system.contracts.trades import OrderSide
+        from datetime import datetime, timezone
+        import pytest
+
+        broker = MockBroker(MockBrokerConfig(
+            initial_cash=100_000.0, slippage_bps=0.0, fill_fraction=1.0,
+        ))
+        broker.set_prices({"TEST": 100.0})
+
+        buy = Order(
+            order_id="buy-1", ticker="TEST", side=OrderSide.BUY,
+            quantity=5.0, timestamp=datetime(2024, 1, 2, tzinfo=timezone.utc),
+        )
+        broker.submit_order(buy)
+        cash_after_buy = broker.get_account().cash
+
+        sell = Order(
+            order_id="sell-1", ticker="TEST", side=OrderSide.SELL,
+            quantity=10.0, timestamp=datetime(2024, 1, 2, tzinfo=timezone.utc),
+        )
+        broker.submit_order(sell)
+        cash_after_sell = broker.get_account().cash
+
+        assert cash_after_sell == pytest.approx(cash_after_buy + 500.0), (
+            f"Expected cash increase of $500, got {cash_after_sell - cash_after_buy}"
+        )
+
+    def test_sell_clamp_removes_position(self):
+        """After clamped sell of full position, ticker no longer in positions."""
+        from trading_system.broker.mock import MockBroker, MockBrokerConfig
+        from trading_system.broker.base import Order
+        from trading_system.contracts.trades import OrderSide
+        from datetime import datetime, timezone
+
+        broker = MockBroker(MockBrokerConfig(
+            initial_cash=100_000.0, slippage_bps=0.0, fill_fraction=1.0,
+        ))
+        broker.set_prices({"XYZ": 50.0})
+
+        buy = Order(
+            order_id="buy-1", ticker="XYZ", side=OrderSide.BUY,
+            quantity=10.0, timestamp=datetime(2024, 1, 2, tzinfo=timezone.utc),
+        )
+        broker.submit_order(buy)
+        assert any(p.ticker == "XYZ" for p in broker.get_positions())
+
+        sell = Order(
+            order_id="sell-1", ticker="XYZ", side=OrderSide.SELL,
+            quantity=999.0,
+            timestamp=datetime(2024, 1, 2, tzinfo=timezone.utc),
+        )
+        broker.submit_order(sell)
+        assert not any(p.ticker == "XYZ" for p in broker.get_positions()), (
+            "Position should be fully closed after clamped sell"
+        )
+
+
+class TestMockBrokerZeroFillGuard:
+    """Tests for zero-fill ghost position prevention (Codex P2 fix)."""
+
+    def test_zero_fill_fraction_buy_no_ghost_position(self):
+        """fill_fraction=0.0 → BUY creates NO position entry."""
+        from trading_system.broker.mock import MockBroker, MockBrokerConfig
+        from trading_system.broker.base import Order
+        from trading_system.contracts.trades import OrderStatus, OrderSide
+        from datetime import datetime, timezone
+
+        broker = MockBroker(MockBrokerConfig(
+            initial_cash=100_000.0, slippage_bps=0.0, fill_fraction=0.0,
+        ))
+        broker.set_prices({"GHOST": 100.0})
+
+        buy = Order(
+            order_id="buy-1", ticker="GHOST", side=OrderSide.BUY,
+            quantity=10.0, timestamp=datetime(2024, 1, 2, tzinfo=timezone.utc),
+        )
+        result = broker.submit_order(buy)
+
+        assert result.status == OrderStatus.REJECTED
+        assert result.filled_quantity == 0.0
+        assert not any(p.ticker == "GHOST" for p in broker.get_positions()), (
+            "Zero-fill should not create a ghost position"
+        )
+
+    def test_zero_fill_fraction_buy_cash_unchanged(self):
+        """fill_fraction=0.0 → cash should not change."""
+        from trading_system.broker.mock import MockBroker, MockBrokerConfig
+        from trading_system.broker.base import Order
+        from trading_system.contracts.trades import OrderSide
+        from datetime import datetime, timezone
+        import pytest
+
+        broker = MockBroker(MockBrokerConfig(
+            initial_cash=50_000.0, slippage_bps=0.0, fill_fraction=0.0,
+        ))
+        broker.set_prices({"GHOST": 200.0})
+
+        buy = Order(
+            order_id="buy-1", ticker="GHOST", side=OrderSide.BUY,
+            quantity=100.0, timestamp=datetime(2024, 1, 2, tzinfo=timezone.utc),
+        )
+        broker.submit_order(buy)
+
+        assert broker.get_account().cash == pytest.approx(50_000.0)

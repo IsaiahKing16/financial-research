@@ -18,7 +18,7 @@ matching on return fingerprints. Generates probabilistic BUY/SELL/HOLD signals.
   - `contracts/`: Pydantic schemas, BaseMatcher ABC, EngineState, SignalDirection/Source
   - `features.py`, `data.py`, `schema.py` — feature pipeline and data loading
   - `regime.py`: RegimeLabeler (SPY + VIX spike + yield curve); regime_filter=False in prod
-  - `live.py`: LiveRunner + MockBrokerAdapter (EOD pipeline skeleton; broker DI for tests)
+  - `live.py`: LiveRunner (Phase 5): receives AllocationDecisions + exit_tickers, submits via OrderManager + BaseBroker DI
   - `contracts/matchers/hnsw_matcher.py`: save_index/load_index for disk persistence
   - Research pilots (behind flags): `sax_filter.py`, `wfa_reranker.py`, `ib_compression.py`, `conformal_hooks.py`
 - `trading_system/` — Phase 3Z production layer: SharedState, StrategyEvaluator, risk overlays

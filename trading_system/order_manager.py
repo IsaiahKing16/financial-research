@@ -38,6 +38,7 @@ class OrderManager:
             )
         self._broker = broker
         self._timeout_seconds = timeout_seconds
+        # NOTE: timeout enforcement requires async broker support (Phase 8). Not enforced for synchronous brokers.
         self._orders: dict[str, ManagedOrder] = {}
 
     def create_order_from_decision(

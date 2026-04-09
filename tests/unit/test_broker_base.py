@@ -52,13 +52,24 @@ class TestOrderSchema:
         assert o.limit_price == 350.0
 
     def test_order_is_frozen(self):
+        from pydantic import ValidationError
         from trading_system.broker.base import Order
         o = Order(
             order_id="x", ticker="A", side=OrderSide.BUY,
             quantity=1.0, timestamp=datetime(2024, 1, 2, tzinfo=timezone.utc),
         )
-        with pytest.raises(Exception):
+        with pytest.raises((ValidationError, TypeError)):
             o.quantity = 99.0
+
+    def test_limit_order_requires_price(self):
+        from pydantic import ValidationError
+        from trading_system.broker.base import Order
+        with pytest.raises(ValidationError):
+            Order(
+                order_id="x", ticker="AAPL", side=OrderSide.BUY,
+                quantity=1.0, order_type="LIMIT", limit_price=None,
+                timestamp=datetime(2024, 1, 2, tzinfo=timezone.utc),
+            )
 
 
 class TestOrderResultSchema:

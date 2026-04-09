@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from trading_system.contracts.trades import OrderSide, OrderStatus
 
@@ -23,6 +23,21 @@ class Order(BaseModel):
     notional: Optional[float] = Field(default=None, description="Dollar amount (audit trail)")
     timestamp: datetime
 
+    @field_validator("ticker")
+    @classmethod
+    def ticker_uppercase(cls, v: str) -> str:
+        if v != v.upper():
+            raise ValueError(f"Ticker must be uppercase: got '{v}'")
+        return v
+
+    @model_validator(mode="after")
+    def _validate_limit_price(self) -> "Order":
+        if self.order_type == "LIMIT" and self.limit_price is None:
+            raise ValueError("limit_price is required when order_type='LIMIT'")
+        if self.order_type == "MARKET" and self.limit_price is not None:
+            raise ValueError("limit_price must be None for MARKET orders")
+        return self
+
 
 class OrderResult(BaseModel):
     """Immutable result of a broker order submission."""
@@ -37,6 +52,13 @@ class OrderResult(BaseModel):
     executed_at: Optional[datetime] = None
     error: Optional[str] = None
 
+    @field_validator("ticker")
+    @classmethod
+    def ticker_uppercase(cls, v: str) -> str:
+        if v != v.upper():
+            raise ValueError(f"Ticker must be uppercase: got '{v}'")
+        return v
+
 
 class BrokerPosition(BaseModel):
     """Broker-reported position for a single ticker."""
@@ -47,6 +69,13 @@ class BrokerPosition(BaseModel):
     avg_cost: float
     current_value: float
     unrealized_pnl: float
+
+    @field_validator("ticker")
+    @classmethod
+    def ticker_uppercase(cls, v: str) -> str:
+        if v != v.upper():
+            raise ValueError(f"Ticker must be uppercase: got '{v}'")
+        return v
 
 
 class AccountSnapshot(BaseModel):

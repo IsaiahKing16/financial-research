@@ -105,6 +105,19 @@ class TestMockBrokerRejections:
         r = b.submit_order(_order(quantity=10.0))
         assert r.status == OrderStatus.FILLED
 
+    def test_sell_without_position_rejected(self):
+        b = MockBroker(MockBrokerConfig(slippage_bps=0.0))
+        b.set_prices({"AAPL": 100.0})
+        r = b.submit_order(_order(side=OrderSide.SELL, quantity=5.0))
+        assert r.status == OrderStatus.REJECTED
+        assert r.error is not None
+        assert b.get_account().cash == pytest.approx(10_000.0)  # cash unchanged
+
+    def test_unpriced_ticker_raises(self):
+        b = MockBroker()
+        with pytest.raises(RuntimeError, match="no price set"):
+            b.submit_order(_order(ticker="TSLA"))
+
 
 class TestMockBrokerPositionTracking:
     def test_buy_creates_position(self):
@@ -143,6 +156,16 @@ class TestMockBrokerPositionTracking:
         b.submit_order(_order(quantity=10.0, order_id="b1"))
         b.submit_order(_order(side=OrderSide.SELL, quantity=10.0, order_id="s1"))
         assert b.get_account().cash == pytest.approx(10_000.0)
+
+    def test_avg_cost_weighted_average(self):
+        b = MockBroker(MockBrokerConfig(slippage_bps=0.0))
+        b.set_prices({"AAPL": 100.0})
+        b.submit_order(_order(quantity=10.0, order_id="b1"))
+        b.set_prices({"AAPL": 120.0})
+        b.submit_order(_order(quantity=10.0, order_id="b2"))
+        pos = b.get_positions()[0]
+        assert pos.avg_cost == pytest.approx(110.0)
+        assert pos.quantity == pytest.approx(20.0)
 
     def test_multiple_tickers(self):
         b = MockBroker(MockBrokerConfig(slippage_bps=0.0))

@@ -36,8 +36,6 @@ class MockBroker(BaseBroker):
         self._prices.update(prices)
 
     def submit_order(self, order: Order) -> OrderResult:
-        price = self._prices.get(order.ticker, 0.0)
-
         # Rejection: fail ticker
         if order.ticker in self._config.fail_tickers:
             result = OrderResult(
@@ -51,6 +49,14 @@ class MockBroker(BaseBroker):
             )
             self._history.append((order, result))
             return result
+
+        # Guard: price must be set
+        if order.ticker not in self._prices:
+            raise RuntimeError(
+                f"MockBroker: no price set for {order.ticker!r}; call set_prices() first"
+            )
+
+        price = self._prices[order.ticker]
 
         # Compute fill price with slippage
         slip = self._config.slippage_bps / 10_000
@@ -101,12 +107,23 @@ class MockBroker(BaseBroker):
                 )
                 pos.quantity = total_qty
         else:
-            self._cash += cost
             pos = self._positions.get(order.ticker)
-            if pos is not None:
-                pos.quantity -= fill_qty
-                if pos.quantity <= 0:
-                    del self._positions[order.ticker]
+            if pos is None:
+                result = OrderResult(
+                    order_id=order.order_id,
+                    ticker=order.ticker,
+                    status=OrderStatus.REJECTED,
+                    filled_quantity=0.0,
+                    fill_price=0.0,
+                    latency_ms=self._config.latency_ms,
+                    error=f"No position in {order.ticker} to sell",
+                )
+                self._history.append((order, result))
+                return result
+            self._cash += cost
+            pos.quantity -= fill_qty
+            if pos.quantity < 1e-9:
+                del self._positions[order.ticker]
 
         result = OrderResult(
             order_id=order.order_id,

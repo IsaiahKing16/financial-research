@@ -75,6 +75,38 @@ class TestResearchFlags:
         assert cfg.research_flags.use_slip_deficit is False
 
 
+# ─── TestPortfolioManagerFlag (T4.1b) ─────────────────────────────────────────
+
+class TestPortfolioManagerFlag:
+    """use_portfolio_manager is a flat TradingConfig field, not a sub-config.
+
+    Placed at the orchestration layer (not inside PositionLimitsConfig or
+    ResearchFlagsConfig) because it controls whether the PM pipeline stage
+    runs at all — not a per-trade parameter.
+    """
+
+    def test_default_is_false(self):
+        """Default preserves Phase 3 behavior (no PM filter)."""
+        cfg = TradingConfig()
+        assert cfg.use_portfolio_manager is False
+
+    def test_enable_via_replace(self):
+        """Can enable via dataclasses.replace() for Phase 4 wiring."""
+        cfg = TradingConfig()
+        cfg_on = dataclasses.replace(cfg, use_portfolio_manager=True)
+        assert cfg_on.use_portfolio_manager is True
+
+    def test_enable_does_not_mutate_original(self):
+        cfg = TradingConfig()
+        _ = dataclasses.replace(cfg, use_portfolio_manager=True)
+        assert cfg.use_portfolio_manager is False
+
+    def test_validate_passes_with_pm_enabled(self):
+        """Enabling PM does not introduce new validation errors."""
+        cfg = dataclasses.replace(TradingConfig(), use_portfolio_manager=True)
+        assert cfg.validate() == []
+
+
 # ─── TestTradingConfigDefaults ────────────────────────────────────────────────
 
 class TestTradingConfigDefaults:

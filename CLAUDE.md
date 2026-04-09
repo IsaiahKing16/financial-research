@@ -42,7 +42,7 @@ matching on return fingerprints. Generates probabilistic BUY/SELL/HOLD signals.
 
 ## Critical Rules
 
-1. **Run tests first.** `PYTHONUTF8=1 py -3.12 -m pytest tests/ -q -m "not slow"` — 807 tests, all must pass.
+1. **Run tests first.** `PYTHONUTF8=1 py -3.12 -m pytest tests/ -q -m "not slow"` — 829 tests, all must pass.
 2. **Numbers require provenance.** Any claimed metric must trace to walk-forward results
    or experiment logs. If it cannot be traced, it is fabricated. No exceptions.
 3. **Do NOT modify `prepare.py` or this file** unless explicitly asked.
@@ -88,11 +88,18 @@ regime=hold_spy_threshold+0.05, horizon=fwd_7d_up, stop_loss_atr_multiple=3.0
 - Commits on `phase4-portfolio-manager` branch: T4.0b → T4.0 → T4.0c → T4.1a → T4.1b → T4.2 → T4.3 → T4.4.
 - Session log: `docs/session-logs/SESSION_2026-04-09_phase4-t4-1a-through-t4-2.md`
 
-**Phase 5 Live Execution Plumbing — IN PROGRESS (2026-04-09)**
+**Phase 5 Live Execution Plumbing — COMPLETE (2026-04-09)**
 - Plan: `docs/superpowers/plans/2026-04-09-phase5-live-plumbing-plan.md`
 - Spec: `docs/superpowers/specs/2026-04-09-phase5-live-plumbing-design.md`
-- T5.1–T5.6 complete (BaseBroker, MockBroker, OrderManager, Reconciliation, LiveRunner, Gate Test)
-- G1: 100/100 fills ✓, G2: 30-day recon ✓, G3: 0.18s ✓ — T5.7 (CLAUDE.md) pending
+- G1: 100/100 fills ✓, G2: 30-day recon ✓, G3: 0.18s ✓
+
+**Phase 6 Candlestick Features — IN PROGRESS (2026-04-09)**
+- Handoff: `HANDOFF_phase6-candlestick-features.md`
+- Branch: `feat/phase6-candlestick-features`
+- 15-column continuous candlestick feature set (5 proportions × 3 timeframes) implemented.
+- `FeatureRegistry` + `FeatureSet` added to `pattern_engine/features.py`.
+- `EngineConfig.feature_set` field added; `returns_candle` registered (23 columns).
+- 829 tests pass (807 baseline + 22 new). Walk-forward smoke test pending.
 
 Phase 1–4 summary (for context, not active):
 - H7 regime HOLD: mean_BSS=+0.00033, 3/6 positive folds. Thin margin.

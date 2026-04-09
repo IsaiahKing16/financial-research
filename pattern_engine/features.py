@@ -1,14 +1,12 @@
 """
-features.py — Feature column definitions and weighting utilities.
+features.py — Feature column definitions, FeatureRegistry, and weighting utilities.
 
-Mirrors production pattern_engine/features.py but lives in the rebuild
-workspace. Imports from the production FeatureRegistry where available;
-falls back to hardcoded returns_only when running in isolation.
-
-Linear: SLE-60
+Linear: SLE-60 (original), Phase 6 (FeatureRegistry + returns_candle)
 """
 
 from __future__ import annotations
+
+from dataclasses import dataclass, field
 
 import numpy as np
 
@@ -28,11 +26,89 @@ Candidate to replace RETURNS_ONLY_COLS once walk-forward confirms improvement.
 """
 
 
+# ─── FeatureSet + FeatureRegistry ─────────────────────────────────────────────
+
+@dataclass(frozen=True)
+class FeatureSet:
+    """Descriptor for a named feature set used by EngineConfig.
+
+    Args:
+        name:        Unique identifier (matches the key in FeatureRegistry).
+        columns:     Ordered list of column names. Order is HNSW-index-stable —
+                     never change column order after an index has been built.
+        description: Human-readable summary of what this set contains.
+    """
+    name: str
+    columns: list[str] = field(default_factory=list)
+    description: str = ""
+
+
+def _build_registry() -> dict[str, FeatureSet]:
+    """Build the feature registry. Deferred to avoid import-time circular deps."""
+    from pattern_engine.candlestick import CANDLE_COLS  # Phase 6
+    return {
+        "returns_only": FeatureSet(
+            name="returns_only",
+            columns=list(VOL_NORM_COLS),
+            description="8 vol-normalized returns — locked default (Phase 1-5)",
+        ),
+        "returns_candle": FeatureSet(
+            name="returns_candle",
+            columns=list(VOL_NORM_COLS) + list(CANDLE_COLS),
+            description="8 vol-normalized returns + 15 candlestick features (Phase 6)",
+        ),
+    }
+
+
+class _FeatureRegistry:
+    """Lazy-initialized registry mapping feature set names → FeatureSet.
+
+    Initialization is deferred so that circular imports during package load
+    (features.py → candlestick.py → features.py) are avoided.
+    """
+
+    def __init__(self) -> None:
+        self._registry: dict[str, FeatureSet] | None = None
+
+    def _ensure_loaded(self) -> None:
+        if self._registry is None:
+            self._registry = _build_registry()
+
+    def get(self, name: str) -> FeatureSet:
+        """Return the FeatureSet for a given name.
+
+        Args:
+            name: Feature set identifier (e.g. "returns_only").
+
+        Returns:
+            FeatureSet with .columns and .description.
+
+        Raises:
+            KeyError: If name is not registered.
+        """
+        self._ensure_loaded()
+        if name not in self._registry:  # type: ignore[operator]
+            raise KeyError(
+                f"Unknown feature set '{name}'. "
+                f"Available: {sorted(self._registry.keys())}"  # type: ignore[union-attr]
+            )
+        return self._registry[name]  # type: ignore[index]
+
+    def __contains__(self, name: str) -> bool:
+        self._ensure_loaded()
+        return name in self._registry  # type: ignore[operator]
+
+    def keys(self):
+        self._ensure_loaded()
+        return self._registry.keys()  # type: ignore[union-attr]
+
+
+FeatureRegistry = _FeatureRegistry()
+"""Singleton feature set registry. Use FeatureRegistry.get("returns_only")."""
+
+
 def get_feature_cols(feature_set: str) -> list[str]:
     """Resolve feature column names for a given feature set.
-
-    Delegates to production FeatureRegistry where available; falls back
-    to hardcoded sets for isolated testing.
 
     Args:
         feature_set: Feature set name (e.g. "returns_only").
@@ -41,21 +117,16 @@ def get_feature_cols(feature_set: str) -> list[str]:
         Ordered list of column names for that feature set.
 
     Raises:
-        ValueError: If the feature set is not registered and not hardcoded.
+        ValueError: If the feature set is not registered.
     """
     try:
-        from pattern_engine.features import FeatureRegistry
         return FeatureRegistry.get(feature_set).columns
-    except (ImportError, KeyError):
+    except KeyError:
         pass
-
-    # Hardcoded fallback for isolated rebuild workspace tests
-    if feature_set == "returns_only":
-        return RETURNS_ONLY_COLS
 
     raise ValueError(
         f"Unknown feature set '{feature_set}'. "
-        "Ensure FeatureRegistry is accessible or add a hardcoded fallback."
+        f"Available: {list(FeatureRegistry.keys())}"
     )
 
 

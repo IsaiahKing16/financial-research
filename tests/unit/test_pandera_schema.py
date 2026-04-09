@@ -29,8 +29,11 @@ from pattern_engine.schema import (
 )
 
 # ─── Feature set used in all tests ────────────────────────────────────────────
+# returns_only maps to VOL_NORM_COLS (ret_{w}d_norm) per CLAUDE.md locked setting.
+# Phase 6 FeatureRegistry now makes this explicit; previously the fallback returned
+# ret_{w}d (RETURNS_ONLY_COLS), which was inconsistent with the locked production default.
 FEATURE_SET = "returns_only"
-FEATURE_COLS = [f"ret_{w}d" for w in [1, 3, 7, 14, 30, 45, 60, 90]]
+FEATURE_COLS = [f"ret_{w}d_norm" for w in [1, 3, 7, 14, 30, 45, 60, 90]]
 TARGET = "fwd_7d_up"
 
 
@@ -105,7 +108,7 @@ class TestValidateTrainDB:
             validate_train_db(df, FEATURE_SET, TARGET)
 
     def test_missing_feature_column_raises(self):
-        df = _make_train_df().drop(columns=["ret_1d"])
+        df = _make_train_df().drop(columns=["ret_1d_norm"])
         with pytest.raises(SchemaError):
             validate_train_db(df, FEATURE_SET, TARGET)
 
@@ -116,7 +119,7 @@ class TestValidateTrainDB:
 
     def test_nan_in_feature_raises(self):
         df = _make_train_df()
-        df.loc[10, "ret_7d"] = np.nan
+        df.loc[10, "ret_7d_norm"] = np.nan
         with pytest.raises(SchemaError):
             validate_train_db(df, FEATURE_SET, TARGET)
 
@@ -144,7 +147,7 @@ class TestValidateTrainDB:
     def test_schema_error_lists_all_failures(self):
         """Error message must describe all violations (multi-error format)."""
         df = _make_train_df()
-        df = df.drop(columns=["ret_1d"])
+        df = df.drop(columns=["ret_1d_norm"])
         df.loc[0, TARGET] = np.nan
         with pytest.raises(SchemaError) as exc_info:
             validate_train_db(df, FEATURE_SET, TARGET)
@@ -184,13 +187,13 @@ class TestValidateQueryDB:
             validate_query_db(df, FEATURE_SET)
 
     def test_missing_feature_col_raises(self):
-        df = _make_query_df().drop(columns=["ret_90d"])
+        df = _make_query_df().drop(columns=["ret_90d_norm"])
         with pytest.raises(SchemaError):
             validate_query_db(df, FEATURE_SET)
 
     def test_nan_in_feature_raises(self):
         df = _make_query_df()
-        df.loc[2, "ret_30d"] = np.nan
+        df.loc[2, "ret_30d_norm"] = np.nan
         with pytest.raises(SchemaError):
             validate_query_db(df, FEATURE_SET)
 

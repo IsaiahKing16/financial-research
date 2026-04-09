@@ -35,6 +35,8 @@ class EngineConfig:
     use_hnsw: bool = True                 # HNSWMatcher (faster; parity confirmed)
 
     # ── Features ─────────────────────────────────────────────────────────────
+    feature_set: str = "returns_only"
+    """Feature set name resolved via FeatureRegistry. Default is locked per CLAUDE.md."""
     feature_weights: dict = field(default_factory=dict)
 
     # ── Forward projection ────────────────────────────────────────────────────

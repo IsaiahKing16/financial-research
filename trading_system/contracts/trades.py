@@ -165,11 +165,13 @@ class OrderSide(str, Enum):
 
 class OrderStatus(str, Enum):
     """Lifecycle state of an order."""
-    PENDING = "PENDING"         # Submitted, awaiting fill
+    PENDING = "PENDING"         # Created, not yet submitted to broker
+    SUBMITTED = "SUBMITTED"     # Sent to broker, awaiting response
     FILLED = "FILLED"           # Fully executed
     PARTIAL = "PARTIAL"         # Partially filled (live trading only)
     CANCELLED = "CANCELLED"     # Cancelled before fill
     REJECTED = "REJECTED"       # Broker/system rejected the order
+    TIMED_OUT = "TIMED_OUT"     # No broker response within deadline
 
 
 class TradeEvent(BaseModel):

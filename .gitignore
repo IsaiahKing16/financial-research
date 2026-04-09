@@ -42,3 +42,4 @@ data/results/
 
 # Claude worktrees
 .claude/
+.worktrees/

@@ -1,282 +1,128 @@
-"""
-live.py — EOD live signal generation and order submission runner.
-
-Orchestrates the nightly 4:00 PM execution pipeline:
-  1. Validate EngineState config hash hasn't drifted since overnight fit
-  2. Query PatternMatcher on today's val_db
-  3. Apply signal filters (SentimentVetoFilter if enabled)
-  4. Submit orders via broker adapter
-  5. Return updated SharedState with new positions
-
-Design: dependency injection (PatternMatcher + broker injected, not hardcoded)
-so that tests can swap in a MockBrokerAdapter without real API keys.
-
-Linear: M9 (data ingestion scale-up)
-"""
-
+"""LiveRunner — execution-only runner for live trading."""
 from __future__ import annotations
 
 import hashlib
 import json
 import logging
-from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
 from typing import Optional
 
-import pandas as pd
-
-from pattern_engine.contracts.state import EngineState
 from pattern_engine.matcher import PatternMatcher
+from pattern_engine.contracts.state import EngineState
 from trading_system.contracts.state import SharedState
+from trading_system.contracts.decisions import AllocationDecision
+from trading_system.portfolio_state import PortfolioSnapshot
+from trading_system.broker.base import BaseBroker
+from trading_system.order_manager import OrderManager, ManagedOrder
+from trading_system.reconciliation import reconcile
 
-logger = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
-
-# ─── Order / OrderResult ──────────────────────────────────────────────────────
-
-@dataclass
-class Order:
-    """A single order to submit to the broker.
-
-    Args:
-        ticker: Stock ticker symbol (uppercase).
-        direction: "BUY" or "SELL".
-        notional: Dollar amount (pre-position-sizing).
-    """
-    ticker: str
-    direction: str       # "BUY" or "SELL"
-    notional: float      # dollar amount (pre-position-sizing)
-
-
-@dataclass
-class OrderResult:
-    """Result returned by the broker after submitting an order.
-
-    Args:
-        ticker: Stock ticker symbol.
-        filled_fraction: Fraction of order filled (1.0 = full, 0.0 = rejected).
-        fill_price: Execution price (0.0 if rejected).
-        latency_ms: Round-trip broker latency in milliseconds.
-        error: None if successful; error message string if failed.
-    """
-    ticker: str
-    filled_fraction: float  # 1.0 = full fill, 0.5 = half fill, 0.0 = rejected
-    fill_price: float       # execution price (0.0 if rejected)
-    latency_ms: float       # round-trip broker latency observed
-    error: Optional[str]    # None if successful, error message if failed
-
-
-# ─── BaseBrokerAdapter ABC ────────────────────────────────────────────────────
-
-class BaseBrokerAdapter(ABC):
-    """Abstract broker interface. Inject a concrete implementation into LiveRunner.
-
-    All implementations must return OrderResult even on failure — never raise.
-    """
-
-    @abstractmethod
-    def submit_order(self, order: Order) -> OrderResult:
-        """Submit a single order. Must return OrderResult even on failure."""
-
-    @abstractmethod
-    def get_account_value(self) -> float:
-        """Return current total account value in dollars."""
-
-
-# ─── MockBrokerAdapter ────────────────────────────────────────────────────────
-
-class MockBrokerAdapter(BaseBrokerAdapter):
-    """In-memory broker for testing. Simulates latency and partial fills.
-
-    Args:
-        fill_fraction: Fraction of each order filled (1.0 = full, 0.5 = half).
-        latency_ms: Simulated round-trip latency in milliseconds.
-        fail_tickers: Set of ticker symbols that will be rejected.
-        account_value: Simulated account value.
-
-    Note: latency_ms causes a real blocking time.sleep() call. Keep test
-    values small (≤ 50ms) to avoid slowing the test suite.
-    """
-
-    def __init__(
-        self,
-        fill_fraction: float = 1.0,
-        latency_ms: float = 0.0,
-        fail_tickers: Optional[set] = None,
-        account_value: float = 100_000.0,
-    ) -> None:
-        self.fill_fraction = fill_fraction
-        self.latency_ms = latency_ms
-        self.fail_tickers = fail_tickers or set()
-        self._account_value = account_value
-        self.submitted_orders: list[Order] = []  # for test assertions
-
-    def submit_order(self, order: Order) -> OrderResult:
-        import time
-        self.submitted_orders.append(order)
-        time.sleep(self.latency_ms / 1000.0)
-        if order.ticker in self.fail_tickers:
-            return OrderResult(
-                ticker=order.ticker,
-                filled_fraction=0.0,
-                fill_price=0.0,
-                latency_ms=self.latency_ms,
-                error=f"Broker rejected {order.ticker}",
-            )
-        return OrderResult(
-            ticker=order.ticker,
-            filled_fraction=self.fill_fraction,
-            fill_price=100.0,  # arbitrary sentinel — no real price relationship
-            latency_ms=self.latency_ms,
-            error=None,
-        )
-
-    def get_account_value(self) -> float:
-        return self._account_value
-
-
-# ─── LiveRunner ───────────────────────────────────────────────────────────────
 
 class LiveRunner:
-    """EOD live signal generation and order submission runner.
+    """Execution-only runner. Receives decisions, submits orders via OrderManager.
 
-    Executes the nightly pipeline:
-      1. (Optional) Verify EngineState config_hash hasn't drifted — warn, don't halt.
-      2. Check shared_state.is_halted — skip all orders if True.
-      3. Query matcher on val_db to get BUY/SELL/HOLD signals.
-      4. Build and submit an Order for each BUY or SELL signal.
-      5. Return (shared_state, order_results).
-
-    SharedState update is deferred to Phase 4 PortfolioManager (out of scope
-    here). This runner returns the original shared_state unchanged plus the
-    list of OrderResult objects.
-
-    Args:
-        matcher: A fitted PatternMatcher instance.
-        shared_state: Current SharedState (frozen Pydantic bus).
-        broker: A BaseBrokerAdapter implementation (real or mock).
-        engine_state: Optional EngineState checkpoint used to verify config
-                      hash hasn't drifted since the overnight fit. If None,
-                      the check is skipped entirely.
+    The caller (daily orchestrator, Phase 8) runs the full pipeline upstream:
+    matcher → PM → risk engine → position sizer → AllocationDecisions.
+    LiveRunner receives decisions and exit tickers, then executes them.
     """
 
     def __init__(
         self,
         matcher: PatternMatcher,
         shared_state: SharedState,
-        broker: BaseBrokerAdapter,
+        broker: BaseBroker,
+        order_manager: OrderManager,
         engine_state: Optional[EngineState] = None,
+        reconcile_on_start: bool = True,
     ) -> None:
         if not isinstance(matcher, PatternMatcher):
             raise RuntimeError(
-                f"matcher must be a PatternMatcher instance; got {type(matcher)}"
+                f"matcher must be a PatternMatcher, got {type(matcher).__name__}"
             )
-        if not isinstance(shared_state, SharedState):
+        if not isinstance(broker, BaseBroker):
             raise RuntimeError(
-                f"shared_state must be a SharedState instance; got {type(shared_state)}"
-            )
-        if not isinstance(broker, BaseBrokerAdapter):
-            raise RuntimeError(
-                f"broker must be a BaseBrokerAdapter instance; got {type(broker)}"
+                f"broker must be a BaseBroker, got {type(broker).__name__}"
             )
         self._matcher = matcher
         self._shared_state = shared_state
         self._broker = broker
+        self._order_manager = order_manager
         self._engine_state = engine_state
+        self._reconcile_on_start = reconcile_on_start
 
     def run(
         self,
-        val_db: pd.DataFrame,
-    ) -> tuple[SharedState, list[OrderResult]]:
-        """Execute the EOD pipeline. Returns (updated_state, order_results).
-
-        Pipeline:
-          1. If engine_state provided, verify config_hash hasn't drifted
-             (log warning if so — don't halt).
-          2. Check shared_state.is_halted — if True, skip all orders, return
-             state unchanged and an empty list.
-          3. Query matcher on val_db (confidence signals only: BUY/SELL,
-             not HOLD).
-          4. For each BUY/SELL signal: build Order(ticker, direction,
-             notional=1000.0).
-          5. Submit each Order via broker.submit_order().
-          6. Return (shared_state, order_results).
-             Note: SharedState update is deferred to Phase 4 PortfolioManager
-                   (out of scope here — just return original state + results).
+        entry_decisions: list[AllocationDecision],
+        exit_tickers: list[tuple[str, float, float]],
+        snapshot: PortfolioSnapshot,
+        prices: dict[str, float] | None = None,
+    ) -> list[ManagedOrder]:
+        """Execute entry and exit orders.
 
         Args:
-            val_db: Query DataFrame with feature columns + Ticker + Date.
-                    The matcher uses its own internally stored feature columns.
+            entry_decisions: BUY allocations from upstream pipeline.
+            exit_tickers: List of (ticker, quantity, price) for exits.
+            snapshot: Current portfolio snapshot for reconciliation.
+            prices: Current prices by ticker (required for entry orders).
 
         Returns:
-            (shared_state, order_results) — original state plus broker results.
-
-        Raises:
-            RuntimeError: If the matcher has not been fitted (raised by
-                          PatternMatcher.query() internally).
+            List of ManagedOrder results (exits first, then entries).
         """
-        # Step 1 — config drift check (warn only)
+        # 1. Pre-flight reconciliation
+        if self._reconcile_on_start:
+            recon_result = reconcile(snapshot, self._broker)
+            if not recon_result.passed:
+                log.error(
+                    "Reconciliation failed: %d mismatches, %d missing, %d unexpected",
+                    len(recon_result.mismatches),
+                    len(recon_result.missing_positions),
+                    len(recon_result.unexpected_positions),
+                )
+                return []
+
+        # 2. Config hash drift check (warn-only)
         if self._engine_state is not None:
-            # We cannot reconstruct the original EngineConfig here without
-            # full context, so we compare the stored hash directly against
-            # the matcher's current config object when possible.
-            try:
-                config = self._matcher.config
-                config_dict = (
-                    config.model_dump()
-                    if hasattr(config, "model_dump")
-                    else vars(config)
-                )
-                current_hash = hashlib.sha256(
-                    json.dumps(config_dict, sort_keys=True, default=str).encode()
-                ).hexdigest()
-                if current_hash != self._engine_state.config_hash:
-                    logger.warning(
-                        "LiveRunner: config_hash drift detected. "
-                        "Stored hash=%s, current hash=%s. "
-                        "Matcher may have been reconfigured since last fit. "
-                        "Continuing execution.",
-                        self._engine_state.config_hash[:16],
-                        current_hash[:16],
-                    )
-            except Exception as exc:
-                logger.warning(
-                    "LiveRunner: could not verify config_hash: %s. "
-                    "Continuing execution.",
-                    exc,
+            config = self._matcher.config
+            config_dict = (
+                config.model_dump()
+                if hasattr(config, "model_dump")
+                else vars(config)
+            )
+            current_hash = hashlib.sha256(
+                json.dumps(config_dict, sort_keys=True, default=str).encode()
+            ).hexdigest()
+            if current_hash != self._engine_state.config_hash:
+                log.warning(
+                    "Config drift detected: engine_state hash=%s, current=%s",
+                    self._engine_state.config_hash,
+                    current_hash,
                 )
 
-        # Step 2 — halt guard
+        # 3. Halt check
         if self._shared_state.is_halted:
-            logger.warning(
-                "LiveRunner: system is halted (evaluator RED or HALT in queue). "
-                "Skipping all order submission."
-            )
-            return self._shared_state, []
+            log.warning("SharedState is halted — skipping all orders")
+            return []
 
-        # Step 3 — query matcher
-        # query() raises RuntimeError("Call fit() before query()") if not fitted.
-        _probs, signals_arr, _reasons, _n_matches, _mean_ret, _ensemble = (
-            self._matcher.query(val_db, verbose=0)
-        )
+        # 4. Create exit orders
+        exit_orders = [
+            self._order_manager.create_exit_order(ticker, quantity, price)
+            for ticker, quantity, price in exit_tickers
+        ]
 
-        # Step 4 & 5 — build orders and submit
-        tickers = val_db["Ticker"].values
-        order_results: list[OrderResult] = []
+        # 5. Create entry orders
+        entry_orders = []
+        for decision in entry_decisions:
+            price = (prices or {}).get(decision.ticker)
+            if price is not None and price > 0:
+                entry_orders.append(
+                    self._order_manager.create_order_from_decision(decision, price)
+                )
+            else:
+                log.warning("No price for %s — skipping entry order", decision.ticker)
 
-        for i, signal in enumerate(signals_arr):
-            if signal not in ("BUY", "SELL"):
-                # HOLD — skip
-                continue
-            ticker = str(tickers[i])
-            order = Order(
-                ticker=ticker,
-                direction=signal,
-                notional=1000.0,
-            )
-            result = self._broker.submit_order(order)
-            order_results.append(result)
+        # 6. Submit all orders (exits first, then entries)
+        all_orders = exit_orders + entry_orders
+        if not all_orders:
+            return []
 
-        # Step 6 — return original state + results
-        # SharedState update deferred to Phase 4 PortfolioManager
-        return self._shared_state, order_results
+        return self._order_manager.submit_batch(all_orders)

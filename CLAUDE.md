@@ -18,7 +18,7 @@ matching on return fingerprints. Generates probabilistic BUY/SELL/HOLD signals.
   - `contracts/`: Pydantic schemas, BaseMatcher ABC, EngineState, SignalDirection/Source
   - `features.py`, `data.py`, `schema.py` — feature pipeline and data loading
   - `regime.py`: RegimeLabeler (SPY + VIX spike + yield curve); regime_filter=False in prod
-  - `live.py`: LiveRunner + MockBrokerAdapter (EOD pipeline skeleton; broker DI for tests)
+  - `live.py`: LiveRunner (Phase 5): receives AllocationDecisions + exit_tickers, submits via OrderManager + BaseBroker DI
   - `contracts/matchers/hnsw_matcher.py`: save_index/load_index for disk persistence
   - Research pilots (behind flags): `sax_filter.py`, `wfa_reranker.py`, `ib_compression.py`, `conformal_hooks.py`
 - `trading_system/` — Phase 3Z production layer: SharedState, StrategyEvaluator, risk overlays
@@ -29,6 +29,9 @@ matching on return fingerprints. Generates probabilistic BUY/SELL/HOLD signals.
   - `risk_engine.py`: stateless orchestrator — compute_atr_pct, drawdown_brake_scalar, apply_risk_adjustments (Phase 3)
   - `portfolio_manager.py`: rank_signals, allocate_day — stateless PM (Phase 4, when created)
   - `portfolio_state.py`: PortfolioSnapshot, RankedSignal, PMRejection (Phase 4, when created)
+  - `broker/`: BaseBroker ABC, Order/OrderResult schemas, MockBroker (Phase 5)
+  - `order_manager.py`: OrderManager — AllocationDecision→Order lifecycle (Phase 5)
+  - `reconciliation.py`: Position reconciliation vs broker (Phase 5)
   - `drift_monitor.py`: feature drift detection
 - `research/` — pluggable ABCs + Phase C modules
   - `hnsw_distance.py`: HNSWIndex, 54.5× speedup, recall@50=0.9996 (SLE-47 ✓)
@@ -39,7 +42,7 @@ matching on return fingerprints. Generates probabilistic BUY/SELL/HOLD signals.
 
 ## Critical Rules
 
-1. **Run tests first.** `PYTHONUTF8=1 py -3.12 -m pytest tests/ -q -m "not slow"` — 743 tests, all must pass.
+1. **Run tests first.** `PYTHONUTF8=1 py -3.12 -m pytest tests/ -q -m "not slow"` — 801 tests, all must pass.
 2. **Numbers require provenance.** Any claimed metric must trace to walk-forward results
    or experiment logs. If it cannot be traced, it is fabricated. No exceptions.
 3. **Do NOT modify `prepare.py` or this file** unless explicitly asked.
@@ -84,6 +87,12 @@ regime=hold_spy_threshold+0.05, horizon=fwd_7d_up, stop_loss_atr_multiple=3.0
   8/9 gates PASS; G6 (rejection diversity) sample-size-gated N/A at n=9.
 - Commits on `phase4-portfolio-manager` branch: T4.0b → T4.0 → T4.0c → T4.1a → T4.1b → T4.2 → T4.3 → T4.4.
 - Session log: `docs/session-logs/SESSION_2026-04-09_phase4-t4-1a-through-t4-2.md`
+
+**Phase 5 Live Execution Plumbing — IN PROGRESS (2026-04-09)**
+- Plan: `docs/superpowers/plans/2026-04-09-phase5-live-plumbing-plan.md`
+- Spec: `docs/superpowers/specs/2026-04-09-phase5-live-plumbing-design.md`
+- T5.1–T5.6 complete (BaseBroker, MockBroker, OrderManager, Reconciliation, LiveRunner, Gate Test)
+- G1: 100/100 fills ✓, G2: 30-day recon ✓, G3: 0.18s ✓ — T5.7 (CLAUDE.md) pending
 
 Phase 1–4 summary (for context, not active):
 - H7 regime HOLD: mean_BSS=+0.00033, 3/6 positive folds. Thin margin.

@@ -39,3 +39,6 @@ joblib>=1.3.0
 pydantic>=2.0.0           # Frozen Pydantic models for cross-module contracts
 pandera>=0.18.0           # DataFrame schema validation (strict=True, coerce=False)
 hnswlib>=0.7.0            # HNSW approximate nearest-neighbor index (Matcher backend)
+
+# Phase 1: BSS calibration experiments
+betacal>=0.1.0            # Beta calibration (Kull et al. 2017, AISTATS) — H4 experiment

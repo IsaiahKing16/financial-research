@@ -66,34 +66,41 @@ class MockBroker(BaseBroker):
             fill_price = price * (1 - slip)
 
         fill_qty = order.quantity * self._config.fill_fraction
-        cost = fill_qty * fill_price
-
-        # Rejection: insufficient funds (BUY only)
-        if (
-            order.side == OrderSide.BUY
-            and self._config.reject_when_insufficient
-            and cost > self._cash
-        ):
-            result = OrderResult(
-                order_id=order.order_id,
-                ticker=order.ticker,
-                status=OrderStatus.REJECTED,
-                filled_quantity=0.0,
-                fill_price=0.0,
-                latency_ms=self._config.latency_ms,
-                error="Insufficient funds",
-            )
-            self._history.append((order, result))
-            return result
-
-        # Determine status
-        if self._config.fill_fraction < 1.0:
-            status = OrderStatus.PARTIAL
-        else:
-            status = OrderStatus.FILLED
 
         # Update positions and cash
         if order.side == OrderSide.BUY:
+            # Zero fill → nothing happened, reject cleanly (no ghost positions)
+            if fill_qty < 1e-9:
+                result = OrderResult(
+                    order_id=order.order_id,
+                    ticker=order.ticker,
+                    status=OrderStatus.REJECTED,
+                    filled_quantity=0.0,
+                    fill_price=0.0,
+                    latency_ms=self._config.latency_ms,
+                    error="Zero fill quantity",
+                )
+                self._history.append((order, result))
+                return result
+
+            cost = fill_qty * fill_price
+
+            # Rejection: insufficient funds
+            if self._config.reject_when_insufficient and cost > self._cash:
+                result = OrderResult(
+                    order_id=order.order_id,
+                    ticker=order.ticker,
+                    status=OrderStatus.REJECTED,
+                    filled_quantity=0.0,
+                    fill_price=0.0,
+                    latency_ms=self._config.latency_ms,
+                    error="Insufficient funds",
+                )
+                self._history.append((order, result))
+                return result
+
+            status = OrderStatus.PARTIAL if self._config.fill_fraction < 1.0 else OrderStatus.FILLED
+
             self._cash -= cost
             pos = self._positions.get(order.ticker)
             if pos is None:
@@ -120,10 +127,37 @@ class MockBroker(BaseBroker):
                 )
                 self._history.append((order, result))
                 return result
+
+            # Clamp to available shares — cannot sell more than held
+            fill_qty = min(fill_qty, pos.quantity)
+            if fill_qty < 1e-9:
+                result = OrderResult(
+                    order_id=order.order_id,
+                    ticker=order.ticker,
+                    status=OrderStatus.REJECTED,
+                    filled_quantity=0.0,
+                    fill_price=0.0,
+                    latency_ms=self._config.latency_ms,
+                    error="No shares available after clamping",
+                )
+                self._history.append((order, result))
+                return result
+
+            # Determine if clamped (requested more than held)
+            requested_qty = order.quantity * self._config.fill_fraction
+            was_clamped = fill_qty < requested_qty - 1e-9
+
+            cost = fill_qty * fill_price
             self._cash += cost
             pos.quantity -= fill_qty
+
+            # Clean up zero-quantity positions
             if pos.quantity < 1e-9:
                 del self._positions[order.ticker]
+
+            status = OrderStatus.PARTIAL if was_clamped else (
+                OrderStatus.PARTIAL if self._config.fill_fraction < 1.0 else OrderStatus.FILLED
+            )
 
         result = OrderResult(
             order_id=order.order_id,

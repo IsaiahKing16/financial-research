@@ -186,6 +186,7 @@ class TradingConfig:
     evaluation: EvaluationConfig = field(default_factory=EvaluationConfig)
     signals: SignalConfig = field(default_factory=SignalConfig)
     research_flags: ResearchFlagsConfig = field(default_factory=ResearchFlagsConfig)
+    use_portfolio_manager: bool = False  # Phase 4: enable PM filter (default off)
 
     def validate(self) -> List[str]:
         """Check internal consistency. Returns list of error messages (empty = valid)."""

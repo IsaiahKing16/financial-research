@@ -356,6 +356,25 @@ class PatternMatcher:
             inv_w = np.where(top_mask, 1.0 / (distances_b + 0.01), 0.0)
             inv_w_sum = inv_w.sum(axis=1, keepdims=True)
             inv_w_norm = inv_w / np.maximum(inv_w_sum, 1e-9)
+
+            # Sector soft-prior boost (H2 experiment; default 1.0 = no-op).
+            # Boosts same-sector neighbours in the inverse-distance kernel without
+            # hard-filtering — preserves pool size while amplifying sector signal.
+            # val_sectors_b is derived from val_tickers_b via _SECTOR_MAP (already
+            # imported at module level) to avoid adding a new parameter to this method.
+            _boost = getattr(cfg, "same_sector_boost_factor", 1.0)
+            if _boost > 1.0:
+                _query_sectors = np.array(
+                    [_SECTOR_MAP.get(t, "") for t in val_tickers_b], dtype=object
+                )
+                same_sec = (
+                    self._train_sector_arr[indices_b] == _query_sectors[:, np.newaxis]
+                )
+                boost_arr = np.where(same_sec & top_mask, _boost, 1.0)
+                inv_w = inv_w * boost_arr
+                inv_w_sum = inv_w.sum(axis=1, keepdims=True)
+                inv_w_norm = inv_w / np.maximum(inv_w_sum, 1e-9)
+
             prob_up = (targets * inv_w_norm).sum(axis=1)
             mean_ret = (returns * inv_w_norm).sum(axis=1)
         else:  # uniform (locked setting)

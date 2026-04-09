@@ -25,6 +25,10 @@ matching on return fingerprints. Generates probabilistic BUY/SELL/HOLD signals.
   - `strategy_evaluator.py`: signal → position decision with risk overlays
   - `signal_adapter.py`: UnifiedSignal (Pydantic), KNN/DL adapters
   - `risk_overlays/`: fatigue accumulation, liquidity congestion
+  - `position_sizer.py`: Half-Kelly with SizingConfig (Phase 2)
+  - `risk_engine.py`: stateless orchestrator — compute_atr_pct, drawdown_brake_scalar, apply_risk_adjustments (Phase 3)
+  - `portfolio_manager.py`: rank_signals, allocate_day — stateless PM (Phase 4, when created)
+  - `portfolio_state.py`: PortfolioSnapshot, RankedSignal, PMRejection (Phase 4, when created)
   - `drift_monitor.py`: feature drift detection
 - `research/` — pluggable ABCs + Phase C modules
   - `hnsw_distance.py`: HNSWIndex, 54.5× speedup, recall@50=0.9996 (SLE-47 ✓)
@@ -35,7 +39,7 @@ matching on return fingerprints. Generates probabilistic BUY/SELL/HOLD signals.
 
 ## Critical Rules
 
-1. **Run tests first.** `PYTHONUTF8=1 py -3.12 -m pytest tests/ -q -m "not slow"` — 678 tests, all must pass.
+1. **Run tests first.** `PYTHONUTF8=1 py -3.12 -m pytest tests/ -q -m "not slow"` — 743 tests, all must pass.
 2. **Numbers require provenance.** Any claimed metric must trace to walk-forward results
    or experiment logs. If it cannot be traced, it is fabricated. No exceptions.
 3. **Do NOT modify `prepare.py` or this file** unless explicitly asked.
@@ -70,40 +74,22 @@ regime=hold_spy_threshold+0.05, horizon=fwd_7d_up, stop_loss_atr_multiple=3.0
 - `docs/campaigns/PHASE_3Z_CAMPAIGN.md` — Full Phase 3Z rebuild history (SLE-51–89)
 - `docs/CANDLESTICK_CATEGORIZATION_DESIGN.md` v0.2 — Future Phase 6
 - `docs/PHASE2_SYSTEM_DESIGN.md`, `docs/PHASE2_RISK_ENGINE.md` — Phase 2 spec + campaign (in docs/, NOT docs/campaigns/)
+- Phase 4 plan: `docs/superpowers/plans/2026-04-06-phase4-portfolio-manager-plan.md`
 
 ## Current Phase
 
-**Phase 3 Risk Engine Integration — COMPLETE 2026-04-06. GATE PASSED.**
+**Phase 4 Portfolio Manager — COMPLETE (2026-04-09)**
+- Plan: `docs/superpowers/plans/2026-04-08-phase4-portfolio-manager-plan.md`
+- Result: Sharpe=2.649, MaxDD=4.4%, max sector=15.0%, mean idle cash=28.0% (2024 fold).
+  8/9 gates PASS; G6 (rejection diversity) sample-size-gated N/A at n=9.
+- Commits on `phase4-portfolio-manager` branch: T4.0b → T4.0 → T4.0c → T4.1a → T4.1b → T4.2 → T4.3 → T4.4.
+- Session log: `docs/session-logs/SESSION_2026-04-09_phase4-t4-1a-through-t4-2.md`
 
-Experiment history (H1–H7 complete):
-- 585T (H1–H4): Resolution≈0 (pool dilution). All parametric fixes failed. 0/6 positive folds.
-- 52T VOL_NORM (H5): max_d sweep → best max_d=0.90, 2/6 positive folds. Gate=3/6.
-- 52T Murphy: Resolution=0.0076 (signal EXISTS), Reliability=0.0095 (dominant, esp. 2022 Bear).
-- 52T H6 (feature expansion): 8D baseline still best. Cross-sectional features hurt at max_d=0.90.
-- **H7 (regime HOLD): GATE MET — 3/6 positive folds, mean_BSS=+0.00033.**
-  - Winner: mode=hold, spy_threshold=+0.05 (SPY ret_90d < +5% → HOLD)
-  - See: `results/bss_fix_sweep_h7.tsv`, `scripts/experiments/h7_regime_filter.py`
-
-**Phase 2 COMPLETE (2026-04-06):**
-- trading_system/position_sizer.py — Half-Kelly with SizingConfig, 28 tests
-- Gate: 5/6 folds positive Kelly, 2024 Sharpe=2.527, MaxDD=4.7% ✓
-- Caution: 2022-Bear fold Kelly=-0.504 (b_ratio=0.661 — poor win/loss ratio in crash)
-- Provenance: results/phase2_walkforward.tsv, results/phase2_gate_check.txt
-
-**Phase 3 COMPLETE (2026-04-06):**
-- `trading_system/risk_engine.py` — thin stateless orchestrator: `compute_atr_pct`,
-  `drawdown_brake_scalar`, `AdjustedSizing`, `apply_risk_adjustments`
-- `size_position(atr_pct=...)` — Phase 2 compat preserved (None → flat_atr_pct)
-- **Phase 3 contract:** overlays multiply POSITION SIZE, not confidence (Half-Kelly
-  already incorporates confidence; double-throttling would double-count).
-- Gate (2024 fold): Sharpe=2.659, MaxDD=4.3%, 0 blocked, 278/278 placed ✓
-- Provenance: `results/phase3_walkforward.tsv`, `results/phase3_gate_check.txt`
-- **Fatigue overlay DISABLED** in walk-forward (`USE_FATIGUE_OVERLAY=False` in
-  `scripts/run_phase3_walkforward.py`). SLE-75 saturates in sustained regimes:
-  with H7's sticky BULL definition and `decay_rate=0.15`, multiplier collapsed to
-  ~1e-13 over 181 BULL days, dropping PnL from $2053 → $408. LiquidityCongestionGate
-  stays on (multiplier=1.0 on all 278 trades, zero drag). SLE-75 needs redesign
-  before re-enabling. Diagnostic: `results/phase3_throttling_diagnostic.csv`.
+Phase 1–4 summary (for context, not active):
+- H7 regime HOLD: mean_BSS=+0.00033, 3/6 positive folds. Thin margin.
+- Phase 2: Half-Kelly, Sharpe=2.527, 5/6 folds positive Kelly. 2022-Bear Kelly=-0.504.
+- Phase 3: Risk engine, Sharpe=2.659, MaxDD=4.3%. Fatigue OFF (SLE-75 saturates).
+- Phase 4: PM filter, Sharpe=2.649 (regression −0.38%), MaxDD=4.4%. 9/278 rejected, all insufficient_capital.
 
 ## Session Protocol
 
@@ -123,6 +109,9 @@ Every session must:
 - `results/backtest_trades.csv` — Phase 1 flat 5% sizing, 278 trades, 2024 fold
 - `results/phase2_backtest_trades.csv` — Legacy Phase 2 ATR 10% sizing, 191 trades, 2024 fold
 - `results/cached_signals_2024.csv` — 585T Platt signals, 13,104 rows, 159 BUY, conf [0.65–0.75]
+- `results/phase2_walkforward.tsv` — Kelly sizing, 6-fold results
+- `results/phase3_walkforward.tsv` — Risk engine integration, 2024 fold
+- `results/phase3_gate_check.txt` — Phase 3 gate metrics (Sharpe=2.659, MaxDD=4.3%)
 
 ## Skills Available
 

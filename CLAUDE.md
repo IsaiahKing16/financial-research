@@ -39,7 +39,7 @@ matching on return fingerprints. Generates probabilistic BUY/SELL/HOLD signals.
 
 ## Critical Rules
 
-1. **Run tests first.** `PYTHONUTF8=1 py -3.12 -m pytest tests/ -q -m "not slow"` — 739 tests, all must pass.
+1. **Run tests first.** `PYTHONUTF8=1 py -3.12 -m pytest tests/ -q -m "not slow"` — 743 tests, all must pass.
 2. **Numbers require provenance.** Any claimed metric must trace to walk-forward results
    or experiment logs. If it cannot be traced, it is fabricated. No exceptions.
 3. **Do NOT modify `prepare.py` or this file** unless explicitly asked.
@@ -78,15 +78,18 @@ regime=hold_spy_threshold+0.05, horizon=fwd_7d_up, stop_loss_atr_multiple=3.0
 
 ## Current Phase
 
-**Phase 4 Portfolio Manager — IN PROGRESS**
-- Plan: `docs/superpowers/plans/2026-04-06-phase4-portfolio-manager-plan.md`
-- Gate: Sharpe ≥ 2.0, MaxDD ≤ 10%, sector ≤ 30%, idle cash < 35% mean
-- Prereqs DONE: Phase 1 BSS PASSED (H7), Phase 2 COMPLETE, Phase 3 COMPLETE
+**Phase 4 Portfolio Manager — COMPLETE (2026-04-09)**
+- Plan: `docs/superpowers/plans/2026-04-08-phase4-portfolio-manager-plan.md`
+- Result: Sharpe=2.649, MaxDD=4.4%, max sector=15.0%, mean idle cash=28.0% (2024 fold).
+  8/9 gates PASS; G6 (rejection diversity) sample-size-gated N/A at n=9.
+- Commits on `phase4-portfolio-manager` branch: T4.0b → T4.0 → T4.0c → T4.1a → T4.1b → T4.2 → T4.3 → T4.4.
+- Session log: `docs/session-logs/SESSION_2026-04-09_phase4-t4-1a-through-t4-2.md`
 
-Phase 1–3 summary (for context, not active):
+Phase 1–4 summary (for context, not active):
 - H7 regime HOLD: mean_BSS=+0.00033, 3/6 positive folds. Thin margin.
 - Phase 2: Half-Kelly, Sharpe=2.527, 5/6 folds positive Kelly. 2022-Bear Kelly=-0.504.
 - Phase 3: Risk engine, Sharpe=2.659, MaxDD=4.3%. Fatigue OFF (SLE-75 saturates).
+- Phase 4: PM filter, Sharpe=2.649 (regression −0.38%), MaxDD=4.4%. 9/278 rejected, all insufficient_capital.
 
 ## Session Protocol
 

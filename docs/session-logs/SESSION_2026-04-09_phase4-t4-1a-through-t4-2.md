@@ -418,5 +418,5 @@ f423df8 feat(phase4): add portfolio_state schemas (T4.0b)
 68d0729 docs(phase4): formal implementation plan
 ```
 
-**Branch status:** 10 commits ahead of `main`, not merged, not pushed.
-Per plan §Step 9.5: do NOT push without user authorization.
+**Branch status:** 11 commits ahead of `main`, pushed to origin. Not yet merged.
+PR ready: https://github.com/IsaiahKing16/financial-research/pull/new/phase4-portfolio-manager

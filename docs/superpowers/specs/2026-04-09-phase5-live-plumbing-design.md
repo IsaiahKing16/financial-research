@@ -32,11 +32,15 @@ Real broker adapters (IBKR, Alpaca) are deferred to Phase 8 when paper trading b
 
 2. **Real broker adapters deferred.** The gate requires mock broker parity only. IBKR/Alpaca adapters cannot be meaningfully tested until Phase 8 (paper trading). Building them now is premature.
 
-3. **Order manager as bridge.** `OrderManager` translates `AllocationDecision` → `Order` and manages the order state machine. LiveRunner calls the order manager, not the broker directly. Upstream layers (PM, risk engine) are still called externally by the caller.
+3. **Order manager as bridge.** `OrderManager` translates `AllocationDecision` → `Order` (BUY entries) and manages the order state machine. A separate `create_exit_order()` handles SELL exits (stop-loss, max-hold). LiveRunner calls the order manager, not the broker directly.
 
 4. **Reconciliation: reusable core + dual consumption.** A `reconcile()` function in `trading_system/reconciliation.py` is consumed by both a standalone CLI script (`scripts/reconcile.py`) and as a pre-flight check in LiveRunner. Reports discrepancies but never auto-corrects.
 
-5. **LiveRunner does not orchestrate the full pipeline.** It receives signals (or AllocationDecisions) and submits orders. PM, risk engine, and position sizing happen upstream. Full daily orchestration is Phase 8.
+5. **LiveRunner is an execution-only runner.** It receives `AllocationDecision` objects (BUY entries) and exit triggers from its caller, translates them to orders via OrderManager, and submits. PM, risk engine, and position sizing happen upstream. The caller (a daily orchestrator, built in Phase 8) is responsible for running the pipeline and passing decisions to LiveRunner. LiveRunner retains its matcher for signal generation but does NOT run PM/risk/sizing.
+
+6. **Extend `OrderStatus`, don't duplicate.** Add `SUBMITTED` and `TIMED_OUT` to the existing `OrderStatus` enum in `contracts/trades.py` rather than creating a parallel `OrderState` enum. The existing `PENDING` semantics shift from "submitted, awaiting fill" to "created, not yet submitted" — audit all usages for compatibility.
+
+7. **Use `capital_allocated` for quantity computation.** `OrderManager.create_order_from_decision()` computes `quantity = decision.capital_allocated / price`, using the dollar amount already computed by the position sizer. More directly traceable than re-deriving from `final_position_pct * equity`.
 
 ---
 
@@ -64,6 +68,7 @@ class OrderResult(BaseModel, frozen=True):
     filled_quantity: float
     fill_price: float
     latency_ms: float = 0.0
+    executed_at: Optional[datetime] = None  # timestamp of broker fill
     error: Optional[str] = None
 
 class BrokerPosition(BaseModel, frozen=True):
@@ -100,9 +105,23 @@ class BaseBroker(ABC):
     def is_connected(self) -> bool: ...
 ```
 
-### Reuse
+### Reuse & Enum Extension
 
 `OrderSide` and `OrderStatus` enums already exist in `trading_system/contracts/trades.py`. No duplication.
+
+**`OrderStatus` extension:** Add two new values to the existing enum:
+- `SUBMITTED = "SUBMITTED"` — sent to broker, awaiting response
+- `TIMED_OUT = "TIMED_OUT"` — no broker response within deadline
+
+Update the existing `PENDING` docstring from "Submitted, awaiting fill" to "Created, not yet submitted to broker." Audit all existing usages of `OrderStatus.PENDING` in backtest code for semantic compatibility (currently used only in `TradeEvent.backtest_fill()` which creates FILLED events, so PENDING is not used in production paths).
+
+### Package `__init__.py`
+
+`trading_system/broker/__init__.py` re-exports for clean imports:
+```python
+from .base import BaseBroker, Order, OrderResult, BrokerPosition, AccountSnapshot
+from .mock import MockBroker, MockBrokerConfig
+```
 
 ### Migration
 
@@ -163,6 +182,7 @@ class MockBroker(BaseBroker):
 - **Fail tickers:** Orders for tickers in `fail_tickers` return `REJECTED` status.
 - **Buying power:** If `reject_when_insufficient`, rejects orders exceeding available cash.
 - **Price injection via `set_prices()`** — test harness provides prices; no market data dependency.
+- **`initial_cash` default:** 10,000 matches `TradingConfig.capital.initial_capital`. The old `MockBrokerAdapter` defaulted to 100,000 — tests migrated from the old mock must specify `initial_cash` explicitly if they relied on the higher default.
 
 ---
 
@@ -182,19 +202,12 @@ PENDING → CANCELLED (manual cancel before submission)
 
 ### Schemas
 
-```python
-class OrderState(str, Enum):
-    PENDING = "PENDING"
-    SUBMITTED = "SUBMITTED"
-    FILLED = "FILLED"
-    PARTIAL = "PARTIAL"
-    REJECTED = "REJECTED"
-    CANCELLED = "CANCELLED"
-    TIMED_OUT = "TIMED_OUT"
+Uses the extended `OrderStatus` enum from `contracts/trades.py` (no separate `OrderState`).
 
+```python
 class ManagedOrder(BaseModel, frozen=True):
     order: Order
-    state: OrderState
+    status: OrderStatus          # uses extended OrderStatus (PENDING/SUBMITTED/FILLED/etc.)
     result: Optional[OrderResult] = None
     created_at: datetime
     submitted_at: Optional[datetime] = None
@@ -210,11 +223,17 @@ class OrderManager:
     def __init__(self, broker: BaseBroker, timeout_seconds: float = 30.0): ...
 
     def create_order_from_decision(
-        self, decision: AllocationDecision, equity: float, price: float,
+        self, decision: AllocationDecision, price: float,
     ) -> Order:
-        """AllocationDecision -> Order.
-        quantity = (decision.final_position_pct x equity) / price.
-        Respects TradingConfig.capital.fractional_shares."""
+        """AllocationDecision -> BUY Order.
+        quantity = decision.capital_allocated / price.
+        Side is always BUY (AllocationDecisions are entry-only from PM)."""
+
+    def create_exit_order(
+        self, ticker: str, quantity: float, price: float,
+    ) -> Order:
+        """Create a SELL order for an exit (stop-loss, max-hold, drawdown halt).
+        Exit orders bypass the PM/AllocationDecision pipeline entirely."""
 
     def submit(self, order: Order) -> ManagedOrder:
         """Submit to broker. PENDING -> SUBMITTED -> terminal state."""
@@ -230,7 +249,7 @@ class OrderManager:
         """All managed orders keyed by order_id."""
 
     def summary(self) -> dict[str, int]:
-        """Count of orders by state. For logging/diagnostics."""
+        """Count of orders by status. For logging/diagnostics."""
 ```
 
 ### Design Notes
@@ -304,6 +323,7 @@ if not result.passed:
 - **Tolerance-based** — exact float matching is too brittle. 5% default accommodates rounding and partial fills.
 - **Three failure modes:** quantity mismatch (within tolerance = pass), unexpected position (always fail), missing position (always fail).
 - **No auto-correction** — reconciliation reports discrepancies but never modifies positions. Human intervention required.
+- **SharedState checkpoint format:** The standalone script loads from a JSON file produced by `SharedState.model_dump_json()` (Pydantic v2). The caller specifies the file path via CLI arg.
 
 ---
 
@@ -326,6 +346,22 @@ class LiveRunner:
     ): ...
 ```
 
+### Updated `run()` Signature
+
+```python
+def run(
+    self,
+    entry_decisions: list[AllocationDecision],
+    exit_tickers: list[tuple[str, float, float]],  # (ticker, quantity, price)
+    snapshot: PortfolioSnapshot,
+) -> list[ManagedOrder]:
+```
+
+The caller (daily orchestrator, Phase 8) runs the full pipeline upstream:
+matcher → PM → risk engine → position sizer → produces AllocationDecisions.
+It also determines which positions to exit (stop-loss, max-hold).
+LiveRunner receives both lists and executes them.
+
 ### Updated `run()` Flow
 
 ```
@@ -334,25 +370,30 @@ class LiveRunner:
    - if failed: return early with no orders, log error
 2. Config hash drift check (existing, warn-only)
 3. Check shared_state.is_halted (existing)
-4. Query matcher for signals (existing)
-5. Pass AllocationDecisions to order_manager.submit_batch()
-6. Return (shared_state, list[ManagedOrder])
+4. Create exit orders via order_manager.create_exit_order() for each exit_ticker
+5. Create entry orders via order_manager.create_order_from_decision() for each entry_decision
+6. Submit all orders via order_manager.submit_batch() (exits first, then entries)
+7. Return list[ManagedOrder]
 ```
 
 ### What Changes
 
 - Constructor takes `BaseBroker` (new ABC) instead of `BaseBrokerAdapter` (deleted)
 - Constructor takes `OrderManager` via DI
+- `run()` receives `AllocationDecision` + exit tickers (no longer calls matcher internally)
 - `run()` returns `list[ManagedOrder]` instead of `list[OrderResult]`
 - Pre-flight reconciliation as opt-in first step
 - Hardcoded `notional=1000.0` removed — sizing comes from AllocationDecision via order manager
 
 ### What Stays the Same
 
-- Signal generation via matcher unchanged
 - Config hash drift warning unchanged
 - Halt check unchanged
 - LiveRunner still does NOT run PM or risk engine — those are called upstream
+
+### Reconciliation & PortfolioSnapshot
+
+`reconcile()` accepts `PortfolioSnapshot` (from `portfolio_state.py`), but LiveRunner holds `SharedState`. The `run()` method now receives a `PortfolioSnapshot` parameter from its caller. No conversion utility needed — the caller constructs the snapshot (as already done in `run_phase4_walkforward.py`).
 
 ### Deletions from `live.py`
 
@@ -382,7 +423,7 @@ tests/unit/test_broker_base.py       — ABC contract tests
 tests/unit/test_broker_mock.py       — MockBroker: fills, partials, rejections, slippage, position tracking
 tests/unit/test_order_manager.py     — AllocationDecision -> Order, state machine, timeout, batch
 tests/unit/test_reconciliation.py    — match, mismatch, unexpected, missing, tolerance edge cases
-tests/test_live_runner.py            — LiveRunner rewire: reconciliation, order manager, halt check
+tests/unit/test_live.py              — LiveRunner rewire: reconciliation, order manager, halt check (existing file, modified)
 tests/integration/test_phase5_gate.py — 100-trade replay gate (marked @pytest.mark.slow)
 ```
 
@@ -440,7 +481,9 @@ UnifiedSignal ──> PM.allocate_day() ──> RiskEngine ──> PositionSizer
 | CREATE | `tests/unit/test_reconciliation.py` |
 | CREATE | `tests/integration/test_phase5_gate.py` |
 | MODIFY | `pattern_engine/live.py` — delete old ABC/mock, rewire LiveRunner |
-| MODIFY | `tests/test_live_runner.py` — update for new interfaces |
+| MODIFY | `trading_system/contracts/trades.py` — extend OrderStatus with SUBMITTED, TIMED_OUT |
+| MODIFY | `tests/unit/test_live.py` — update for new interfaces |
+| MODIFY | `CLAUDE.md` — add broker package + order_manager to codebase section, update test count |
 
 ---
 

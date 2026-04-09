@@ -1,7 +1,7 @@
 # Session Log — Phase 4 Portfolio Manager: T4.1a → T4.4 (phase close)
 
 **Date:** 2026-04-09
-**Branch:** `phase4-portfolio-manager` (9 commits ahead of `main` at close)
+**Branch:** `phase4-portfolio-manager` (10 commits ahead of `main` at close)
 **Entry point:** `SESSION_2026-04-08_phase4-t4-0-through-t4-0c.md`
 **Plan:** `docs/superpowers/plans/2026-04-08-phase4-portfolio-manager-plan.md`
 **Status at end:** **Phase 4 COMPLETE.** T4.1a, T4.1b, T4.2, T4.3, T4.4 done.
@@ -406,17 +406,17 @@ None blocking. Phase 4 is closed. Follow-ups for future sessions
 
 ## Commit graph on branch (at phase close)
 ```
+7e2b6bc docs(phase4): phase close - CLAUDE.md + session log
 23f2a22 feat(phase4): add Phase 3 vs Phase 4 diff script (T4.4)
 e329f4a feat(phase4): add PM rejection histograms (T4.3)
 7748e43 feat(phase4): add use_portfolio_manager flag (T4.1b)
 13b81cf feat(phase4): add Phase 4 walk-forward with PM filter (T4.1a)
+643fa44 docs(phase4): session log + CLAUDE.md test count (T4.0b-T4.0c handoff)
 26410ba feat(phase4): add signal reconciliation gate (T4.0c)
 69d4606 feat(phase4): add portfolio_manager core (T4.0)
 f423df8 feat(phase4): add portfolio_state schemas (T4.0b)
 68d0729 docs(phase4): formal implementation plan
 ```
-Plus the phase-close commit carrying CLAUDE.md test-count update
-and this session log.
 
-**Branch status:** 9 commits ahead of `main`, not merged, not pushed.
+**Branch status:** 10 commits ahead of `main`, not merged, not pushed.
 Per plan §Step 9.5: do NOT push without user authorization.

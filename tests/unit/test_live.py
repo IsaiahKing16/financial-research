@@ -159,6 +159,19 @@ class TestLiveRunnerReconciliation:
         assert len(results) == 1
         assert results[0].status == OrderStatus.FILLED
 
+    def test_reconcile_on_passes_with_clean_state(self):
+        runner, broker, om = _make_runner(reconcile_on_start=True)
+        # Empty snapshot + empty broker → reconcile passes → orders proceed
+        snap = _snapshot()  # no open positions
+        results = runner.run(
+            entry_decisions=[_decision()],
+            exit_tickers=[],
+            snapshot=snap,
+            prices={"AAPL": 150.0},
+        )
+        assert len(results) == 1
+        assert results[0].status == OrderStatus.FILLED
+
 
 class TestLiveRunnerOrders:
     def test_entry_decision_creates_buy(self):

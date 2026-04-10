@@ -126,6 +126,7 @@ class PatternMatcher:
         # Platt calibrator (SLE-89): None until fit() runs the double-pass.
         # query() returns raw probs if None; applies transform() otherwise.
         self._calibrator: Optional[_PlattCalibrator] = None
+        self._bma_calibrator: Optional[object] = None  # BMACalibrator when use_bma=True
 
         # Research pilot modules (SLE-72–78, all None until flag activates in fit())
         self._sax_filter = None         # SAXFilter | None (use_sax_filter flag)
@@ -384,6 +385,20 @@ class PatternMatcher:
         # Neutral probability when no matches found
         prob_up = np.where(n_matches == 0, 0.5, prob_up)
 
+        # E1: BMA override — replace uniform-mean prob with BMA posterior-weighted prob
+        if getattr(cfg, 'use_bma', False) and self._bma_calibrator is not None:
+            K = cfg.top_k
+            base_rate = float(self._train_target_arr.mean())
+            bma_probs = np.zeros(B, dtype=np.float64)
+            for i in range(B):
+                accepted = indices_b[i][top_mask[i]]
+                labels_i = self._train_target_arr[accepted]
+                row = np.full(K, base_rate, dtype=np.float64)
+                n = min(len(labels_i), K)
+                row[:n] = labels_i[:n]
+                bma_probs[i] = float(self._bma_calibrator.transform(row))
+            prob_up = bma_probs
+
         # Research pilot: risk overlay multipliers (SLE-74, SLE-75).
         # Callers attach overlays via add_overlay() and are responsible for
         # calling overlay.update(date, **market_data) before each query().
@@ -459,6 +474,67 @@ class PatternMatcher:
             ))
 
         return prob_up, mean_ret, signals, reasons, n_matches.tolist(), ensemble_list, neighbor_results
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # E1: BMA per-neighbour label extraction
+    # ──────────────────────────────────────────────────────────────────────────
+
+    def _extract_neighbour_labels_for_bma(
+        self,
+        cal_db,
+        regime_labeler=None,
+    ) -> tuple:
+        """Extract (N_cal, K) per-neighbour label matrix for BMA calibration.
+
+        Each row = K neighbour labels for one calibration query.
+        Rows with fewer than K accepted neighbours are padded with base_rate.
+
+        Returns:
+            raw_matrix: (N_cal, K) float64
+            y_true:     (N_cal,) float64
+        """
+        cfg = self.config
+        horizon = cfg.projection_horizon
+        base_rate = float(self._train_target_arr.mean()) if self._train_target_arr is not None else 0.5
+        K = cfg.top_k
+
+        X_raw = cal_db[self._feature_cols].values
+        X_cal = self._prepare_features(X_raw, fit_scaler=False)
+
+        all_rows = []
+        for start in range(0, len(X_cal), cfg.batch_size):
+            end = min(start + cfg.batch_size, len(X_cal))
+            X_batch = X_cal[start:end]
+            val_slice = cal_db.iloc[start:end]
+
+            distances_b, indices_b = self._query_batch(X_batch)
+
+            val_tickers_b = np.asarray(val_slice["Ticker"], dtype=object)
+            val_sectors_b = np.array(
+                [_SECTOR_MAP.get(t, "") for t in val_tickers_b], dtype=object
+            )
+
+            top_mask = self._post_filter(
+                distances_b, indices_b,
+                val_tickers_b, val_sectors_b, None,
+            )
+
+            B = X_batch.shape[0]
+            for i in range(B):
+                accepted = indices_b[i][top_mask[i]]
+                labels_i = self._train_target_arr[accepted]
+                row = np.full(K, base_rate, dtype=np.float64)
+                n = min(len(labels_i), K)
+                row[:n] = labels_i[:n]
+                all_rows.append(row)
+
+        raw_matrix = np.vstack(all_rows)  # (N_cal, K)
+        y_true = (
+            cal_db[horizon].values.astype(np.float64)
+            if horizon in cal_db.columns
+            else np.zeros(len(cal_db), dtype=np.float64)
+        )
+        return raw_matrix, y_true
 
     # ──────────────────────────────────────────────────────────────────────────
     # Public API — fit / query
@@ -547,6 +623,7 @@ class PatternMatcher:
         # Subsequent query() calls see self._calibrator and apply transform().
         _cal_method = getattr(cfg, 'calibration_method', 'platt')
         self._calibrator = None  # sentinel: self.query() returns raw probs below
+        self._bma_calibrator = None  # reset on each fit
         if _cal_method not in ('none', None):
             # cal_frac (default 0.76): sample a fraction of training rows for the
             # calibration double-pass.  Platt scaling (logistic regression) reaches
@@ -567,15 +644,27 @@ class PatternMatcher:
                 _cal_db = train_db.iloc[_cal_idx]
             else:
                 _cal_db = train_db
-            _cal_raw_probs, _, _, _, _, _ = self.query(
-                _cal_db, regime_labeler=regime_labeler, verbose=0
-            )
-            _y_true = (
-                _cal_db[cfg.projection_horizon].values.astype(np.float64)
-                if cfg.projection_horizon in _cal_db.columns
-                else np.zeros(len(_cal_db), dtype=np.float64)
-            )
-            self._calibrator = _PlattCalibrator().fit(_cal_raw_probs, _y_true)
+
+            if getattr(cfg, 'use_bma', False):
+                # E1 BMA path: extract (N_cal, K) per-neighbour label matrix
+                from research.bma_calibrator import BMACalibrator
+                _raw_matrix, _bma_y_true = self._extract_neighbour_labels_for_bma(
+                    _cal_db, regime_labeler=regime_labeler
+                )
+                self._bma_calibrator = BMACalibrator()
+                self._bma_calibrator.fit(_raw_matrix, _bma_y_true)
+                # self._calibrator stays None — BMA replaces it in _package_results
+            else:
+                # Existing path (unchanged)
+                _cal_raw_probs, _, _, _, _, _ = self.query(
+                    _cal_db, regime_labeler=regime_labeler, verbose=0
+                )
+                _y_true = (
+                    _cal_db[cfg.projection_horizon].values.astype(np.float64)
+                    if cfg.projection_horizon in _cal_db.columns
+                    else np.zeros(len(_cal_db), dtype=np.float64)
+                )
+                self._calibrator = _PlattCalibrator().fit(_cal_raw_probs, _y_true)
 
         return self
 

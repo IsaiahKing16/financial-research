@@ -42,7 +42,7 @@ matching on return fingerprints. Generates probabilistic BUY/SELL/HOLD signals.
 
 ## Critical Rules
 
-1. **Run tests first.** `PYTHONUTF8=1 py -3.12 -m pytest tests/ -q -m "not slow"` — 829 tests, all must pass.
+1. **Run tests first.** `PYTHONUTF8=1 py -3.12 -m pytest tests/ -q -m "not slow"` — 836 tests, all must pass.
 2. **Numbers require provenance.** Any claimed metric must trace to walk-forward results
    or experiment logs. If it cannot be traced, it is fabricated. No exceptions.
 3. **Do NOT modify `prepare.py` or this file** unless explicitly asked.
@@ -70,6 +70,9 @@ regime=hold_spy_threshold+0.05, horizon=fwd_7d_up, stop_loss_atr_multiple=3.0
 # BSS root cause (2026-03-26): analogue pool dilution at 585T scale, NOT miscalibration.
 #   Platt is helping (+0.023 BSS vs raw). Fix: tighten max_distance or same_sector_only
 #   — locked settings, require new experiment evidence before changing.
+# E1 BMA: FAIL (0/6 folds improved by >=+0.001). use_bma stays False.
+#   BMA EM-fitted Student's t mixture degrades BSS (delta ~-0.09 to -0.14 all folds).
+#   Provenance: results/phase7/e1_bma_vs_beta_abm.tsv (2026-04-09)
 
 ## Key Design Docs (read before modifying related code)
 

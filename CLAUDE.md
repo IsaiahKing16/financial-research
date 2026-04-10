@@ -42,7 +42,7 @@ matching on return fingerprints. Generates probabilistic BUY/SELL/HOLD signals.
 
 ## Critical Rules
 
-1. **Run tests first.** `PYTHONUTF8=1 py -3.12 -m pytest tests/ -q -m "not slow"` — 829 tests, all must pass.
+1. **Run tests first.** `PYTHONUTF8=1 py -3.12 -m pytest tests/ -q -m "not slow"` — 858 tests, all must pass.
 2. **Numbers require provenance.** Any claimed metric must trace to walk-forward results
    or experiment logs. If it cannot be traced, it is fabricated. No exceptions.
 3. **Do NOT modify `prepare.py` or this file** unless explicitly asked.
@@ -53,10 +53,15 @@ matching on return fingerprints. Generates probabilistic BUY/SELL/HOLD signals.
 
 ## Locked Settings (do not change without new experiment evidence)
 
-Distance=Euclidean, Weighting=uniform, Features=VOL_NORM_COLS(8), Calibration=beta_abm,
-cal_frac=0.76, max_distance=0.90, top_k=50, confidence_threshold=0.65,
+Distance=Euclidean, Weighting=uniform, Features=returns_candle(23), Calibration=beta_abm,
+cal_frac=0.76, max_distance=2.5, top_k=50, confidence_threshold=0.65,
 regime=hold_spy_threshold+0.05, horizon=fwd_7d_up, stop_loss_atr_multiple=3.0
-# max_distance=0.90, beta_abm: swept H5 (2026-04-02). Best at 52T VOL_NORM. Provenance: results/bss_fix_sweep_h5.tsv
+# Features=returns_candle(23), max_distance=2.5: Phase 6 (2026-04-09).
+#   Task 6.1 sweep: winner=2.5 (smallest with AvgK≥20 all 6 folds). Provenance: results/phase6/sweep_max_distance_23d.tsv
+#   Task 6.2 BSS comparison: returns_candle wins 5/6 folds vs returns_only. GATE PASS. Provenance: results/phase6/bss_comparison_candle_vs_baseline.tsv
+#   Task 6.3 body_position: gate triggered DROP (3/6) but KEPT by judgment — 2023/2024-Val deltas favor 23D
+#     by ×10–36 vs the gains in earlier folds. Provenance: results/phase6/redundancy_body_position.tsv
+# max_distance=0.90, beta_abm (8D baseline, superseded): swept H5 (2026-04-02). Provenance: results/bss_fix_sweep_h5.tsv
 # regime=hold_spy_threshold+0.05: H7 (2026-04-06). GATE MET: 3/6 positive folds, mean_BSS=+0.00033.
 #   mode=hold: Bear rows (SPY ret_90d < +0.05) → base_rate prob (HOLD signal).
 #   Bull mode only: KNN signal used when SPY 90d return > +5% (confirmed trend).
@@ -70,6 +75,21 @@ regime=hold_spy_threshold+0.05, horizon=fwd_7d_up, stop_loss_atr_multiple=3.0
 # BSS root cause (2026-03-26): analogue pool dilution at 585T scale, NOT miscalibration.
 #   Platt is helping (+0.023 BSS vs raw). Fix: tighten max_distance or same_sector_only
 #   — locked settings, require new experiment evidence before changing.
+# E1 BMA: FAIL (0/6 folds improved by >=+0.001). use_bma stays False.
+#   BMA EM-fitted Student's t mixture degrades BSS (delta ~-0.09 to -0.14 all folds).
+#   Provenance: results/phase7/e1_bma_vs_beta_abm.tsv (2026-04-09)
+# E2 OWA: FAIL (0/6 folds improved by >=+0.001). use_owa stays False.
+#   MI-ranked OWA weighting (best alpha=4.0) shows no BSS improvement on 23D returns_candle.
+#   Deltas: [-0.00026, -0.00044, -0.00015, +0.00025, +0.00015, -0.000079] all < +0.001.
+#   Provenance: results/phase7/e2_owa_vs_baseline.tsv (2026-04-09)
+# E3 DTW Reranker: FAIL (Spearman fast-fail: mean rho=1.0000, rankings near-identical to Euclidean).
+#   DTW on 8 return scalars is redundant with Euclidean distance (same values, no warping benefit).
+#   use_dtw_reranker stays False. Provenance: results/phase7/e3_dtw_vs_baseline.tsv (2026-04-09)
+# E4 Conformal: FAIL (coverage 0.814 mean, 5/6 folds >= 88%; width 1.000 mean, 0/6 < 0.30).
+#   Root cause: 52T probs cluster in [0.50, 0.59]; |prob-label| scores always >=0.41;
+#   threshold ~0.57 yields near-trivial [0,1] intervals (width ~1.0). 2020-COVID fold
+#   coverage 0% (no gamma achieves 88% — ACI over-tightens on COVID volatility).
+#   use_conformal stays False. Provenance: results/phase7/e4_conformal_coverage.tsv (2026-04-09)
 
 ## Key Design Docs (read before modifying related code)
 
@@ -93,13 +113,18 @@ regime=hold_spy_threshold+0.05, horizon=fwd_7d_up, stop_loss_atr_multiple=3.0
 - Spec: `docs/superpowers/specs/2026-04-09-phase5-live-plumbing-design.md`
 - G1: 100/100 fills ✓, G2: 30-day recon ✓, G3: 0.18s ✓
 
-**Phase 6 Candlestick Features — IN PROGRESS (2026-04-09)**
-- Handoff: `HANDOFF_phase6-candlestick-features.md`
-- Branch: `feat/phase6-candlestick-features`
+**Phase 6 Candlestick Features — COMPLETE (2026-04-09)**
 - 15-column continuous candlestick feature set (5 proportions × 3 timeframes) implemented.
-- `FeatureRegistry` + `FeatureSet` added to `pattern_engine/features.py`.
-- `EngineConfig.feature_set` field added; `returns_candle` registered (23 columns).
-- 829 tests pass (807 baseline + 22 new). Walk-forward smoke test pending.
+- Task 6.1: max_distance=2.5 selected (√(23/8) scaling; AvgK≥20 all 6 folds).
+- Task 6.2: returns_candle wins 5/6 folds vs returns_only. GATE PASS.
+- Task 6.3: body_position KEPT (gate DROP at 3/6 but magnitude asymmetry favors 23D in 2023/2024-Val).
+- Locked: feature_set=returns_candle, max_distance=2.5. 846 tests pass.
+
+**Phase 7 Model Enhancements — COMPLETE (2026-04-10)**
+- E1 BMA: FAIL | E2 OWA: FAIL | E3 DTW: FAIL | E4 Conformal: FAIL | E5 LOF: DEFERRED | E6 STUMPY: DEFERRED
+- Root cause: 52T probs cluster [0.50–0.59], below 0.65 threshold — calibration improvements structurally impossible.
+- E5/E6 deferred pending new research direction. All 6 flags remain False. 858 tests pass.
+- Provenance: results/phase7/enhancement_summary.tsv
 
 Phase 1–4 summary (for context, not active):
 - H7 regime HOLD: mean_BSS=+0.00033, 3/6 positive folds. Thin margin.

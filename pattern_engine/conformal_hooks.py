@@ -219,3 +219,68 @@ def augment_signals_with_conformal(
         else:
             signals.append("HOLD")
     return probs, signals
+
+
+# ─── E4: Adaptive Conformal Inference ────────────────────────────────────────
+
+class AdaptiveConformalPredictor:
+    """Adaptive Conformal Inference (Gibbs & Candès, NeurIPS 2021).
+
+    Provides distribution-free prediction intervals for time-series data
+    by dynamically adjusting the quantile level based on recent coverage errors.
+
+    Unlike NaiveConformalCalibrator (which uses a fixed quantile), ACI
+    updates alpha_t online after each prediction to track non-stationarity.
+
+    Args:
+        nominal_alpha: Target miscoverage rate (default 0.10 → 90% coverage).
+        gamma: Learning rate for alpha_t adjustment (default 0.05).
+    """
+
+    def __init__(self, nominal_alpha: float = 0.10, gamma: float = 0.05) -> None:
+        self.nominal_alpha = nominal_alpha
+        self.gamma = gamma
+        self.alpha_t = nominal_alpha
+        self._scores: Optional[np.ndarray] = None
+
+    def calibrate(self, cal_probs: np.ndarray, cal_labels: np.ndarray) -> None:
+        """Compute non-conformity scores on calibration set.
+
+        Score = |predicted_prob - actual_outcome|
+        """
+        self._scores = np.sort(np.abs(cal_probs - cal_labels))
+
+    def predict_interval(self, prob: float) -> Tuple[float, float]:
+        """Return (lower, upper) prediction interval for a single probability.
+
+        Uses the (1 - alpha_t) quantile of calibration non-conformity scores
+        as the half-width around the point estimate.
+        """
+        if self._scores is None:
+            raise RuntimeError("calibrate() must be called before predict_interval().")
+        n = len(self._scores)
+        idx = int(np.ceil((1 - self.alpha_t) * (n + 1))) - 1
+        idx = int(np.clip(idx, 0, n - 1))
+        threshold = float(self._scores[idx])
+        lower = max(0.0, prob - threshold)
+        upper = min(1.0, prob + threshold)
+        return lower, upper
+
+    def update(self, prob: float, actual: int) -> None:
+        """ACI online update: adjust alpha_t based on observed coverage error.
+
+        If the last prediction MISSED coverage, decrease alpha_t (widen intervals).
+        If it HIT coverage, increase alpha_t (narrow intervals).
+        """
+        lower, upper = self.predict_interval(prob)
+        err = 1 if not (lower <= float(actual) <= upper) else 0
+        self.alpha_t = self.alpha_t + self.gamma * (err - self.nominal_alpha)
+        self.alpha_t = float(np.clip(self.alpha_t, 0.01, 0.50))
+
+    def mean_interval_width(self, test_probs: np.ndarray) -> float:
+        """Compute mean interval width over a set of test probabilities."""
+        widths = [
+            self.predict_interval(float(p))[1] - self.predict_interval(float(p))[0]
+            for p in test_probs
+        ]
+        return float(np.mean(widths))

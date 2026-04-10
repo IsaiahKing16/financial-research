@@ -80,6 +80,11 @@ regime=hold_spy_threshold+0.05, horizon=fwd_7d_up, stop_loss_atr_multiple=3.0
 # E3 DTW Reranker: FAIL (Spearman fast-fail: mean rho=1.0000, rankings near-identical to Euclidean).
 #   DTW on 8 return scalars is redundant with Euclidean distance (same values, no warping benefit).
 #   use_dtw_reranker stays False. Provenance: results/phase7/e3_dtw_vs_baseline.tsv (2026-04-09)
+# E4 Conformal: FAIL (coverage 0.814 mean, 5/6 folds >= 88%; width 1.000 mean, 0/6 < 0.30).
+#   Root cause: 52T probs cluster in [0.50, 0.59]; |prob-label| scores always >=0.41;
+#   threshold ~0.57 yields near-trivial [0,1] intervals (width ~1.0). 2020-COVID fold
+#   coverage 0% (no gamma achieves 88% — ACI over-tightens on COVID volatility).
+#   use_conformal stays False. Provenance: results/phase7/e4_conformal_coverage.tsv (2026-04-09)
 
 ## Key Design Docs (read before modifying related code)
 

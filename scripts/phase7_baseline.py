@@ -359,17 +359,19 @@ def run_fold_with_config(
         probs=probs,
     )
 
-    # Scored rows: matcher gave BUY/SELL AND not overridden by bear regime
-    scored_mask = (sigs != "HOLD") & ~bear_mask
+    # Scored rows: all non-bear rows (SPY ret_90d >= threshold), regardless of signal
+    # NOTE: 52T pipeline always returns HOLD (probs in [0.50, 0.58], below 0.65 threshold),
+    # so filtering on sigs != "HOLD" would produce n_scored=0 for all folds.
+    scored_mask = ~bear_mask
     n_scored    = int(scored_mask.sum())
-    mean_prob   = float(probs[scored_mask].mean()) if scored_mask.any() else float("nan")
+    mean_prob   = float(probs_hold[scored_mask].mean()) if scored_mask.any() else float("nan")
 
-    # BSS uses H7-overridden probabilities (bear rows clamped to base_rate)
-    bss_val = _bss(probs_hold, y_true)
+    # BSS uses H7-overridden probabilities on scored (non-bear) rows only
+    bss_val = _bss(probs_hold[scored_mask], y_true[scored_mask])
 
     # Murphy decomposition on scored rows only
     if scored_mask.any():
-        rel, res, unc = _murphy_decomposition(probs[scored_mask], y_true[scored_mask])
+        rel, res, unc = _murphy_decomposition(probs_hold[scored_mask], y_true[scored_mask])
     else:
         rel, res, unc = float("nan"), float("nan"), base_rate * (1.0 - base_rate)
 

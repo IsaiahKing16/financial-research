@@ -77,6 +77,9 @@ regime=hold_spy_threshold+0.05, horizon=fwd_7d_up, stop_loss_atr_multiple=3.0
 #   MI-ranked OWA weighting (best alpha=4.0) shows no BSS improvement on 23D returns_candle.
 #   Deltas: [-0.00026, -0.00044, -0.00015, +0.00025, +0.00015, -0.000079] all < +0.001.
 #   Provenance: results/phase7/e2_owa_vs_baseline.tsv (2026-04-09)
+# E3 DTW Reranker: FAIL (Spearman fast-fail: mean rho=1.0000, rankings near-identical to Euclidean).
+#   DTW on 8 return scalars is redundant with Euclidean distance (same values, no warping benefit).
+#   use_dtw_reranker stays False. Provenance: results/phase7/e3_dtw_vs_baseline.tsv (2026-04-09)
 
 ## Key Design Docs (read before modifying related code)
 

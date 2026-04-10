@@ -827,6 +827,30 @@ class PatternMatcher:
                     q_batch, indices_b, top_mask, cfg.top_k
                 )
 
+            # E3: DTW reranker — rerank accepted neighbours by DTW distance on
+            # return columns (0:8) only. Replaces top_mask with a new mask
+            # selecting only the top dtw_rerank_k DTW-closest neighbours.
+            # Candlestick columns (8:23) are excluded — bounded proportions
+            # have no meaningful temporal warping.
+            if getattr(cfg, 'use_dtw_reranker', False) and self._X_train_weighted is not None:
+                from research.wfa_reranker import dtw_rerank
+                _k = getattr(cfg, 'dtw_rerank_k', 20)
+                _new_mask = np.zeros_like(top_mask)
+                for i in range(B):
+                    _accepted_idx = indices_b[i][top_mask[i]]
+                    if len(_accepted_idx) == 0:
+                        continue
+                    _nbrs_feat = self._X_train_weighted[_accepted_idx]  # (n_acc, D)
+                    _reranked, _ = dtw_rerank(
+                        q_batch[i], _nbrs_feat, _accepted_idx,
+                        k=min(_k, len(_accepted_idx))
+                    )
+                    # Rebuild top_mask using O(1) position lookup
+                    _pos_map = {int(v): p for p, v in enumerate(indices_b[i])}
+                    for ri in _reranked:
+                        _new_mask[i, _pos_map[int(ri)]] = True
+                top_mask = _new_mask
+
             # Stage 5: package results
             (prob_b, ret_b, sigs_b, rsns_b, nm_b, ens_b, _nr_b) = self._package_results(
                 top_mask, distances_b, indices_b,

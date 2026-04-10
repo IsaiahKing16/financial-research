@@ -1,0 +1,7 @@
+fold	baseline_bss	dtw_bss	delta	improved
+2019	8.6e-05			False
+2020-COVID	1.6e-05			False
+2021	-6.3e-05			False
+2022-Bear	-0.122284			False
+2023	-0.018695			False
+2024-Val	-0.000408			False

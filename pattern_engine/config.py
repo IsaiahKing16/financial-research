@@ -27,7 +27,7 @@ class EngineConfig:
 
     # ── Matching algorithm ────────────────────────────────────────────────────
     top_k: int = 50
-    max_distance: float = 1.1019          # Quantile-calibrated; see CLAUDE.md
+    max_distance: float = 2.5              # Phase 6 locked; see CLAUDE.md
     distance_weighting: str = "uniform"   # Locked — beats inverse on 52T sweep
     distance_metric: str = "euclidean"
     nn_jobs: int = 1                      # MUST stay 1 — Windows/Py3.12 deadlock
@@ -35,7 +35,7 @@ class EngineConfig:
     use_hnsw: bool = True                 # HNSWMatcher (faster; parity confirmed)
 
     # ── Features ─────────────────────────────────────────────────────────────
-    feature_set: str = "returns_only"
+    feature_set: str = "returns_candle"
     """Feature set name resolved via FeatureRegistry. Default is locked per CLAUDE.md."""
     feature_weights: dict = field(default_factory=dict)
 
@@ -59,7 +59,7 @@ class EngineConfig:
     # ── Regime ───────────────────────────────────────────────────────────────
     regime_filter: bool = False           # Off until validated (CLAUDE.md)
     regime_fallback: bool = False
-    calibration_method: str = "platt"
+    calibration_method: str = "beta_abm"
     cal_max_samples: int = 100_000
 
     # ── Research pilots (all off in production) ───────────────────────────────
@@ -74,6 +74,24 @@ class EngineConfig:
     use_sentiment_veto: bool = False
     sector_conviction_lift: float = 0.005
     momentum_min_outperformance: float = 0.015
+
+    # ── Phase 7 enhancements (all False in production) ───────────────────────────
+    use_bma: bool = False               # E1: Bayesian Model Averaging calibrator
+    use_owa: bool = False               # E2: OWA feature weighting
+    use_dtw_reranker: bool = False      # E3: DTW post-retrieval reranker
+    use_conformal: bool = False         # E4: Adaptive Conformal Prediction
+    use_anomaly_filter: bool = False    # E5: LOF anomaly filter
+    use_stumpy: bool = False            # E6: STUMPY matrix profile signal
+
+    # Phase 7 enhancement parameters
+    owa_alpha: float = 1.0              # E2: concentration exponent
+    dtw_rerank_k: int = 20             # E3: neighbours to return after reranking
+    conformal_alpha: float = 0.10      # E4: nominal miscoverage rate
+    conformal_gamma: float = 0.05      # E4: ACI online learning rate
+    anomaly_contamination: float = 0.05  # E5: expected outlier fraction
+    anomaly_penalty: float = 0.50      # E5: confidence multiplier for outliers
+    stumpy_weight: float = 0.20        # E6: blend weight for STUMPY signal
+    stumpy_subsequence_length: int = 50  # E6: matrix profile subsequence length
 
 
 # ── Walk-forward fold definitions ─────────────────────────────────────────────

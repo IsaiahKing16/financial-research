@@ -3,3 +3,5 @@ E1_BMA	False	[9e-05, 2e-05, -6e-05, -0.12228, -0.0187, -0.00041]	[-0.12832, -0.1
 E2_OWA	False	[9e-05, 2e-05, -6e-05, -0.12228, -0.0187, -0.00041]	[-0.00017, -0.00042, -0.00022, -0.12204, -0.01854, -0.00049]	[-0.00026, -0.00044, -0.00015, 0.00025, 0.00015, -8e-05]	0	bss_delta+worst_fold	0.001	FAIL	C:\Users\Isaia\.claude\financial-research\.worktrees\phase7-enhancements\results\phase7\e2_owa_vs_baseline.tsv	172.0				
 E3_DTW					0			FAIL						Spearman fast-fail: mean_rho=1.0000
 E4_Conformal					5			FAIL			0.8144	0.9899	0.0	coverage_gate=FAIL width_gate=FAIL mean_cov=0.814 mean_w=1.000
+E5_LOF_Anomaly	False										DEFERRED			Deferred: new research supersedes. Would evaluate on 585T signals (FPR reduction gate).
+E6_STUMPY	False										DEFERRED			Deferred: new research supersedes. Would benchmark matrix profile vs KNN on 6-fold BSS.

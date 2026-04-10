@@ -108,13 +108,17 @@ regime=hold_spy_threshold+0.05, horizon=fwd_7d_up, stop_loss_atr_multiple=3.0
 - Spec: `docs/superpowers/specs/2026-04-09-phase5-live-plumbing-design.md`
 - G1: 100/100 fills ✓, G2: 30-day recon ✓, G3: 0.18s ✓
 
-**Phase 6 Candlestick Features — IN PROGRESS (2026-04-09)**
-- Handoff: `HANDOFF_phase6-candlestick-features.md`
-- Branch: `feat/phase6-candlestick-features`
-- 15-column continuous candlestick feature set (5 proportions × 3 timeframes) implemented.
-- `FeatureRegistry` + `FeatureSet` added to `pattern_engine/features.py`.
-- `EngineConfig.feature_set` field added; `returns_candle` registered (23 columns).
-- 829 tests pass (807 baseline + 22 new). Walk-forward smoke test pending.
+**Phase 6 Candlestick Features — COMPLETE (2026-04-09)**
+- Locked: feature_set=returns_candle(23D), max_distance=2.5. 846 tests pass.
+
+**Phase 7 Model Enhancements — IN PROGRESS (2026-04-09)**
+- Branch: `phase7-enhancements` (worktree `.worktrees/phase7-enhancements`)
+- Plan: `docs/superpowers/plans/2026-04-09-phase7-model-enhancements-plan.md`
+- Spec: `docs/superpowers/specs/2026-04-09-phase7-model-enhancements-design.md`
+- Session log: `docs/session-logs/SESSION_2026-04-09_phase7-e1-e4.md`
+- E1 BMA: FAIL | E2 OWA: FAIL | E3 DTW: FAIL (Spearman rho=1.0) | E4 Conformal: FAIL
+- E5 LOF Anomaly Filter: PENDING | E6 STUMPY: PENDING
+- 858 tests pass. Next: dispatch E5 (LOF on 585T signals) then E6 (STUMPY).
 
 Phase 1–4 summary (for context, not active):
 - H7 regime HOLD: mean_BSS=+0.00033, 3/6 positive folds. Thin margin.

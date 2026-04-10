@@ -73,6 +73,10 @@ regime=hold_spy_threshold+0.05, horizon=fwd_7d_up, stop_loss_atr_multiple=3.0
 # E1 BMA: FAIL (0/6 folds improved by >=+0.001). use_bma stays False.
 #   BMA EM-fitted Student's t mixture degrades BSS (delta ~-0.09 to -0.14 all folds).
 #   Provenance: results/phase7/e1_bma_vs_beta_abm.tsv (2026-04-09)
+# E2 OWA: FAIL (0/6 folds improved by >=+0.001). use_owa stays False.
+#   MI-ranked OWA weighting (best alpha=4.0) shows no BSS improvement on 23D returns_candle.
+#   Deltas: [-0.00026, -0.00044, -0.00015, +0.00025, +0.00015, -0.000079] all < +0.001.
+#   Provenance: results/phase7/e2_owa_vs_baseline.tsv (2026-04-09)
 
 ## Key Design Docs (read before modifying related code)
 

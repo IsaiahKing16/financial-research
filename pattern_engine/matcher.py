@@ -571,6 +571,24 @@ class PatternMatcher:
         X_raw = train_db[feature_cols].values
         X_weighted = self._prepare_features(X_raw, fit_scaler=True)
 
+        # E2: OWA feature weighting — compute MI-based global weights.
+        # IMPORTANT: MI is computed on X_weighted (scaled), not X_raw.
+        # The index lives in scaled space — MI ranking must match that space.
+        if getattr(cfg, 'use_owa', False):
+            from pattern_engine.owa_weights import mi_to_weight_dict
+            _horizon = cfg.projection_horizon
+            _y_train = (
+                train_db[_horizon].values.astype(np.float64)
+                if _horizon in train_db.columns
+                else np.zeros(len(train_db), dtype=np.float64)
+            )
+            cfg.feature_weights = mi_to_weight_dict(
+                feature_cols, X_weighted, _y_train,
+                alpha=getattr(cfg, 'owa_alpha', 1.0)
+            )
+            # Re-apply with OWA weights (scaler already fitted above)
+            X_weighted = self._prepare_features(X_raw, fit_scaler=False)
+
         # Research pilot: IB compression (SLE-78) — applied *before* building
         # the index so the index lives in compressed d_out-dimensional space.
         # When flag is False (default), X_weighted passes through unchanged.

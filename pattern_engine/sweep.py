@@ -204,6 +204,9 @@ class OptunaSweep:
                 # Store provenance as user attributes
                 trial.set_user_attr("exception", str(exc))
                 trial.set_user_attr("trimmed_mean_bss", _PENALTY_FLOOR)
+                trial.set_user_attr("mean_bss", _PENALTY_FLOOR)
+                trial.set_user_attr("positive_folds", 0)
+                trial.set_user_attr("wilcoxon_p", None)
                 return _PENALTY_FLOOR
 
             raw_score = result_dict.get("trimmed_mean_bss", result_dict.get("mean_bss", -0.10))
@@ -219,9 +222,11 @@ class OptunaSweep:
             }
             rows.append(row)
 
-            # Provenance attributes
+            # Provenance attributes (all needed for resume reconstruction)
             trial.set_user_attr("trimmed_mean_bss", score)
+            trial.set_user_attr("mean_bss", result_dict.get("mean_bss", score))
             trial.set_user_attr("positive_folds", result_dict.get("positive_folds", 0))
+            trial.set_user_attr("wilcoxon_p", result_dict.get("wilcoxon_p"))
             trial.set_user_attr("gate_passed", passed)
             fold_results = result_dict.get("fold_results", [])
             trial.set_user_attr("fold_results", fold_results)

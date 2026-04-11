@@ -38,7 +38,21 @@ except ImportError:
 
 HORIZON = "fwd_7d_up"
 SPY_THRESHOLD = 0.05
-DATA_DIR = Path("data/52t_features")
+def _find_data_dir() -> Path:
+    """Resolve 52T features directory, with worktree fallback."""
+    # Try relative to this module's repo root
+    module_root = Path(__file__).resolve().parent.parent
+    candidate = module_root / "data" / "52t_features"
+    if candidate.exists():
+        return candidate
+    # Worktree fallback: .worktrees/<name>/ → go up two levels to main repo
+    main_repo = module_root.parent.parent
+    alt = main_repo / "data" / "52t_features"
+    if alt.exists():
+        return alt
+    return Path("data/52t_features")  # CWD-relative fallback for production
+
+DATA_DIR = _find_data_dir()
 FEATURE_COLS: list[str] = FeatureRegistry.get("returns_candle").columns   # 23 columns
 CANDLE_FEATURE_COLS: list[str] = list(CANDLE_COLS)
 MURPHY_BINS = 10

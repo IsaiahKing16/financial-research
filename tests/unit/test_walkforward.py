@@ -348,7 +348,13 @@ class TestParity:
         result = run_fold(fold, full_db)
 
         import csv
-        baseline_path = Path("results/phase7/baseline_23d.tsv")
+        # Resolve relative to repo root (handles worktree context)
+        repo_root = Path(__file__).resolve().parent.parent.parent
+        baseline_path = repo_root / "results" / "phase7" / "baseline_23d.tsv"
+        if not baseline_path.exists():
+            # Worktree fallback
+            main_repo = repo_root.parent.parent
+            baseline_path = main_repo / "results" / "phase7" / "baseline_23d.tsv"
         if not baseline_path.exists():
             pytest.skip("Baseline TSV not found — run phase7_baseline.py first")
 

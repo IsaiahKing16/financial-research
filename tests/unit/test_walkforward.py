@@ -5,6 +5,7 @@ TDD tests written before implementation per Phase 3 Optuna plan (Tasks 1-3).
 from __future__ import annotations
 
 import math
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -328,3 +329,37 @@ class TestRunWalkforward:
 
         # Positive folds: 5 out of 6
         assert result["positive_folds"] == 5
+
+
+# ── TestParity ───────────────────────────────────────────────────────────────
+
+
+@pytest.mark.slow
+class TestParity:
+    """Parity: walkforward.run_fold() matches baseline TSV on real data."""
+
+    def test_fold_2019_parity(self):
+        """BSS from walkforward.run_fold on fold 2019 matches baseline TSV."""
+        from pattern_engine.walkforward import load_and_augment_db, run_fold
+        from pattern_engine.config import WALKFORWARD_FOLDS
+
+        full_db = load_and_augment_db()
+        fold = WALKFORWARD_FOLDS[0]  # 2019
+        result = run_fold(fold, full_db)
+
+        import csv
+        baseline_path = Path("results/phase7/baseline_23d.tsv")
+        if not baseline_path.exists():
+            pytest.skip("Baseline TSV not found — run phase7_baseline.py first")
+
+        with open(baseline_path) as f:
+            reader = csv.DictReader(f, delimiter="\t")
+            for row in reader:
+                if row["fold"] == "2019":
+                    expected_bss = float(row["bss"])
+                    break
+            else:
+                pytest.fail("2019 fold not found in baseline TSV")
+
+        assert result["bss"] == pytest.approx(expected_bss, abs=1e-6), \
+            f"Parity failure: walkforward BSS={result['bss']}, baseline BSS={expected_bss}"

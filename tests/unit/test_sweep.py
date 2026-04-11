@@ -292,3 +292,36 @@ class TestKNNSearchSpace:
         # max_distance bounds are floats
         lo, hi = KNN_SEARCH_SPACE["max_distance"]
         assert isinstance(lo, float) and isinstance(hi, float)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 5. TestIntegration
+# ─────────────────────────────────────────────────────────────────────────────
+
+@pytest.mark.slow
+class TestIntegration:
+    """End-to-end integration test on real 52T data."""
+
+    def test_optuna_3_trials_on_real_data(self):
+        """3-trial OptunaSweep with real data produces valid SweepResult."""
+        from pattern_engine.walkforward import load_and_augment_db, run_walkforward
+        from pattern_engine.sweep import OptunaSweep
+
+        full_db = load_and_augment_db()
+
+        def knn_objective(config, db):
+            return run_walkforward(db, cfg_overrides=config)
+
+        sweep = OptunaSweep(
+            study_name="integration_test",
+            objective_fn=knn_objective,
+            search_space={"max_distance": (1.5, 3.5)},
+            n_trials=3,
+            max_hours=2.0,
+        )
+        result = sweep.run(full_db, verbose=1)
+
+        assert len(result.results_df) == 3
+        assert result.best_config is not None
+        assert isinstance(result.best_bss, float)
+        assert result.elapsed_minutes > 0

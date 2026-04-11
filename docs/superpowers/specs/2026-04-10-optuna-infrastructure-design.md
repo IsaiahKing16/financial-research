@@ -17,7 +17,7 @@ All FPPE hyperparameter sweeps (Phase 1 H1–H7, Phase 6 max_distance, Phase 7 E
 |----------|--------|-----------|
 | Scope | General-purpose framework | Reusable for KNN, LightGBM (H9), HMM (H8), any future model |
 | Pruning | No pruning | 6 folds at ~2 min/trial — pruning saves little, risks discarding good configs on noisy early folds |
-| Objective | Trimmed mean BSS + positive-folds gate constraint | Matches FPPE's existing evaluation methodology |
+| Objective | Trimmed mean BSS (Optuna target) + positive-folds gate (TPE steering only) + Wilcoxon p-value (significance) | Gate steers TPE away from bad configs; Wilcoxon provides proper statistical test. Gate alone has 65.6% FPR under null. |
 | Trial budget | 80 trials / 16 hours default | Research paper upper recommendation; thorough exploration |
 | Location | `pattern_engine/` modules | Production infrastructure, not scripts |
 
@@ -115,8 +115,12 @@ Extracts and consolidates proven logic from `scripts/phase7_baseline.py`.
       "positive_folds": int,
       "fold_results": list[dict],
       "trimmed_mean_bss": float,  # drops worst fold
+      "wilcoxon_p": float | None, # one-sided Wilcoxon signed-rank p-value (H₀: median BSS ≤ 0)
+                                  # None if fewer than 6 non-zero BSS values (Wilcoxon requires ≥6)
   }
   ```
+- **Statistical note:** The `wilcoxon_p` field provides a proper p-value for testing whether BSS is significantly positive across folds. This replaces the `positive_folds >= 3` majority-vote as the statistical significance measure. The majority-vote gate has a **65.6% false positive rate** under the null (P(≥3/6 | p=0.5) = 65.6%) — see research note on PBO/CSCV. The gate is retained for TPE steering only (penalizing clearly bad configs), NOT for claiming statistical significance.
+- Implementation: `scipy.stats.wilcoxon(bss_values, alternative='greater')`. Returns the p-value from a one-sided test.
 
 ### Private Helpers
 
@@ -200,7 +204,8 @@ class SweepResult:
     best_config: dict
     best_bss: float
     best_positive_folds: int
-    results_df: pd.DataFrame       # All trials: trial_id, params, mean_bss, fold_bss, gate_pass
+    best_wilcoxon_p: float | None  # Wilcoxon p-value for best trial (None if < 6 valid folds)
+    results_df: pd.DataFrame       # All trials: trial_id, params, mean_bss, fold_bss, gate_pass, wilcoxon_p
     elapsed_minutes: float
     study: optuna.Study | None     # None for GridSweep; guarded by TYPE_CHECKING
 ```
@@ -247,9 +252,9 @@ ExperimentLogger(
 # started: 2026-04-10T14:30:00
 # search_space: {"max_distance": [1.0, 4.0], "top_k": [20, 100], ...}
 # locked: returns_candle(23), beta_abm, regime=hold_spy_threshold+0.05
-trial	max_distance	top_k	cal_frac	confidence_threshold	mean_bss	trimmed_mean_bss	positive_folds	gate_pass	bss_2019	bss_2020	bss_2021	bss_2022	bss_2023	bss_2024	elapsed_s
-0	2.31	42	0.72	0.63	+0.00041	+0.00058	3	True	...	12.3
-1	1.85	67	0.81	0.70	-0.00102	-0.00054	1	False	...	11.8
+trial	max_distance	top_k	cal_frac	confidence_threshold	mean_bss	trimmed_mean_bss	positive_folds	wilcoxon_p	gate_pass	bss_2019	bss_2020	bss_2021	bss_2022	bss_2023	bss_2024	elapsed_s
+0	2.31	42	0.72	0.63	+0.00041	+0.00058	3	0.156	True	...	12.3
+1	1.85	67	0.81	0.70	-0.00102	-0.00054	1	0.844	False	...	11.8
 ```
 
 **Design choices:**
@@ -332,10 +337,33 @@ Dedicated test verifying `walkforward.run_fold()` produces **identical BSS** to 
 
 ---
 
+## Statistical Validity Notes
+
+### Gate Function Role
+
+The default `gate_fn` (`positive_folds >= 3`) is used **only for TPE steering** — penalizing clearly poor configs so the Bayesian sampler avoids them. It is NOT a statistical significance test. Under the null (no skill), BSS > 0 occurs ~50% per fold, so P(≥3/6) = 65.6% — a gate this permissive cannot make significance claims.
+
+**For claiming a config is statistically significant**, use the `wilcoxon_p` field from `run_walkforward()`. A Wilcoxon signed-rank p-value < 0.05 (one-sided, H₀: median BSS ≤ 0) is the minimum standard. When comparing multiple configs from a sweep, apply **Holm-Bonferroni correction** across the top-N candidates via `statsmodels.stats.multitest.multipletests(p_values, method='holm')`.
+
+### Multiple Testing Across Experiments
+
+When FPPE runs multiple sweep experiments (e.g., KNN sweep, LightGBM sweep, HMM sweep), the best config from each experiment should be collected and their `wilcoxon_p` values corrected jointly. This is outside P3's scope but the infrastructure supports it — each `SweepResult` carries `best_wilcoxon_p`.
+
+### CPCV Future Path
+
+The current 6-fold walk-forward produces 5 out-of-sample test periods — insufficient for robust inference. Combinatorially Purged Cross-Validation (CPCV) with 10 groups and k=8 test groups produces 36 backtest paths from 45 combinations. The `objective_fn` abstraction supports this: a CPCV-based objective function can replace the walk-forward one without changing `OptunaSweep` or `GridSweep`. Recommended library: `skfolio.model_selection.CombinatorialPurgedCV`. This is a separate research item (not P3 scope).
+
+### DSR and MinBTL
+
+Deflated Sharpe Ratio (DSR) and Minimum Backtest Length (MinBTL) computations are complementary validations that can be added to `experiment_log.py` as post-sweep analysis utilities. Not required for P3 MVP but noted as natural extensions.
+
+---
+
 ## Dependencies
 
 - `optuna>=3.4.0` — already installed in venv
 - `betacal` — already installed in venv (used by `_BetaCalibrator`)
+- `scipy` — already installed in venv (used by `scipy.stats.wilcoxon` for p-value computation)
 - No new dependencies required
 
 ## Locked Settings Context

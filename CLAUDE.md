@@ -18,6 +18,9 @@ matching on return fingerprints. Generates probabilistic BUY/SELL/HOLD signals.
   - `contracts/`: Pydantic schemas, BaseMatcher ABC, EngineState, SignalDirection/Source
   - `features.py`, `data.py`, `schema.py` — feature pipeline and data loading
   - `regime.py`: RegimeLabeler (SPY + VIX spike + yield curve); regime_filter=False in prod
+  - `walkforward.py`: run_fold, run_walkforward, load_and_augment_db, BSS, Murphy decomposition, beta_abm calibration
+  - `sweep.py`: OptunaSweep (TPE), GridSweep, SweepResult, KNN_SEARCH_SPACE
+  - `experiment_log.py`: ExperimentLogger incremental TSV writer
   - `live.py`: LiveRunner (Phase 5): receives AllocationDecisions + exit_tickers, submits via OrderManager + BaseBroker DI
   - `contracts/matchers/hnsw_matcher.py`: save_index/load_index for disk persistence
   - Research pilots (behind flags): `sax_filter.py`, `wfa_reranker.py`, `ib_compression.py`, `conformal_hooks.py`
@@ -42,7 +45,7 @@ matching on return fingerprints. Generates probabilistic BUY/SELL/HOLD signals.
 
 ## Critical Rules
 
-1. **Run tests first.** `PYTHONUTF8=1 py -3.12 -m pytest tests/ -q -m "not slow"` — 858 tests, all must pass.
+1. **Run tests first.** `PYTHONUTF8=1 py -3.12 -m pytest tests/ -q -m "not slow"` — 908 tests, all must pass.
 2. **Numbers require provenance.** Any claimed metric must trace to walk-forward results
    or experiment logs. If it cannot be traced, it is fabricated. No exceptions.
 3. **Do NOT modify `prepare.py` or this file** unless explicitly asked.
@@ -125,6 +128,13 @@ regime=hold_spy_threshold+0.05, horizon=fwd_7d_up, stop_loss_atr_multiple=3.0
 - Root cause: 52T probs cluster [0.50–0.59], below 0.65 threshold — calibration improvements structurally impossible.
 - E5/E6 deferred pending new research direction. All 6 flags remain False. 858 tests pass.
 - Provenance: results/phase7/enhancement_summary.tsv
+
+**R3 Optuna Infrastructure — COMPLETE (2026-04-11)**
+- Extracted walkforward.py (~490 lines), sweep.py (~480 lines), experiment_log.py (~70 lines) from phase7_baseline.py
+- OptunaSweep (TPE) + GridSweep with gate penalization, resume support
+- Parity verified: fold 2019 BSS matches baseline_23d.tsv within 1e-6
+- 908 tests pass (+50 new). Branch: p3-optuna-infrastructure (merged).
+- Research roadmap: `docs/research/UNIFIED_RESEARCH_ROADMAP.md` (20 papers, 6 tiers)
 
 Phase 1–4 summary (for context, not active):
 - H7 regime HOLD: mean_BSS=+0.00033, 3/6 positive folds. Thin margin.

@@ -200,3 +200,49 @@ def test_exception_hierarchy_importable():
     assert issubclass(OrderRejectedError, ExecutionError)
     assert issubclass(InsufficientFundsError, ExecutionError)
     assert issubclass(CalibrationError, ModelError)
+
+
+# ─── portfolio_state FiniteFloat (P8-PRE-6D closes ADR-009 deferred gap) ───────
+
+def test_portfolio_snapshot_rejects_nan_equity():
+    """PortfolioSnapshot must reject NaN equity (FiniteFloat guard)."""
+    from datetime import date
+    from pydantic import ValidationError
+    from trading_system.portfolio_state import PortfolioSnapshot
+    import pytest
+    with pytest.raises(ValidationError, match="finite"):
+        PortfolioSnapshot(
+            as_of_date=date(2024, 1, 2),
+            equity=float("nan"),
+            cash=0.0,
+        )
+
+
+def test_portfolio_snapshot_rejects_nan_cash():
+    """PortfolioSnapshot must reject NaN cash (FiniteFloat guard)."""
+    from datetime import date
+    from pydantic import ValidationError
+    from trading_system.portfolio_state import PortfolioSnapshot
+    import pytest
+    with pytest.raises(ValidationError, match="finite"):
+        PortfolioSnapshot(
+            as_of_date=date(2024, 1, 2),
+            equity=100_000.0,
+            cash=float("nan"),
+        )
+
+
+def test_open_position_rejects_nan_entry_price():
+    """OpenPosition must reject NaN entry_price (FiniteFloat guard)."""
+    from datetime import date
+    from pydantic import ValidationError
+    from trading_system.portfolio_state import OpenPosition
+    import pytest
+    with pytest.raises(ValidationError, match="finite"):
+        OpenPosition(
+            ticker="AAPL",
+            sector="Technology",
+            entry_date=date(2024, 1, 2),
+            position_pct=0.05,
+            entry_price=float("nan"),
+        )

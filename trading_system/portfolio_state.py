@@ -29,6 +29,8 @@ from typing import Dict, Literal, Optional, Tuple
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from pattern_engine.contracts.finite_types import FiniteFloat
+
 
 # ── OpenPosition ──────────────────────────────────────────────────────────────
 
@@ -44,8 +46,8 @@ class OpenPosition(BaseModel):
     ticker: str = Field(min_length=1, max_length=10)
     sector: str = Field(min_length=1)
     entry_date: Date
-    position_pct: float = Field(ge=0.0, le=1.0)
-    entry_price: float = Field(gt=0.0)
+    position_pct: FiniteFloat = Field(ge=0.0, le=1.0)
+    entry_price: FiniteFloat = Field(gt=0.0)
 
     @field_validator("ticker")
     @classmethod
@@ -71,8 +73,8 @@ class PortfolioSnapshot(BaseModel):
     model_config = {"frozen": True}
 
     as_of_date: Date
-    equity: float = Field(gt=0.0, description="Total portfolio equity (cash + positions)")
-    cash: float = Field(ge=0.0, description="Available cash")
+    equity: FiniteFloat = Field(gt=0.0, description="Total portfolio equity (cash + positions)")
+    cash: FiniteFloat = Field(ge=0.0, description="Available cash")
     open_positions: Tuple[OpenPosition, ...] = Field(default_factory=tuple)
 
     @model_validator(mode="after")
@@ -122,7 +124,7 @@ class RankedSignal(BaseModel):
     ticker: str = Field(min_length=1, max_length=10)
     sector: str = Field(min_length=1)
     signal_date: Date
-    confidence: float = Field(ge=0.0, le=1.0)
+    confidence: FiniteFloat = Field(ge=0.0, le=1.0)
     rank: int = Field(ge=1, description="1-based rank; 1 = highest priority")
 
     @field_validator("ticker")

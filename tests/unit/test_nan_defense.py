@@ -180,3 +180,23 @@ def test_engine_state_rejects_nan_scaler_params():
             fit_timestamp="2024-01-01T00:00:00+00:00",
             feature_set_name="returns_candle",
         )
+
+
+def test_exception_hierarchy_importable():
+    """Error hierarchy is importable and correctly structured."""
+    from trading_system.exceptions import (
+        TradingSystemError,
+        DataError, MarketDataError, StaleDataError,
+        ExecutionError, OrderRejectedError, InsufficientFundsError,
+        ModelError, CalibrationError,
+        RiskLimitError,
+    )
+
+    # All are subclasses of TradingSystemError
+    for exc_cls in [DataError, ExecutionError, ModelError, RiskLimitError]:
+        assert issubclass(exc_cls, TradingSystemError)
+    assert issubclass(MarketDataError, DataError)
+    assert issubclass(StaleDataError, DataError)
+    assert issubclass(OrderRejectedError, ExecutionError)
+    assert issubclass(InsufficientFundsError, ExecutionError)
+    assert issubclass(CalibrationError, ModelError)

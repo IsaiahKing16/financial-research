@@ -373,3 +373,44 @@ class TestSizePositionIcontract:
         from trading_system.position_sizer import size_position
         result = size_position(confidence=0.65, b_ratio=1.2)
         assert result.approved is True
+
+
+# ─── risk_engine icontract guards (P8-PRE-6D) ──────────────────────────────────
+
+class TestRiskEngineIcontract:
+    """P8-PRE-6D: risk_engine functions must reject NaN/inf via icontract."""
+
+    def test_compute_atr_pct_rejects_nan_atr(self):
+        from trading_system.risk_engine import compute_atr_pct
+        with pytest.raises(icontract.ViolationError):
+            compute_atr_pct(atr_14=float("nan"), close=100.0)
+
+    def test_compute_atr_pct_rejects_nan_close(self):
+        from trading_system.risk_engine import compute_atr_pct
+        with pytest.raises(icontract.ViolationError):
+            compute_atr_pct(atr_14=1.5, close=float("nan"))
+
+    def test_compute_atr_pct_valid(self):
+        from trading_system.risk_engine import compute_atr_pct
+        result = compute_atr_pct(atr_14=1.5, close=100.0)
+        assert result == pytest.approx(0.015)
+
+    def test_drawdown_brake_rejects_nan_drawdown(self):
+        from trading_system.risk_engine import drawdown_brake_scalar
+        with pytest.raises(icontract.ViolationError):
+            drawdown_brake_scalar(drawdown=float("nan"))
+
+    def test_drawdown_brake_scalar_in_unit_interval(self):
+        from trading_system.risk_engine import drawdown_brake_scalar
+        for dd in [0.0, 0.10, 0.15, 0.175, 0.20, 0.30]:
+            result = drawdown_brake_scalar(dd)
+            assert 0.0 <= result <= 1.0
+
+    def test_apply_risk_adjustments_rejects_nan_drawdown(self):
+        from trading_system.risk_engine import apply_risk_adjustments
+        from trading_system.position_sizer import SizingResult
+        sizing = SizingResult(approved=True, position_pct=0.05,
+                              kelly_fraction=0.2, scaled_kelly=0.1,
+                              atr_weight=0.5, rejection_reason=None)
+        with pytest.raises(icontract.ViolationError):
+            apply_risk_adjustments(sizing=sizing, drawdown=float("nan"))

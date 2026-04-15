@@ -23,13 +23,28 @@ Linear: Phase 3
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from typing import List, Optional
+
+import icontract
 
 from trading_system.position_sizer import SizingResult
 from trading_system.risk_overlays.base import BaseRiskOverlay
 
 
+@icontract.require(
+    lambda atr_14: math.isfinite(atr_14),
+    "atr_14 must be finite (not NaN/inf).",
+)
+@icontract.require(
+    lambda close: math.isfinite(close),
+    "close must be finite (not NaN/inf).",
+)
+@icontract.ensure(
+    lambda result: math.isfinite(result) and result > 0,
+    "atr_pct result must be finite and positive.",
+)
 def compute_atr_pct(atr_14: float, close: float) -> float:
     """ATR as a fraction of price.
 
@@ -62,6 +77,22 @@ def compute_atr_pct(atr_14: float, close: float) -> float:
     return atr_14 / close
 
 
+@icontract.require(
+    lambda drawdown: math.isfinite(drawdown),
+    "drawdown must be finite (not NaN/inf).",
+)
+@icontract.require(
+    lambda warn: math.isfinite(warn),
+    "warn must be finite (not NaN/inf).",
+)
+@icontract.require(
+    lambda halt: math.isfinite(halt),
+    "halt must be finite (not NaN/inf).",
+)
+@icontract.ensure(
+    lambda result: 0.0 <= result <= 1.0,
+    "drawdown_brake_scalar result must be in [0.0, 1.0].",
+)
 def drawdown_brake_scalar(
     drawdown: float,
     warn: float = 0.15,
@@ -151,6 +182,22 @@ class AdjustedSizing:
 
 # ─── Orchestrator ─────────────────────────────────────────────────────────────
 
+@icontract.require(
+    lambda drawdown: math.isfinite(drawdown),
+    "drawdown must be finite (not NaN/inf).",
+)
+@icontract.require(
+    lambda dd_warn: math.isfinite(dd_warn),
+    "dd_warn must be finite (not NaN/inf).",
+)
+@icontract.require(
+    lambda dd_halt: math.isfinite(dd_halt),
+    "dd_halt must be finite (not NaN/inf).",
+)
+@icontract.ensure(
+    lambda result: math.isfinite(result.final_position_pct),
+    "final_position_pct must be finite.",
+)
 def apply_risk_adjustments(
     sizing: SizingResult,
     drawdown: float,

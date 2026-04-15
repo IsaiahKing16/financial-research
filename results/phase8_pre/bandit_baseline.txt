@@ -1,0 +1,2 @@
+	Total issues (by severity):
+	Total issues (by confidence):

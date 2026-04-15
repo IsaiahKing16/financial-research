@@ -1,0 +1,10 @@
+pattern_engine\sweep.py:190: error: Function is missing a type annotation for one or more parameters  [no-untyped-def]
+pattern_engine\sweep.py:258: error: Missing type arguments for generic type "dict"  [type-arg]
+pattern_engine\sweep.py:294: error: Argument "storage" to "load_study" has incompatible type "str | None"; expected "str | BaseStorage"  [arg-type]
+pattern_engine\sweep.py:301: error: Missing type arguments for generic type "dict"  [type-arg]
+pattern_engine\sweep.py:327: error: Missing type arguments for generic type "dict"  [type-arg]
+pattern_engine\sweep.py:388: error: Missing type arguments for generic type "dict"  [type-arg]
+pattern_engine\sweep.py:389: error: Missing type arguments for generic type "list"  [type-arg]
+pattern_engine\sweep.py:390: error: Missing type arguments for generic type "dict"  [type-arg]
+pattern_engine\sweep.py:405: error: Missing type arguments for generic type "dict"  [type-arg]
+Found 169 errors in 28 files (checked 57 source files)

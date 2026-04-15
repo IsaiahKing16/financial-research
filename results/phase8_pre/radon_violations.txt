@@ -1,0 +1,29 @@
+
+================================================================================
+POWER OF 10 R4 VIOLATIONS: 24 functions exceed thresholds
+================================================================================
+
+  pattern_engine\matcher.py:744  query()  -- 241 lines, 102 statements LINES STMTS
+  pattern_engine\matcher.py:336  _package_results()  -- 161 lines, 82 statements LINES STMTS
+  pattern_engine\matcher.py:563  fit()  -- 145 lines, 51 statements LINES STMTS
+  trading_system\broker\mock.py:38  submit_order()  -- 135 lines, 51 statements LINES STMTS
+  pattern_engine\walkforward.py:278  run_fold()  -- 132 lines, 41 statements LINES
+  trading_system\signal_adapter.py:185  simulate_signals_from_val_db()  -- 129 lines, 31 statements LINES
+  trading_system\risk_engine.py:154  apply_risk_adjustments()  -- 112 lines, 25 statements LINES
+  trading_system\position_sizer.py:130  size_position()  -- 106 lines, 19 statements LINES
+  pattern_engine\candlestick.py:69  _compute_features_from_arrays()  -- 102 lines, 46 statements LINES
+  trading_system\portfolio_manager.py:116  allocate_day()  -- 91 lines, 32 statements LINES
+  pattern_engine\live.py:53  run()  -- 76 lines, 26 statements LINES
+  pattern_engine\sweep.py:397  run()  -- 76 lines, 32 statements LINES
+  pattern_engine\data.py:296  compute_features()  -- 75 lines, 30 statements LINES
+  pattern_engine\matcher.py:257  _post_filter()  -- 74 lines, 14 statements LINES
+  trading_system\strategy_evaluator.py:362  _determine_status()  -- 74 lines, 18 statements LINES
+  pattern_engine\regime.py:161  label()  -- 72 lines, 25 statements LINES
+  pattern_engine\schema.py:84  validate_train_db()  -- 70 lines, 25 statements LINES
+  pattern_engine\walkforward.py:205  _build_cfg()  -- 69 lines, 43 statements LINES
+  trading_system\strategy_evaluator.py:538  evaluate_and_update_state()  -- 67 lines, 15 statements LINES
+  pattern_engine\data.py:416  build_database()  -- 66 lines, 15 statements LINES
+  pattern_engine\journal.py:58  build_journal_entries()  -- 66 lines, 21 statements LINES
+  pattern_engine\contracts\datasets.py:63  make_train_db_schema()  -- 65 lines, 8 statements LINES
+  pattern_engine\candlestick.py:223  compute_candlestick_features()  -- 64 lines, 15 statements LINES
+  pattern_engine\walkforward.py:445  run_walkforward()  -- 61 lines, 23 statements LINES

@@ -90,22 +90,50 @@ def test_position_decision_rejects_inf_stop_loss():
 
 
 def test_trade_event_rejects_nan_fill_price():
-    """TradeEvent rejects NaN in fill_price (direct order execution field)."""
-    from trading_system.contracts.trades import TradeEvent
+    """TradeEvent rejects NaN in fill_price (direct order execution field).
+
+    Uses all required fields with valid values; only fill_price is invalid.
+    status=PENDING avoids the filled_requires_price validator so the ONLY
+    reason for rejection is FiniteFloat catching NaN on fill_price.
+    """
+    from trading_system.contracts.trades import TradeEvent, OrderSide, OrderStatus
     from pydantic import ValidationError
     from datetime import date
 
     with pytest.raises(ValidationError):
         TradeEvent(
-            trade_id="T001",
+            trade_event_id=1,
+            trade_id=42,
             ticker="AAPL",
-            side="BUY",
-            status="FILLED",
+            side=OrderSide.BUY,
+            order_date=date(2024, 1, 2),
             ordered_quantity=10.0,
             limit_price_estimate=150.0,
             fill_quantity=10.0,
-            fill_price=float("nan"),
+            fill_price=float("nan"),  # <-- sole invalid value
             fill_ratio=1.0,
-            execution_latency_seconds=0.1,
-            order_date=date.today(),
+            status=OrderStatus.PENDING,
+            execution_latency_seconds=0.0,
         )
+
+
+def test_trade_event_valid_construction():
+    """Confirm a fully valid TradeEvent can be constructed without error."""
+    from trading_system.contracts.trades import TradeEvent, OrderSide, OrderStatus
+    from datetime import date
+
+    t = TradeEvent(
+        trade_event_id=1,
+        trade_id=42,
+        ticker="AAPL",
+        side=OrderSide.BUY,
+        order_date=date(2024, 1, 2),
+        ordered_quantity=10.0,
+        limit_price_estimate=150.0,
+        fill_quantity=10.0,
+        fill_price=150.0,
+        fill_ratio=1.0,
+        status=OrderStatus.FILLED,
+        execution_latency_seconds=0.0,
+    )
+    assert t.fill_price == 150.0

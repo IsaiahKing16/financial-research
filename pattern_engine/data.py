@@ -29,6 +29,7 @@ Linear: SLE-65
 from __future__ import annotations
 
 import hashlib
+import logging
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional
@@ -275,7 +276,7 @@ class DataLoaderHardened:
                     df.to_csv(cache_path, index=False)
                     source = "yfinance"
                 except Exception as exc:
-                    print(f"  [download FAILED] {ticker}: {exc}")
+                    logging.warning("Download FAILED for %s: %s", ticker, exc)
                     continue
 
             # Checkpoint 1: OHLCV validation
@@ -327,7 +328,7 @@ class DataLoaderHardened:
             try:
                 df_feat = _compute_ticker(df, ticker)
             except Exception as exc:
-                print(f"  Skipping {ticker}: feature computation failed ({exc})")
+                logging.warning("Skipping %s: feature computation failed (%s)", ticker, exc)
                 continue
 
             # Drop rows with missing values in required columns only
@@ -336,7 +337,7 @@ class DataLoaderHardened:
             subset = df_feat[available].dropna().reset_index(drop=True)
 
             if len(subset) < 50:
-                print(f"  Skipping {ticker}: insufficient data ({len(subset)} rows)")
+                logging.warning("Skipping %s: insufficient data (%d rows)", ticker, len(subset))
                 continue
             all_rows.append(subset)
 

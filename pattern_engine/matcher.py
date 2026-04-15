@@ -29,9 +29,12 @@ Linear: SLE-60 (staged architecture), SLE-61 (HNSW backend wiring)
 
 from __future__ import annotations
 
+import logging
 import time
 from datetime import date
 from typing import Optional
+
+_log = logging.getLogger(__name__)
 
 import numpy as np
 import pandas as pd
@@ -780,8 +783,10 @@ class PatternMatcher:
             if verbose:
                 bull_q = (regime_labels_val == 1).sum() if getattr(regime_labeler, "mode", None) == "binary" else "N/A"
                 bear_q = (regime_labels_val == 0).sum() if getattr(regime_labeler, "mode", None) == "binary" else "N/A"
-                print(f"    Regime filter ({regime_labeler.mode}): "
-                      f"val={bull_q} bull / {bear_q} bear queries")
+                _log.debug(
+                    "Regime filter (%s): val=%s bull / %s bear queries",
+                    regime_labeler.mode, bull_q, bear_q,
+                )
 
         # Pre-extract val arrays once (avoids iloc per row in batch loop)
         val_tickers_arr = np.asarray(val_db["Ticker"], dtype=object)
@@ -890,10 +895,13 @@ class PatternMatcher:
                 elapsed = time.time() - start_time
                 rate = batch_end / elapsed if elapsed > 0 else 0
                 remaining = (n_val - batch_end) / rate if rate > 0 else 0
-                print(f"    {batch_end:,}/{n_val:,} "
-                      f"({batch_end / n_val * 100:.0f}%) | "
-                      f"{rate:.0f} queries/sec | "
-                      f"ETA: {remaining / 60:.1f} min")
+                _log.debug(
+                    "Query batch %d/%d complete (%d%%) | %d queries/sec | ETA: %.1f min",
+                    batch_end, n_val,
+                    int(batch_end / n_val * 100),
+                    int(rate),
+                    remaining / 60,
+                )
 
         raw_probs = np.array(all_probs)
 

@@ -174,7 +174,7 @@ class NeighborResult(BaseModel):
     def mean_distance(self) -> float:
         """Mean Euclidean distance to all returned neighbors."""
         if self.n_neighbors_found == 0:
-            return float("inf")
+            return 0.0  # no analogues found; mean_distance is undefined, use 0.0 sentinel
         return sum(self.neighbor_distances) / self.n_neighbors_found
 
 

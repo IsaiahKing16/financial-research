@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
@@ -136,7 +137,6 @@ class EngineState(BaseModel):
         distance computation silently — the KNN search would return garbage
         neighbors without any error.
         """
-        import math
         bad = [i for i, x in enumerate(v) if not math.isfinite(x)]
         if bad:
             raise ValueError(

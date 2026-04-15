@@ -47,3 +47,43 @@ def test_finite_float_accepts_valid():
     assert m.price == -1.5
     m = M(price=1e-300)
     assert m.price == 1e-300
+
+
+def test_allocation_decision_rejects_nan_position_pct():
+    """AllocationDecision rejects NaN in final_position_pct."""
+    import datetime
+    from trading_system.contracts.decisions import AllocationDecision, EvaluatorStatus
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        AllocationDecision(
+            ticker="AAPL",
+            signal_date=datetime.date(2024, 1, 2),
+            final_position_pct=float("nan"),
+            evaluator_status=EvaluatorStatus.GREEN,
+            capital_allocated=1000.0,
+            rank_in_queue=1,
+            sector="Technology",
+        )
+
+
+def test_position_decision_rejects_inf_stop_loss():
+    """PositionDecision rejects Inf in stop_loss_price."""
+    import datetime
+    from trading_system.contracts.decisions import PositionDecision
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        PositionDecision(
+            ticker="AAPL",
+            signal_date=datetime.date(2024, 1, 2),
+            approved=True,
+            rejection_reason=None,
+            position_pct=0.05,
+            target_shares=10.0,
+            entry_price_estimate=150.0,
+            stop_loss_price=float("inf"),
+            atr_pct=0.02,
+            confidence=0.70,
+            sector="Technology",
+        )

@@ -122,12 +122,10 @@ def get_feature_cols(feature_set: str) -> list[str]:
     try:
         return FeatureRegistry.get(feature_set).columns
     except KeyError:
-        pass
-
-    raise ValueError(
-        f"Unknown feature set '{feature_set}'. "
-        f"Available: {list(FeatureRegistry.keys())}"
-    )
+        raise ValueError(
+            f"Unknown feature set '{feature_set}'. "
+            f"Available: {list(FeatureRegistry.keys())}"
+        ) from None
 
 
 # ─── Feature weighting ────────────────────────────────────────────────────────

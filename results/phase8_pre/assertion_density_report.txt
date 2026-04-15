@@ -1,0 +1,201 @@
+================================================================================
+POWER OF 10 R5/R10 ASSERTION DENSITY REPORT
+================================================================================
+Functions audited (>=5 stmts): 169
+Compliant (>=2 assertions):    24 (14.2%)
+Non-compliant (<2 assertions): 145
+Mean assertion density:         0.66 per function
+
+--- NON-COMPLIANT FUNCTIONS (need >=2 assertions) ---
+
+  pattern_engine\candlestick.py:173  _composite_ohlc()  -- 0 assertions, 9 stmts
+  pattern_engine\candlestick.py:223  compute_candlestick_features()  -- 0 assertions, 15 stmts
+  pattern_engine\conformal_hooks.py:186  augment_signals_with_conformal()  -- 0 assertions, 10 stmts
+  pattern_engine\conformal_hooks.py:269  update()  -- 0 assertions, 5 stmts
+  pattern_engine\data.py:68  _atomic_write_parquet()  -- 0 assertions, 8 stmts
+  pattern_engine\data.py:89  _build_lineage()  -- 0 assertions, 5 stmts
+  pattern_engine\data.py:144  _validate_ohlcv()  -- 0 assertions, 6 stmts
+  pattern_engine\data.py:166  _validate_feature_db()  -- 0 assertions, 7 stmts
+  pattern_engine\data.py:218  __init__()  -- 0 assertions, 10 stmts
+  pattern_engine\data.py:242  download()  -- 0 assertions, 24 stmts
+  pattern_engine\data.py:416  build_database()  -- 0 assertions, 15 stmts
+  pattern_engine\data.py:486  _compute_ticker_features_fallback()  -- 0 assertions, 9 stmts
+  pattern_engine\experiment_log.py:17  __init__()  -- 0 assertions, 5 stmts
+  pattern_engine\experiment_log.py:28  log_header()  -- 0 assertions, 10 stmts
+  pattern_engine\experiment_log.py:41  log_trial()  -- 0 assertions, 14 stmts
+  pattern_engine\experiment_log.py:58  finalize()  -- 0 assertions, 9 stmts
+  pattern_engine\features.py:135  apply_feature_weights()  -- 0 assertions, 7 stmts
+  pattern_engine\features.py:77  get()  -- 0 assertions, 5 stmts
+  pattern_engine\ib_compression.py:170  compare_bss_with_ib()  -- 0 assertions, 16 stmts
+  pattern_engine\ib_compression.py:202  _knn_bss()  -- 0 assertions, 6 stmts
+  pattern_engine\journal.py:126  write_journal_parquet()  -- 0 assertions, 11 stmts
+  pattern_engine\live.py:53  run()  -- 0 assertions, 26 stmts
+  pattern_engine\matcher.py:105  __init__()  -- 0 assertions, 21 stmts
+  pattern_engine\matcher.py:201  _build_index()  -- 0 assertions, 9 stmts
+  pattern_engine\matcher.py:257  _post_filter()  -- 0 assertions, 14 stmts
+  pattern_engine\matcher.py:336  _package_results()  -- 0 assertions, 82 stmts
+  pattern_engine\matcher.py:502  _extract_neighbour_labels_for_bma()  -- 0 assertions, 27 stmts
+  pattern_engine\matcher.py:563  fit()  -- 0 assertions, 51 stmts
+  pattern_engine\matcher.py:709  _rebuild_caches()  -- 0 assertions, 10 stmts
+  pattern_engine\momentum_signal.py:53  fit()  -- 0 assertions, 8 stmts
+  pattern_engine\momentum_signal.py:70  apply()  -- 0 assertions, 22 stmts
+  pattern_engine\owa_weights.py:26  owa_weights()  -- 0 assertions, 7 stmts
+  pattern_engine\owa_weights.py:50  mi_to_weight_dict()  -- 0 assertions, 8 stmts
+  pattern_engine\owa_weights.py:79  evaluate_owa_gate()  -- 0 assertions, 9 stmts
+  pattern_engine\regime.py:80  __init__()  -- 0 assertions, 10 stmts
+  pattern_engine\sax_filter.py:66  _build_dist_table()  -- 0 assertions, 11 stmts
+  pattern_engine\sax_filter.py:276  apply_sax_filter()  -- 0 assertions, 9 stmts
+  pattern_engine\sax_filter.py:165  fit()  -- 0 assertions, 7 stmts
+  pattern_engine\schema.py:49  _get_feature_cols()  -- 0 assertions, 8 stmts
+  pattern_engine\schema.py:84  validate_train_db()  -- 0 assertions, 25 stmts
+  pattern_engine\schema.py:156  validate_query_db()  -- 0 assertions, 21 stmts
+  pattern_engine\schema.py:208  _validate_target_col()  -- 0 assertions, 14 stmts
+  pattern_engine\sector_conviction.py:47  fit()  -- 0 assertions, 8 stmts
+  pattern_engine\sector_conviction.py:82  apply()  -- 0 assertions, 18 stmts
+  pattern_engine\sentiment_veto.py:127  apply_with_sentiment()  -- 0 assertions, 9 stmts
+  pattern_engine\sentiment_veto.py:163  apply()  -- 0 assertions, 6 stmts
+  pattern_engine\signal_pipeline.py:35  run()  -- 0 assertions, 6 stmts
+  pattern_engine\sweep.py:142  __init__()  -- 0 assertions, 10 stmts
+  pattern_engine\sweep.py:183  _build_optuna_objective()  -- 0 assertions, 30 stmts
+  pattern_engine\sweep.py:238  run()  -- 0 assertions, 13 stmts
+  pattern_engine\sweep.py:340  _make_sweep_result()  -- 0 assertions, 6 stmts
+  pattern_engine\sweep.py:397  run()  -- 0 assertions, 31 stmts
+  pattern_engine\sweep.py:190  _objective()  -- 0 assertions, 26 stmts
+  pattern_engine\walkforward.py:41  _find_data_dir()  -- 0 assertions, 10 stmts
+  pattern_engine\walkforward.py:81  _bss()  -- 0 assertions, 7 stmts
+  pattern_engine\walkforward.py:91  _murphy_decomposition()  -- 0 assertions, 20 stmts
+  pattern_engine\walkforward.py:134  _apply_h7_hold_regime()  -- 0 assertions, 13 stmts
+  pattern_engine\walkforward.py:173  _impute_candle_nans()  -- 0 assertions, 6 stmts
+  pattern_engine\walkforward.py:445  run_walkforward()  -- 0 assertions, 23 stmts
+  pattern_engine\wfa_reranker.py:36  _dtw_distance()  -- 0 assertions, 13 stmts
+  pattern_engine\wfa_reranker.py:69  _dtw_distance_batch()  -- 0 assertions, 6 stmts
+  pattern_engine\contracts\datasets.py:63  make_train_db_schema()  -- 0 assertions, 8 stmts
+  pattern_engine\contracts\datasets.py:132  make_query_db_schema()  -- 0 assertions, 7 stmts
+  pattern_engine\contracts\state.py:255  verify_config_match()  -- 0 assertions, 9 stmts
+  trading_system\config.py:191  validate()  -- 0 assertions, 16 stmts
+  trading_system\drift_monitor.py:61  update()  -- 0 assertions, 11 stmts
+  trading_system\drift_monitor.py:167  drift()  -- 0 assertions, 5 stmts
+  trading_system\drift_monitor.py:381  get_report()  -- 0 assertions, 18 stmts
+  trading_system\drift_monitor.py:441  reset_cusum()  -- 0 assertions, 9 stmts
+  trading_system\order_manager.py:84  submit()  -- 0 assertions, 6 stmts
+  trading_system\order_manager.py:120  summary()  -- 0 assertions, 5 stmts
+  trading_system\position_sizer.py:130  size_position()  -- 0 assertions, 19 stmts
+  trading_system\reconciliation.py:36  reconcile()  -- 0 assertions, 20 stmts
+  trading_system\signal_adapter.py:89  adapt_knn_signals()  -- 0 assertions, 11 stmts
+  trading_system\signal_adapter.py:134  adapt_dl_signals()  -- 0 assertions, 16 stmts
+  trading_system\strategy_evaluator.py:113  _annualized_sharpe()  -- 0 assertions, 15 stmts
+  trading_system\strategy_evaluator.py:150  _drawdown_from_peak()  -- 0 assertions, 10 stmts
+  trading_system\strategy_evaluator.py:174  _linear_slope()  -- 0 assertions, 10 stmts
+  trading_system\strategy_evaluator.py:232  __init__()  -- 0 assertions, 7 stmts
+  trading_system\strategy_evaluator.py:315  _compute_sharpe()  -- 0 assertions, 5 stmts
+  trading_system\strategy_evaluator.py:326  _compute_all_time_sharpe()  -- 0 assertions, 5 stmts
+  trading_system\strategy_evaluator.py:343  _count_trades_in_window()  -- 0 assertions, 7 stmts
+  trading_system\strategy_evaluator.py:362  _determine_status()  -- 0 assertions, 18 stmts
+  trading_system\strategy_evaluator.py:439  _determine_commands()  -- 0 assertions, 14 stmts
+  trading_system\strategy_evaluator.py:481  evaluate()  -- 0 assertions, 14 stmts
+  trading_system\strategy_evaluator.py:538  evaluate_and_update_state()  -- 0 assertions, 15 stmts
+  trading_system\broker\mock.py:27  __init__()  -- 0 assertions, 5 stmts
+  trading_system\broker\mock.py:177  get_positions()  -- 0 assertions, 6 stmts
+  trading_system\contracts\decisions.py:55  exposure_multiplier()  -- 0 assertions, 6 stmts
+  trading_system\risk_overlays\fatigue_accumulation.py:91  update()  -- 0 assertions, 15 stmts
+  trading_system\risk_overlays\fatigue_accumulation.py:145  reset()  -- 0 assertions, 5 stmts
+  trading_system\risk_overlays\liquidity_congestion.py:91  update()  -- 0 assertions, 21 stmts
+  trading_system\risk_overlays\liquidity_congestion.py:137  _compute_multiplier()  -- 0 assertions, 11 stmts
+  trading_system\risk_overlays\liquidity_congestion.py:167  reset()  -- 0 assertions, 5 stmts
+  pattern_engine\candlestick.py:69  _compute_features_from_arrays()  -- 1 assertions, 46 stmts
+  pattern_engine\conformal_hooks.py:138  _threshold()  -- 1 assertions, 6 stmts
+  pattern_engine\conformal_hooks.py:168  coverage()  -- 1 assertions, 11 stmts
+  pattern_engine\conformal_hooks.py:253  predict_interval()  -- 1 assertions, 10 stmts
+  pattern_engine\data.py:296  compute_features()  -- 1 assertions, 28 stmts
+  pattern_engine\data.py:375  temporal_split()  -- 1 assertions, 9 stmts
+  pattern_engine\features.py:110  get_feature_cols()  -- 1 assertions, 5 stmts
+  pattern_engine\ib_compression.py:81  fit()  -- 1 assertions, 13 stmts
+  pattern_engine\ib_compression.py:153  top_features()  -- 1 assertions, 5 stmts
+  pattern_engine\journal.py:43  _normalize_date()  -- 1 assertions, 10 stmts
+  pattern_engine\journal.py:58  build_journal_entries()  -- 1 assertions, 19 stmts
+  pattern_engine\matcher.py:744  query()  -- 1 assertions, 101 stmts
+  pattern_engine\regime.py:107  fit()  -- 1 assertions, 21 stmts
+  pattern_engine\sax_filter.py:89  _paa()  -- 1 assertions, 8 stmts
+  pattern_engine\sax_filter.py:214  filter_candidates()  -- 1 assertions, 9 stmts
+  pattern_engine\sax_filter.py:245  filter_batch()  -- 1 assertions, 11 stmts
+  pattern_engine\sentiment_veto.py:80  fetch_sentiment()  -- 1 assertions, 16 stmts
+  pattern_engine\sweep.py:84  _suggest_params()  -- 1 assertions, 12 stmts
+  pattern_engine\sweep.py:275  resume()  -- 1 assertions, 26 stmts
+  pattern_engine\walkforward.py:182  _augment_with_candlestick()  -- 1 assertions, 9 stmts
+  pattern_engine\walkforward.py:205  _build_cfg()  -- 1 assertions, 43 stmts
+  pattern_engine\walkforward.py:414  load_and_augment_db()  -- 1 assertions, 9 stmts
+  pattern_engine\wfa_reranker.py:128  rerank()  -- 1 assertions, 9 stmts
+  pattern_engine\wfa_reranker.py:152  rerank_mask()  -- 1 assertions, 15 stmts
+  pattern_engine\contracts\finite_types.py:23  _require_finite()  -- 1 assertions, 5 stmts
+  pattern_engine\contracts\state.py:133  _require_finite_scaler()  -- 1 assertions, 5 stmts
+  pattern_engine\contracts\state.py:161  valid_backend()  -- 1 assertions, 5 stmts
+  pattern_engine\contracts\matchers\balltree_matcher.py:34  __init__()  -- 1 assertions, 7 stmts
+  pattern_engine\contracts\matchers\hnsw_matcher.py:45  __init__()  -- 1 assertions, 12 stmts
+  pattern_engine\contracts\matchers\hnsw_matcher.py:151  save_index()  -- 1 assertions, 9 stmts
+  trading_system\drift_monitor.py:253  set_baseline()  -- 1 assertions, 11 stmts
+  trading_system\drift_monitor.py:305  update_features()  -- 1 assertions, 16 stmts
+  trading_system\drift_monitor.py:363  update_bss()  -- 1 assertions, 7 stmts
+  trading_system\order_manager.py:30  __init__()  -- 1 assertions, 5 stmts
+  trading_system\order_manager.py:44  create_order_from_decision()  -- 1 assertions, 5 stmts
+  trading_system\order_manager.py:103  cancel()  -- 1 assertions, 10 stmts
+  trading_system\portfolio_manager.py:43  rank_signals()  -- 1 assertions, 8 stmts
+  trading_system\portfolio_manager.py:116  allocate_day()  -- 1 assertions, 28 stmts
+  trading_system\risk_engine.py:65  drawdown_brake_scalar()  -- 1 assertions, 9 stmts
+  trading_system\risk_engine.py:154  apply_risk_adjustments()  -- 1 assertions, 25 stmts
+  trading_system\shared_state.py:177  enqueue_command()  -- 1 assertions, 5 stmts
+  trading_system\shared_state.py:207  drain_commands()  -- 1 assertions, 6 stmts
+  trading_system\shared_state.py:256  from_json()  -- 1 assertions, 7 stmts
+  trading_system\signal_adapter.py:185  simulate_signals_from_val_db()  -- 1 assertions, 31 stmts
+  trading_system\signal_adapter.py:318  load_cached_signals()  -- 1 assertions, 7 stmts
+  trading_system\broker\mock.py:38  submit_order()  -- 1 assertions, 51 stmts
+  trading_system\contracts\state.py:72  equity_components_consistent()  -- 1 assertions, 5 stmts
+  trading_system\contracts\trades.py:115  costs_consistent()  -- 1 assertions, 5 stmts
+  trading_system\contracts\trades.py:242  fill_ratio_consistent()  -- 1 assertions, 6 stmts
+  trading_system\contracts\trades.py:254  filled_requires_price()  -- 1 assertions, 5 stmts
+  trading_system\risk_overlays\base.py:72  get_signal_multiplier()  -- 1 assertions, 5 stmts
+
+--- CRITICAL PATH VIOLATIONS (43) ---
+
+  RED pattern_engine\live.py:53  run()  -- 0 assertions, 26 stmts
+  RED pattern_engine\matcher.py:105  __init__()  -- 0 assertions, 21 stmts
+  RED pattern_engine\matcher.py:201  _build_index()  -- 0 assertions, 9 stmts
+  RED pattern_engine\matcher.py:257  _post_filter()  -- 0 assertions, 14 stmts
+  RED pattern_engine\matcher.py:336  _package_results()  -- 0 assertions, 82 stmts
+  RED pattern_engine\matcher.py:502  _extract_neighbour_labels_for_bma()  -- 0 assertions, 27 stmts
+  RED pattern_engine\matcher.py:563  fit()  -- 0 assertions, 51 stmts
+  RED pattern_engine\matcher.py:709  _rebuild_caches()  -- 0 assertions, 10 stmts
+  RED pattern_engine\matcher.py:744  query()  -- 1 assertions, 101 stmts
+  RED pattern_engine\walkforward.py:41  _find_data_dir()  -- 0 assertions, 10 stmts
+  RED pattern_engine\walkforward.py:81  _bss()  -- 0 assertions, 7 stmts
+  RED pattern_engine\walkforward.py:91  _murphy_decomposition()  -- 0 assertions, 20 stmts
+  RED pattern_engine\walkforward.py:134  _apply_h7_hold_regime()  -- 0 assertions, 13 stmts
+  RED pattern_engine\walkforward.py:173  _impute_candle_nans()  -- 0 assertions, 6 stmts
+  RED pattern_engine\walkforward.py:182  _augment_with_candlestick()  -- 1 assertions, 9 stmts
+  RED pattern_engine\walkforward.py:205  _build_cfg()  -- 1 assertions, 43 stmts
+  RED pattern_engine\walkforward.py:414  load_and_augment_db()  -- 1 assertions, 9 stmts
+  RED pattern_engine\walkforward.py:445  run_walkforward()  -- 0 assertions, 23 stmts
+  RED pattern_engine\contracts\matchers\balltree_matcher.py:34  __init__()  -- 1 assertions, 7 stmts
+  RED pattern_engine\contracts\matchers\hnsw_matcher.py:45  __init__()  -- 1 assertions, 12 stmts
+  RED pattern_engine\contracts\matchers\hnsw_matcher.py:151  save_index()  -- 1 assertions, 9 stmts
+  RED trading_system\order_manager.py:30  __init__()  -- 1 assertions, 5 stmts
+  RED trading_system\order_manager.py:44  create_order_from_decision()  -- 1 assertions, 5 stmts
+  RED trading_system\order_manager.py:84  submit()  -- 0 assertions, 6 stmts
+  RED trading_system\order_manager.py:103  cancel()  -- 1 assertions, 10 stmts
+  RED trading_system\order_manager.py:120  summary()  -- 0 assertions, 5 stmts
+  RED trading_system\portfolio_manager.py:43  rank_signals()  -- 1 assertions, 8 stmts
+  RED trading_system\portfolio_manager.py:116  allocate_day()  -- 1 assertions, 28 stmts
+  RED trading_system\position_sizer.py:130  size_position()  -- 0 assertions, 19 stmts
+  RED trading_system\reconciliation.py:36  reconcile()  -- 0 assertions, 20 stmts
+  RED trading_system\risk_engine.py:65  drawdown_brake_scalar()  -- 1 assertions, 9 stmts
+  RED trading_system\risk_engine.py:154  apply_risk_adjustments()  -- 1 assertions, 25 stmts
+  RED trading_system\strategy_evaluator.py:113  _annualized_sharpe()  -- 0 assertions, 15 stmts
+  RED trading_system\strategy_evaluator.py:150  _drawdown_from_peak()  -- 0 assertions, 10 stmts
+  RED trading_system\strategy_evaluator.py:174  _linear_slope()  -- 0 assertions, 10 stmts
+  RED trading_system\strategy_evaluator.py:232  __init__()  -- 0 assertions, 7 stmts
+  RED trading_system\strategy_evaluator.py:315  _compute_sharpe()  -- 0 assertions, 5 stmts
+  RED trading_system\strategy_evaluator.py:326  _compute_all_time_sharpe()  -- 0 assertions, 5 stmts
+  RED trading_system\strategy_evaluator.py:343  _count_trades_in_window()  -- 0 assertions, 7 stmts
+  RED trading_system\strategy_evaluator.py:362  _determine_status()  -- 0 assertions, 18 stmts
+  RED trading_system\strategy_evaluator.py:439  _determine_commands()  -- 0 assertions, 14 stmts
+  RED trading_system\strategy_evaluator.py:481  evaluate()  -- 0 assertions, 14 stmts
+  RED trading_system\strategy_evaluator.py:538  evaluate_and_update_state()  -- 0 assertions, 15 stmts

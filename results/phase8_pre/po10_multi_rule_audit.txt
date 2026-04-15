@@ -1,0 +1,168 @@
+=== R1: RECURSION + DYNAMIC DISPATCH ===
+
+--- Recursion (function calling itself) ---
+  pattern_engine\data.py:269  self.download() (potential self-recursion)
+  pattern_engine\features.py:103  self.keys() (potential self-recursion)
+  pattern_engine\matcher.py:78  self.fit() (potential self-recursion)
+  pattern_engine\matcher.py:638  self.fit() (potential self-recursion)
+  pattern_engine\matcher.py:645  self.fit() (potential self-recursion)
+  pattern_engine\matcher.py:693  self.fit() (potential self-recursion)
+  pattern_engine\matcher.py:705  self.fit() (potential self-recursion)
+  pattern_engine\walkforward.py:72  self.fit() (potential self-recursion)
+  pattern_engine\contracts\matchers\balltree_matcher.py:66  self.fit() (potential self-recursion)
+  pattern_engine\contracts\matchers\balltree_matcher.py:92  self.kneighbors() (potential self-recursion)
+  pattern_engine\contracts\matchers\hnsw_matcher.py:173  self.save_index() (potential self-recursion)
+  pattern_engine\contracts\matchers\hnsw_matcher.py:224  self.load_index() (potential self-recursion)
+
+--- Dynamic dispatch: getattr(), eval(), exec() ---
+pattern_engine/config.py:63:    # kernel.  matcher.py _package_results() reads this via getattr() guard.
+pattern_engine/experiment_log.py:62:            bss = getattr(sweep_result, "best_bss", None)
+pattern_engine/experiment_log.py:65:            elapsed = getattr(sweep_result, "elapsed_minutes", None)
+pattern_engine/ib_compression.py:36:    PatternMatcher reads `getattr(config, 'use_ib_compression', False)`.
+pattern_engine/matcher.py:176:        use_scaling = getattr(cfg, "standardize_features", True)
+pattern_engine/matcher.py:222:            _hnsw_M = getattr(cfg, 'hnsw_M', 16)
+pattern_engine/matcher.py:386:            _boost = getattr(cfg, "same_sector_boost_factor", 1.0)
+pattern_engine/matcher.py:409:        if getattr(cfg, 'use_bma', False) and self._bma_calibrator is not None:
+pattern_engine/matcher.py:597:        if getattr(cfg, 'use_owa', False):
+pattern_engine/matcher.py:607:                alpha=getattr(cfg, 'owa_alpha', 1.0)
+pattern_engine/matcher.py:615:        if getattr(cfg, 'use_ib_compression', False):
+pattern_engine/matcher.py:617:            _horizon = getattr(cfg, 'projection_horizon', 'fwd_7d_up')
+pattern_engine/matcher.py:623:            _d_out = getattr(cfg, 'ib_d_out', 4)
+pattern_engine/matcher.py:635:        if getattr(cfg, 'use_sax_filter', False):
+pattern_engine/matcher.py:642:        if getattr(cfg, 'use_wfa_rerank', False):
+pattern_engine/matcher.py:648:        if regime_labeler is not None and getattr(regime_labeler, "fitted", False):
+pattern_engine/matcher.py:662:        _cal_method = getattr(cfg, 'calibration_method', 'platt')
+pattern_engine/matcher.py:675:            _cal_frac = getattr(cfg, 'cal_frac', 0.76)
+pattern_engine/matcher.py:676:            _cal_max = getattr(cfg, 'cal_max_samples', 100_000)
+pattern_engine/matcher.py:686:            if getattr(cfg, 'use_bma', False):
+pattern_engine/matcher.py:791:        if regime_labeler is not None and getattr(regime_labeler, "fitted", False) and cfg.regime_filter:
+pattern_engine/matcher.py:794:                bull_q = (regime_labels_val == 1).sum() if getattr(regime_labeler, "mode", None) == "binary" else "N/A"
+pattern_engine/matcher.py:795:                bear_q = (regime_labels_val == 0).sum() if getattr(regime_labeler, "mode", None) == "binary" else "N/A"
+pattern_engine/matcher.py:817:        _j_top_n = getattr(cfg, 'journal_top_n', 0)
+pattern_engine/matcher.py:857:            if getattr(cfg, 'use_dtw_reranker', False) and self._X_train_weighted is not None:
+pattern_engine/matcher.py:859:                _k = getattr(cfg, 'dtw_rerank_k', 20)
+pattern_engine/sax_filter.py:25:    - Feature flag: `getattr(config, 'use_sax_filter', False)` — False by
+pattern_engine/walkforward.py:254:        # Strip non-config keys (consumed by matcher via getattr, not EngineConfig fields)
+pattern_engine/wfa_reranker.py:17:    - Feature flag: `getattr(config, 'use_wfa_rerank', False)` — False by
+
+=== R3: UNBOUNDED COLLECTION GROWTH ===
+
+--- .append() inside loops (potential unbounded growth) ---
+pattern_engine/conformal_hooks.py:216:            signals.append("BUY")
+pattern_engine/conformal_hooks.py:218:            signals.append("SELL")
+pattern_engine/conformal_hooks.py:220:            signals.append("HOLD")
+pattern_engine/data.py:342:            all_rows.append(subset)
+pattern_engine/experiment_log.py:50:                values.append(f"{val:+.6f}" if val != 0.0 else "+0.000000")
+pattern_engine/experiment_log.py:52:                values.append(str(val))
+pattern_engine/experiment_log.py:54:                values.append(str(val))
+pattern_engine/journal.py:104:            analogues.append(AnalogueRecord(
+pattern_engine/journal.py:113:        entries.append(JournalEntry(
+pattern_engine/journal.py:131:            rows.append({
+pattern_engine/live.py:117:                entry_orders.append(
+pattern_engine/matcher.py:449:                signals.append("HOLD"); reasons.append("insufficient_matches")
+pattern_engine/matcher.py:451:                signals.append("HOLD"); reasons.append("low_agreement")
+pattern_engine/matcher.py:453:                signals.append("BUY")
+pattern_engine/matcher.py:454:                reasons.append(f"prob={prob_up[i]:.3f}_agree={agreement[i]:.3f}")
+pattern_engine/matcher.py:456:                signals.append("SELL")
+pattern_engine/matcher.py:457:                reasons.append(f"prob={prob_up[i]:.3f}_agree={agreement[i]:.3f}")
+pattern_engine/matcher.py:459:                signals.append("HOLD")
+pattern_engine/matcher.py:460:                reasons.append(f"prob={prob_up[i]:.3f}_below_threshold")
+pattern_engine/matcher.py:486:            neighbor_results.append(NeighborResult(
+pattern_engine/matcher.py:549:                all_rows.append(row)
+pattern_engine/matcher.py:892:                _batch_meta.append((
+pattern_engine/matcher.py:935:                    all_signals.append("HOLD"); all_reasons.append("insufficient_matches")
+pattern_engine/matcher.py:937:                    all_signals.append("HOLD"); all_reasons.append("low_agreement")
+pattern_engine/matcher.py:939:                    all_signals.append("BUY")
+pattern_engine/matcher.py:940:                    all_reasons.append(f"prob={cal_probs[_i]:.3f}_agree={cal_agree[_i]:.3f}")
+pattern_engine/matcher.py:942:                    all_signals.append("SELL")
+pattern_engine/matcher.py:943:                    all_reasons.append(f"prob={cal_probs[_i]:.3f}_agree={cal_agree[_i]:.3f}")
+pattern_engine/matcher.py:945:                    all_signals.append("HOLD")
+pattern_engine/matcher.py:946:                    all_reasons.append(f"prob={cal_probs[_i]:.3f}_below_threshold")
+pattern_engine/matcher.py:1027:        self._active_overlays.append(overlay)
+pattern_engine/schema.py:116:        errors.append(
+pattern_engine/schema.py:144:            errors.append(f"Column '{col}': {check} (example failure: {case})")
+pattern_engine/schema.py:147:        errors.append(str(exc))
+pattern_engine/schema.py:184:        errors.append("Query DataFrame is empty (0 rows)")
+pattern_engine/schema.py:195:            errors.append(f"Column '{col}': {check} (example failure: {case})")
+pattern_engine/schema.py:197:        errors.append(str(exc))
+pattern_engine/schema.py:220:        errors.append(f"Missing projection horizon column: {col}")
+pattern_engine/schema.py:225:        errors.append(
+pattern_engine/schema.py:232:        errors.append(
+pattern_engine/schema.py:239:        errors.append(
+pattern_engine/sweep.py:203:                rows.append(row)
+pattern_engine/sweep.py:223:            rows.append(row)
+pattern_engine/sweep.py:309:            rows.append(row)
+pattern_engine/sweep.py:425:                rows.append(row)
+pattern_engine/sweep.py:439:            rows.append(row)
+pattern_engine/walkforward.py:474:        fold_results.append(result)
+trading_system/broker/mock.py:50:            self._history.append((order, result))
+trading_system/broker/mock.py:83:                self._history.append((order, result))
+trading_system/broker/mock.py:99:                self._history.append((order, result))
+trading_system/broker/mock.py:128:                self._history.append((order, result))
+trading_system/broker/mock.py:143:                self._history.append((order, result))
+trading_system/broker/mock.py:171:        self._history.append((order, result))
+trading_system/broker/mock.py:182:            result.append(BrokerPosition(
+trading_system/config.py:196:            errors.append(
+trading_system/config.py:202:            errors.append(
+trading_system/config.py:212:            errors.append(
+trading_system/config.py:218:            errors.append(
+trading_system/config.py:223:            errors.append(
+trading_system/config.py:228:            errors.append(
+trading_system/portfolio_manager.py:164:            results.append(_reject(
+trading_system/portfolio_manager.py:173:            results.append(_reject(
+trading_system/portfolio_manager.py:183:            results.append(_reject(
+trading_system/portfolio_manager.py:192:            results.append(_reject(
+trading_system/portfolio_manager.py:204:        results.append(_approve(rs))
+trading_system/reconciliation.py:73:            mismatches.append(PositionMismatch(
+trading_system/risk_overlays/liquidity_congestion.py:121:        self._atr_price_ratios.append(ratio)
+trading_system/signal_adapter.py:115:        unified.append(UnifiedSignal(
+trading_system/signal_adapter.py:167:        unified.append(UnifiedSignal(
+trading_system/signal_adapter.py:291:        rows.append({
+trading_system/strategy_evaluator.py:280:        self._closed_trades.append(trade)
+trading_system/strategy_evaluator.py:296:        self._daily_series.append((trade_date, portfolio_return, cumulative_return))
+trading_system/strategy_evaluator.py:306:        self._bss_series.append((bss_date, bss_value))
+trading_system/strategy_evaluator.py:466:            commands.append(SystemCommand.HALT)
+trading_system/strategy_evaluator.py:471:                commands.append(SystemCommand.RESUME)
+trading_system/strategy_evaluator.py:472:            commands.append(SystemCommand.REDUCE_EXPOSURE)
+trading_system/strategy_evaluator.py:475:                commands.append(SystemCommand.RESUME)
+
+--- pd.concat / DataFrame concatenation in loops ---
+pattern_engine/data.py:350:        db = pd.concat(all_rows, ignore_index=True)
+pattern_engine/walkforward.py:186:    augmented = pd.concat(
+pattern_engine/walkforward.py:435:    full_db = pd.concat(
+
+=== R6: MUTABLE MODULE-LEVEL STATE ===
+
+
+=== R7: SILENT EXCEPTION SWALLOWING ===
+
+  RED pattern_engine\features.py:124  except KeyError: pass  SILENT SWALLOW
+  RED research\wfa_reranker.py:23  except ImportError: pass  SILENT SWALLOW
+  RED research\wfa_reranker.py:29  except ImportError: pass  SILENT SWALLOW
+
+=== R8: DEEP ATTRIBUTE CHAINS (>3 levels) ===
+
+
+=== R9: STATIC ANALYSIS BASELINE DELTA ===
+
+--- Ruff violations ---
+  3	RUF003 	[ ] ambiguous-unicode-character-comment
+  3	SIM102 	[ ] collapsible-if
+  2	PLR0913	[ ] too-many-arguments
+  2	RUF001 	[ ] ambiguous-unicode-character-string
+  2	RUF005 	[ ] collection-literal-concatenation
+  2	SIM108 	[ ] if-else-block-instead-of-if-exp
+  1	B008   	[ ] function-call-in-default-argument
+  1	E741   	[ ] ambiguous-variable-name
+  1	F541   	[*] f-string-missing-placeholders
+  1	PD002  	[ ] pandas-use-of-inplace-argument
+  1	PERF401	[ ] manual-list-comprehension
+  1	PLR0911	[ ] too-many-return-statements
+  1	PLR1730	[*] if-stmt-min-max
+  1	RUF023 	[*] unsorted-dunder-slots
+  1	RUF034 	[ ] useless-if-else
+  1	SIM114 	[*] if-with-same-arms
+  1	SIM910 	[*] dict-get-with-none-default
+  1	UP015  	[*] redundant-open-modes
+Found 595 errors.
+[*] 282 fixable with the `--fix` option (69 hidden fixes can be enabled with the `--unsafe-fixes` option).

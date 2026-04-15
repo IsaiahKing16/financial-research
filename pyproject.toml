@@ -11,8 +11,7 @@ select = [
     "PL", "RUF", "S", "SIM", "TCH", "PERF", "NPY", "PD", "PT",
 ]
 ignore = [
-    "S101",   # assert used in tests (allow in test files)
-    "PD901",  # df variable name (acceptable in data pipeline)
+    "PD901",   # df variable name (acceptable in data pipeline)
     "PLR2004", # magic values in comparisons (many in ML code)
 ]
 

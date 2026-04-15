@@ -25,7 +25,9 @@ from datetime import date as Date, datetime, timezone
 from enum import Enum
 from typing import Optional
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from pattern_engine.contracts.finite_types import FiniteFloat
 
 
 class ExitReason(str, Enum):
@@ -41,21 +43,21 @@ class PositionRecord(BaseModel):
 
     Maps to: trading_system/backtest_engine.py::OpenPosition
     """
-    model_config = {"frozen": True}
+    model_config = ConfigDict(frozen=True, allow_inf_nan=False)
 
     trade_id: int = Field(ge=0, description="Unique trade identifier")
     ticker: str = Field(min_length=1, max_length=10)
     sector: str = Field(min_length=1)
     entry_date: Date
-    raw_entry_price: float = Field(gt=0, description="Next-day open BEFORE friction")
-    entry_price: float = Field(gt=0, description="After slippage + spread")
-    shares: float = Field(gt=0, description="May be fractional")
-    position_pct: float = Field(ge=0, le=1, description="Fraction of equity at entry")
-    confidence_at_entry: float = Field(ge=0, le=1)
-    stop_loss_price: float = Field(ge=0, description="0 = no stop (Phase 1 mode)")
-    atr_pct_at_entry: float = Field(ge=0, default=0.0)
+    raw_entry_price: FiniteFloat = Field(gt=0, description="Next-day open BEFORE friction")
+    entry_price: FiniteFloat = Field(gt=0, description="After slippage + spread")
+    shares: FiniteFloat = Field(gt=0, description="May be fractional")
+    position_pct: FiniteFloat = Field(ge=0, le=1, description="Fraction of equity at entry")
+    confidence_at_entry: FiniteFloat = Field(ge=0, le=1)
+    stop_loss_price: FiniteFloat = Field(ge=0, description="0 = no stop (Phase 1 mode)")
+    atr_pct_at_entry: FiniteFloat = Field(ge=0, default=0.0)
     days_held: int = Field(ge=0, default=0)
-    last_close_price: float = Field(ge=0, default=0.0)
+    last_close_price: FiniteFloat = Field(ge=0, default=0.0)
 
     @model_validator(mode="after")
     def entry_price_after_friction(self):
@@ -77,28 +79,28 @@ class TradeRecord(BaseModel):
     At $10k capital with 26 bps round-trip, a $500 position pays ~$1.30
     in friction — significant relative to per-trade alpha.
     """
-    model_config = {"frozen": True}
+    model_config = ConfigDict(frozen=True, allow_inf_nan=False)
 
     trade_id: int = Field(ge=0)
     ticker: str = Field(min_length=1, max_length=10)
     sector: str = Field(min_length=1)
     direction: str = Field(default="LONG", description="v1 is long-only")
     entry_date: Date
-    entry_price: float = Field(gt=0)
+    entry_price: FiniteFloat = Field(gt=0)
     exit_date: Date
-    exit_price: float = Field(gt=0)
-    position_pct: float = Field(ge=0, le=1)
-    shares: float = Field(gt=0)
-    gross_pnl: float = Field(description="(raw_exit - raw_entry) * shares")
-    entry_friction_cost: float = Field(ge=0)
-    exit_friction_cost: float = Field(ge=0)
-    slippage_cost: float = Field(ge=0)
-    spread_cost: float = Field(ge=0)
-    total_costs: float = Field(ge=0)
-    net_pnl: float = Field(description="gross_pnl - total_costs")
+    exit_price: FiniteFloat = Field(gt=0)
+    position_pct: FiniteFloat = Field(ge=0, le=1)
+    shares: FiniteFloat = Field(gt=0)
+    gross_pnl: FiniteFloat = Field(description="(raw_exit - raw_entry) * shares")
+    entry_friction_cost: FiniteFloat = Field(ge=0)
+    exit_friction_cost: FiniteFloat = Field(ge=0)
+    slippage_cost: FiniteFloat = Field(ge=0)
+    spread_cost: FiniteFloat = Field(ge=0)
+    total_costs: FiniteFloat = Field(ge=0)
+    net_pnl: FiniteFloat = Field(description="gross_pnl - total_costs")
     holding_days: int = Field(ge=1)
     exit_reason: ExitReason
-    confidence_at_entry: float = Field(ge=0, le=1)
+    confidence_at_entry: FiniteFloat = Field(ge=0, le=1)
 
     @model_validator(mode="after")
     def dates_ordered(self):
@@ -139,20 +141,20 @@ class DailySnapshot(BaseModel):
 
     Maps to: trading_system/backtest_engine.py::DailyRecord
     """
-    model_config = {"frozen": True}
+    model_config = ConfigDict(frozen=True, allow_inf_nan=False)
 
     date: Date
-    equity: float = Field(gt=0, description="Total portfolio value")
-    cash: float = Field(ge=0, description="Uninvested cash")
-    invested_capital: float = Field(ge=0, description="Capital in open positions")
-    gross_exposure: float = Field(ge=0, le=1.5, description="Should be <= 1.0 for v1")
+    equity: FiniteFloat = Field(gt=0, description="Total portfolio value")
+    cash: FiniteFloat = Field(ge=0, description="Uninvested cash")
+    invested_capital: FiniteFloat = Field(ge=0, description="Capital in open positions")
+    gross_exposure: FiniteFloat = Field(ge=0, le=1.5, description="Should be <= 1.0 for v1")
     open_positions: int = Field(ge=0)
-    daily_return: float = Field(description="Today's return (may be negative)")
-    cumulative_return: float = Field(description="Return since inception")
-    drawdown_from_peak: float = Field(ge=0, le=1, description="Current drawdown [0, 1]")
-    cash_yield_today: float = Field(ge=0, description="Risk-free yield on idle cash")
-    strategy_return_excl_cash: float
-    strategy_return_incl_cash: float
+    daily_return: FiniteFloat = Field(description="Today's return (may be negative)")
+    cumulative_return: FiniteFloat = Field(description="Return since inception")
+    drawdown_from_peak: FiniteFloat = Field(ge=0, le=1, description="Current drawdown [0, 1]")
+    cash_yield_today: FiniteFloat = Field(ge=0, description="Risk-free yield on idle cash")
+    strategy_return_excl_cash: FiniteFloat
+    strategy_return_incl_cash: FiniteFloat
 
 
 # ─── TradeEvent ────────────────────────────────────────────────────────────────
@@ -202,24 +204,24 @@ class TradeEvent(BaseModel):
         execution_latency_seconds: Time from order submission to fill (0 in backtest).
         broker_order_id: External broker order ID (None in backtest mode).
     """
-    model_config = {"frozen": True}
+    model_config = ConfigDict(frozen=True, allow_inf_nan=False)
 
     trade_event_id: int = Field(ge=0, description="Unique event identifier")
     trade_id: int = Field(ge=0, description="Parent TradeRecord identifier")
     ticker: str = Field(min_length=1, max_length=10)
     side: OrderSide
     order_date: Date
-    ordered_quantity: float = Field(gt=0, description="Shares ordered")
-    limit_price_estimate: float = Field(gt=0, description="Expected fill price")
-    fill_quantity: float = Field(ge=0, description="Shares actually filled")
-    fill_price: float = Field(ge=0, description="Actual fill price (0 if not yet filled)")
-    fill_ratio: float = Field(ge=0.0, le=1.0, default=1.0, description="fill_quantity / ordered_quantity")
+    ordered_quantity: FiniteFloat = Field(gt=0, description="Shares ordered")
+    limit_price_estimate: FiniteFloat = Field(gt=0, description="Expected fill price")
+    fill_quantity: FiniteFloat = Field(ge=0, description="Shares actually filled")
+    fill_price: FiniteFloat = Field(ge=0, description="Actual fill price (0 if not yet filled)")
+    fill_ratio: FiniteFloat = Field(ge=0.0, le=1.0, default=1.0, description="fill_quantity / ordered_quantity")
     status: OrderStatus = Field(default=OrderStatus.PENDING)
     execution_timestamp: Optional[str] = Field(
         default=None,
         description="ISO 8601 UTC timestamp of fill (None = not filled yet)",
     )
-    execution_latency_seconds: float = Field(
+    execution_latency_seconds: FiniteFloat = Field(
         ge=0.0,
         default=0.0,
         description="Seconds from order submission to fill (0 in backtest)",

@@ -1,0 +1,45 @@
+# pyproject.toml — FPPE static analysis configuration
+# Reference: PRD §7A.6
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+    "E", "F", "I", "N", "W", "B", "UP", "C90",
+    "PL", "RUF", "S", "SIM", "TCH", "PERF", "NPY", "PD", "PT",
+]
+ignore = [
+    "PD901",   # df variable name (acceptable in data pipeline)
+    "PLR2004", # magic values in comparisons (many in ML code)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["S101", "PLR2004", "N802"]  # assert + magic values OK in tests
+"scripts/**/*.py" = ["T201"]  # print() allowed in scripts
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.ruff.lint.pylint]
+max-statements = 50
+max-branches = 12
+max-returns = 6
+max-args = 7
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_return_any = true
+disallow_untyped_defs = true
+warn_unreachable = true
+ignore_missing_imports = true
+
+[tool.coverage.report]
+fail_under = 85
+omit = ["tests/*", "scripts/*", "archive/*", "venv/*"]
+
+[tool.bandit]
+exclude_dirs = ["tests", "scripts", "archive", "venv"]
+skips = ["B101"]

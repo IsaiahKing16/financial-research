@@ -22,8 +22,11 @@ Linear: SLE-69
 
 from __future__ import annotations
 
+import logging
 from datetime import date as Date
 from typing import Any, Dict, List, Optional
+
+_log = logging.getLogger(__name__)
 
 import numpy as np
 import pandas as pd
@@ -261,10 +264,10 @@ def simulate_signals_from_val_db(
 
     # ── Fit and query ─────────────────────────────────────────────────────────
     matcher = PatternMatcher(engine_config)
-    print("  Fitting PatternMatcher on training set...")
+    _log.info("Fitting PatternMatcher on training set...")
     matcher.fit(train_db, feature_cols)
 
-    print(f"  Running analogue matching on {len(val_db):,} validation rows...")
+    _log.info("Running analogue matching on %d validation rows...", len(val_db))
     (
         probabilities,
         signals,
@@ -304,8 +307,8 @@ def simulate_signals_from_val_db(
     buy_count = (signal_df["signal"] == "BUY").sum()
     sell_count = (signal_df["signal"] == "SELL").sum()
     hold_count = (signal_df["signal"] == "HOLD").sum()
-    print(f"\n  Signal summary: {buy_count} BUY, {sell_count} SELL, {hold_count} HOLD")
-    print(f"  Signal rate: {(buy_count + sell_count) / len(signal_df):.1%} actionable")
+    _log.info("Signal summary: %d BUY, %d SELL, %d HOLD", buy_count, sell_count, hold_count)
+    _log.info("Signal rate: %.1f%% actionable", (buy_count + sell_count) / len(signal_df) * 100)
 
     return signal_df
 
@@ -345,4 +348,4 @@ def save_signals(signal_df: pd.DataFrame, filepath: str) -> None:
         filepath: Destination path.
     """
     signal_df.to_csv(filepath, index=False)
-    print(f"  Signals saved to {filepath}")
+    _log.info("Signals saved to %s", filepath)

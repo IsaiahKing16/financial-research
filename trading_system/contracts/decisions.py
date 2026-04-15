@@ -26,7 +26,9 @@ from datetime import date as Date
 from enum import Enum
 from typing import Optional
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from pattern_engine.contracts.finite_types import FiniteFloat
 
 
 # ─── EvaluatorStatus ──────────────────────────────────────────────────────────
@@ -76,7 +78,7 @@ class EvaluatorSnapshot(BaseModel):
         days_in_market: Trading days since system start.
         reason: Human-readable explanation of the status decision.
     """
-    model_config = {"frozen": True}
+    model_config = ConfigDict(frozen=True)
 
     evaluation_date: Date
     status: EvaluatorStatus
@@ -132,7 +134,7 @@ class PositionDecision(BaseModel):
         confidence: Signal confidence (passed through from SignalRecord).
         sector: Sector classification (passed through from SignalRecord).
     """
-    model_config = {"frozen": True}
+    model_config = ConfigDict(frozen=True, allow_inf_nan=False)
 
     ticker: str = Field(min_length=1, max_length=10)
     signal_date: Date
@@ -141,13 +143,13 @@ class PositionDecision(BaseModel):
         default=None,
         description="Set only when approved=False",
     )
-    position_pct: float = Field(ge=0.0, le=1.0, description="Target fraction of equity")
-    target_shares: float = Field(ge=0.0, description="Shares to buy (may be fractional)")
-    entry_price_estimate: float = Field(ge=0.0, description="Estimated entry price")
-    stop_loss_price: float = Field(ge=0.0, description="ATR stop price (0 = no stop)")
-    atr_pct: float = Field(ge=0.0, description="ATR as % of price")
+    position_pct: FiniteFloat = Field(ge=0.0, le=1.0, description="Target fraction of equity")
+    target_shares: FiniteFloat = Field(ge=0.0, description="Shares to buy (may be fractional)")
+    entry_price_estimate: FiniteFloat = Field(ge=0.0, description="Estimated entry price")
+    stop_loss_price: FiniteFloat = Field(ge=0.0, description="ATR stop price (0 = no stop)")
+    atr_pct: FiniteFloat = Field(ge=0.0, description="ATR as % of price")
     max_holding_days: int = Field(ge=1, default=14)
-    confidence: float = Field(ge=0.0, le=1.0)
+    confidence: FiniteFloat = Field(ge=0.0, le=1.0)
     sector: str = Field(min_length=1)
 
     @model_validator(mode="after")
@@ -202,13 +204,13 @@ class AllocationDecision(BaseModel):
         sector: Sector classification.
         adjusted_for_evaluator: True if position was scaled down due to YELLOW status.
     """
-    model_config = {"frozen": True}
+    model_config = ConfigDict(frozen=True, allow_inf_nan=False)
 
     ticker: str = Field(min_length=1, max_length=10)
     signal_date: Date
-    final_position_pct: float = Field(ge=0.0, le=1.0)
+    final_position_pct: FiniteFloat = Field(ge=0.0, le=1.0)
     evaluator_status: EvaluatorStatus
-    capital_allocated: float = Field(ge=0.0, description="Dollar amount committed")
+    capital_allocated: FiniteFloat = Field(ge=0.0, description="Dollar amount committed")
     rank_in_queue: int = Field(ge=1, description="Priority rank in signal queue")
     sector: str = Field(min_length=1)
     adjusted_for_evaluator: bool = Field(

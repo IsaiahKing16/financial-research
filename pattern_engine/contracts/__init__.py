@@ -11,5 +11,6 @@ Linear: SLE-57 (Pydantic contracts), SLE-58 (Pandera schemas)
 
 from pattern_engine.contracts.signals import SignalRecord
 from pattern_engine.contracts.matcher import BaseMatcher
+from pattern_engine.contracts.finite_types import FiniteFloat
 
-__all__ = ["SignalRecord", "BaseMatcher"]
+__all__ = ["SignalRecord", "BaseMatcher", "FiniteFloat"]

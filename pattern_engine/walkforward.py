@@ -301,6 +301,19 @@ def run_fold(
     val_start = pd.Timestamp(fold["val_start"])
     val_end   = pd.Timestamp(fold["val_end"])
 
+    # Temporal integrity check — prevent data leakage from training into validation
+    if train_end >= val_start:
+        raise RuntimeError(
+            f"Fold '{fold.get('label', '?')}': train_end ({train_end.date()}) must be "
+            f"strictly before val_start ({val_start.date()}). "
+            "Overlapping folds cause data leakage. Check WALKFORWARD_FOLDS in config.py."
+        )
+    if val_start >= val_end:
+        raise RuntimeError(
+            f"Fold '{fold.get('label', '?')}': val_start ({val_start.date()}) must be "
+            f"strictly before val_end ({val_end.date()})."
+        )
+
     train_db = (
         full_db[full_db["Date"] <= train_end]
         .dropna(subset=[HORIZON])
@@ -369,6 +382,17 @@ def run_fold(
     # Murphy decomposition on scored rows only
     if scored_mask.any():
         rel, res, unc = _murphy_decomposition(probs_hold[scored_mask], y_true[scored_mask])
+        # BSS identity guard: BS = REL - RES + UNC  (Murphy decomposition invariant)
+        bs_val = float(np.mean((probs_hold[scored_mask] - y_true[scored_mask]) ** 2))
+        identity_residual = abs(rel - res + unc - bs_val)
+        if identity_residual > 0.05:  # Murphy binning noise up to ~0.004 (clustered probs);
+                                         # 0.05 gives 13x margin while catching formula bugs
+            raise RuntimeError(
+                f"Murphy BSS identity violated in fold '{fold.get('label', '?')}': "
+                f"|REL-RES+UNC-BS| = {identity_residual:.2e}. "
+                "This indicates a bug in _murphy_decomposition. "
+                f"REL={rel:.8f}, RES={res:.8f}, UNC={unc:.8f}, BS={bs_val:.8f}"
+            )
     else:
         rel, res, unc = float("nan"), float("nan"), base_rate * (1.0 - base_rate)
 

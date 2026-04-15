@@ -20,7 +20,9 @@ from enum import Enum
 from typing import List, Optional, Tuple
 
 import numpy as np
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from pattern_engine.contracts.finite_types import FiniteFloat
 
 
 class SignalDirection(str, Enum):
@@ -56,16 +58,16 @@ class SignalRecord(BaseModel):
             mean_7d_return=1.23,
         )
     """
-    model_config = {"frozen": True}
+    model_config = ConfigDict(frozen=True, allow_inf_nan=False)
 
     date: Date = Field(description="Signal generation date (trading day)")
     ticker: str = Field(min_length=1, max_length=10, description="Stock ticker symbol")
     signal: SignalDirection = Field(description="BUY, SELL, or HOLD")
-    confidence: float = Field(ge=0.0, le=1.0, description="Calibrated probability [0, 1]")
+    confidence: FiniteFloat = Field(ge=0.0, le=1.0, description="Calibrated probability [0, 1]")
     signal_source: SignalSource = Field(default=SignalSource.KNN, description="Model that generated the signal")
     sector: str = Field(min_length=1, description="Sector classification from SECTOR_MAP")
     n_matches: int = Field(ge=0, description="Number of K-NN analogues found")
-    raw_prob: float = Field(description="Raw (uncalibrated) probability from K-NN vote")
+    raw_prob: FiniteFloat = Field(description="Raw (uncalibrated) probability from K-NN vote")
     mean_7d_return: float = Field(description="Mean 7-day forward return of analogues (%)")
 
     @field_validator("ticker")
@@ -172,7 +174,7 @@ class NeighborResult(BaseModel):
     def mean_distance(self) -> float:
         """Mean Euclidean distance to all returned neighbors."""
         if self.n_neighbors_found == 0:
-            return float("inf")
+            return 0.0  # no analogues found; mean_distance is undefined, use 0.0 sentinel
         return sum(self.neighbor_distances) / self.n_neighbors_found
 
 
@@ -194,14 +196,14 @@ class CalibratedProbability(BaseModel):
         mean_distance: Mean distance to neighbors (quality indicator).
         calibration_method: Calibration method used (default: "platt").
     """
-    model_config = {"frozen": True}
+    model_config = ConfigDict(frozen=True, allow_inf_nan=False)
 
     query_ticker: str = Field(description="Ticker symbol")
     query_date: Date = Field(description="Date of the query fingerprint")
-    raw_prob: float = Field(ge=0.0, le=1.0, description="Raw KNN vote probability")
-    calibrated_prob: float = Field(ge=0.0, le=1.0, description="Platt-scaled probability")
+    raw_prob: FiniteFloat = Field(ge=0.0, le=1.0, description="Raw KNN vote probability")
+    calibrated_prob: FiniteFloat = Field(ge=0.0, le=1.0, description="Platt-scaled probability")
     n_neighbors_found: int = Field(ge=0, description="Number of neighbors used in vote")
-    mean_distance: float = Field(ge=0.0, description="Mean Euclidean distance to neighbors")
+    mean_distance: FiniteFloat = Field(ge=0.0, description="Mean Euclidean distance to neighbors")
     calibration_method: str = Field(default="platt", description="Calibration method applied")
 
     @field_validator("query_ticker")

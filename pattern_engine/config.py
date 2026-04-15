@@ -101,6 +101,33 @@ class EngineConfig:
     stumpy_subsequence_length: int = 50  # E6: matrix profile subsequence length
 
 
+# ── Power of 10: Loop bound constants (Rule 2) ────────────────────────────────
+# All loops in production code must have an explicit upper bound.
+# Exhaustion raises RuntimeError, never silently continues.
+# Reference: PRD §7A.1 Rule R2, CLAUDE.md Critical Rules.
+
+MAX_CALIBRATION_ITER: int = 10_000
+"""Maximum iterations for calibration fitting (beta_abm, Platt scaling)."""
+
+MAX_ORDER_RETRIES: int = 5
+"""Maximum retry attempts for broker API order submission."""
+
+MAX_WALK_FORWARD_FOLDS: int = 20
+"""Maximum number of walk-forward folds in any single experiment."""
+
+MAX_HNSW_ELEMENTS: int = 500_000
+"""Maximum elements in hnswlib index before index rotation required."""
+
+MAX_BATCH_ITER: int = 100_000
+"""Maximum batches in any single pipeline run (prevents runaway loops)."""
+
+MAX_POLYGON_PAGES: int = 1_000
+"""Maximum pages to fetch from Polygon.io API in a single request."""
+
+MAX_DOWNLOAD_RETRIES: int = 3
+"""Maximum download retry attempts per ticker in data pipeline."""
+
+
 # ── Walk-forward fold definitions ─────────────────────────────────────────────
 # 6 expanding-window folds matching scripts/run_walkforward.py FOLDS.
 # Do not redefine these in individual scripts — always import from here.

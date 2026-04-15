@@ -560,6 +560,18 @@ class PatternMatcher:
     # Public API — fit / query
     # ──────────────────────────────────────────────────────────────────────────
 
+    @icontract.require(
+        lambda train_db: len(train_db) > 0,
+        "train_db must not be empty.",
+    )
+    @icontract.require(
+        lambda train_db, feature_cols: all(c in train_db.columns for c in feature_cols),
+        "All feature_cols must be present in train_db.",
+    )
+    @icontract.ensure(
+        lambda result: result._fitted,
+        "PatternMatcher._fitted must be True after fit().",
+    )
     def fit(
         self,
         train_db: pd.DataFrame,
@@ -741,6 +753,18 @@ class PatternMatcher:
             else np.array([None] * len(train_db))
         )
 
+    @icontract.require(
+        lambda self: self._fitted,
+        "PatternMatcher must be fitted (fit() called) before query().",
+    )
+    @icontract.require(
+        lambda val_db: len(val_db) > 0,
+        "val_db must not be empty.",
+    )
+    @icontract.ensure(
+        lambda result: np.all((result[0] >= 0.0) & (result[0] <= 1.0)),
+        "Output probabilities must be in [0, 1].",
+    )
     def query(
         self,
         val_db: pd.DataFrame,

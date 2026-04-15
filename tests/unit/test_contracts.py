@@ -414,3 +414,52 @@ class TestRiskEngineIcontract:
                               atr_weight=0.5, rejection_reason=None)
         with pytest.raises(icontract.ViolationError):
             apply_risk_adjustments(sizing=sizing, drawdown=float("nan"))
+
+
+# ─── matcher.py icontract guards (P8-PRE-6D) ───────────────────────────────────
+
+class TestMatcherFitQueryIcontract:
+    """P8-PRE-6D: matcher.fit/query must enforce preconditions via icontract."""
+
+    def _make_minimal_df(self, n=20):
+        import numpy as np
+        rng = np.random.default_rng(42)
+        cols = [f"r_{i}" for i in range(8)]
+        df = pd.DataFrame(rng.standard_normal((n, 8)), columns=cols)
+        df["Ticker"] = "TEST"
+        df["Date"] = pd.date_range("2018-01-01", periods=n)
+        df["fwd_7d_up"] = rng.integers(0, 2, n).astype(float)
+        return df, cols
+
+    def test_fit_rejects_empty_dataframe(self):
+        from pattern_engine.matcher import PatternMatcher
+        from pattern_engine.config import EngineConfig
+        m = PatternMatcher(EngineConfig())
+        df, cols = self._make_minimal_df()
+        empty = df.iloc[0:0]
+        with pytest.raises(icontract.ViolationError):
+            m.fit(empty, cols)
+
+    def test_fit_rejects_missing_feature_cols(self):
+        from pattern_engine.matcher import PatternMatcher
+        from pattern_engine.config import EngineConfig
+        m = PatternMatcher(EngineConfig())
+        df, _ = self._make_minimal_df()
+        with pytest.raises(icontract.ViolationError):
+            m.fit(df, ["nonexistent_col"])
+
+    def test_query_rejects_unfitted_matcher(self):
+        from pattern_engine.matcher import PatternMatcher
+        from pattern_engine.config import EngineConfig
+        m = PatternMatcher(EngineConfig())
+        df, _ = self._make_minimal_df()
+        with pytest.raises(icontract.ViolationError):
+            m.query(df)
+
+    def test_fit_ensures_fitted_flag_is_set(self):
+        from pattern_engine.matcher import PatternMatcher
+        from pattern_engine.config import EngineConfig
+        m = PatternMatcher(EngineConfig())
+        df, cols = self._make_minimal_df()
+        m.fit(df, cols)
+        assert m._fitted is True

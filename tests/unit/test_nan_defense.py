@@ -87,3 +87,25 @@ def test_position_decision_rejects_inf_stop_loss():
             confidence=0.70,
             sector="Technology",
         )
+
+
+def test_trade_event_rejects_nan_fill_price():
+    """TradeEvent rejects NaN in fill_price (direct order execution field)."""
+    from trading_system.contracts.trades import TradeEvent
+    from pydantic import ValidationError
+    from datetime import date
+
+    with pytest.raises(ValidationError):
+        TradeEvent(
+            trade_id="T001",
+            ticker="AAPL",
+            side="BUY",
+            status="FILLED",
+            ordered_quantity=10.0,
+            limit_price_estimate=150.0,
+            fill_quantity=10.0,
+            fill_price=float("nan"),
+            fill_ratio=1.0,
+            execution_latency_seconds=0.1,
+            order_date=date.today(),
+        )

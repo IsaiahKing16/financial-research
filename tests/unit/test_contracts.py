@@ -264,6 +264,7 @@ class TestDailySnapshot:
 
 def test_run_fold_raises_on_overlapping_dates():
     """run_fold raises RuntimeError when train_end >= val_start (temporal leakage)."""
+    import pandas as pd  # noqa: PLC0415
     from pattern_engine.walkforward import run_fold
 
     bad_fold = {

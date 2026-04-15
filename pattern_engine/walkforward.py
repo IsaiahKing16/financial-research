@@ -301,6 +301,19 @@ def run_fold(
     val_start = pd.Timestamp(fold["val_start"])
     val_end   = pd.Timestamp(fold["val_end"])
 
+    # Temporal integrity check — prevent data leakage from training into validation
+    if train_end >= val_start:
+        raise RuntimeError(
+            f"Fold '{fold.get('label', '?')}': train_end ({train_end.date()}) must be "
+            f"strictly before val_start ({val_start.date()}). "
+            "Overlapping folds cause data leakage. Check WALKFORWARD_FOLDS in config.py."
+        )
+    if val_start >= val_end:
+        raise RuntimeError(
+            f"Fold '{fold.get('label', '?')}': val_start ({val_start.date()}) must be "
+            f"strictly before val_end ({val_end.date()})."
+        )
+
     train_db = (
         full_db[full_db["Date"] <= train_end]
         .dropna(subset=[HORIZON])

@@ -1,0 +1,17 @@
+pattern_engine\live.py
+    M 53:4 LiveRunner.run - C (13)
+pattern_engine\matcher.py
+    M 898:4 PatternMatcher.query - C (18)
+    M 336:4 PatternMatcher._package_results - C (16)
+pattern_engine\walkforward.py
+    F 278:0 run_fold - C (13)
+    F 445:0 run_walkforward - C (12)
+trading_system\risk_engine.py
+    F 201:0 apply_risk_adjustments - C (11)
+trading_system\signal_adapter.py
+    F 185:0 simulate_signals_from_val_db - C (13)
+trading_system\strategy_evaluator.py
+    M 362:4 StrategyEvaluator._determine_status - C (11)
+
+8 blocks (classes, functions, methods) analyzed.
+Average complexity: C (13.375)

@@ -460,11 +460,27 @@ class PatternMatcher:
                 reasons.append(f"prob={prob_up[i]:.3f}_below_threshold")
 
         ensemble_list = [returns[i][top_mask[i]] for i in range(B)]
+        neighbor_results = self._build_neighbor_results(
+            top_mask, indices_b, distances_b, val_tickers_b, val_dates_b, n_matches, cfg
+        )
 
-        # Build NeighborResult objects for each query (Stage 5 contract output)
+        return prob_up, mean_ret, signals, reasons, n_matches.tolist(), ensemble_list, neighbor_results
+
+    def _build_neighbor_results(
+        self,
+        top_mask: np.ndarray,
+        indices_b: np.ndarray,
+        distances_b: np.ndarray,
+        val_tickers_b,
+        val_dates_b,
+        n_matches: np.ndarray,
+        cfg,
+    ) -> list:
+        """Build NeighborResult objects for each query row (Stage 5 contract output)."""
+        B = top_mask.shape[0]
         neighbor_results: list[NeighborResult] = []
         for i in range(B):
-            accepted_mask_i = top_mask[i]       # (n_probe,) bool
+            accepted_mask_i = top_mask[i]
             accepted_indices = indices_b[i][accepted_mask_i].tolist()
             accepted_distances = distances_b[i][accepted_mask_i].tolist()
             accepted_labels = [
@@ -473,16 +489,14 @@ class PatternMatcher:
             # Normalise query_date: np.datetime64 / pd.Timestamp → datetime.date
             raw_date = val_dates_b[i]
             if hasattr(raw_date, "date"):
-                # pd.Timestamp
                 query_date_val: date = raw_date.date()
             elif hasattr(raw_date, "astype"):
-                # np.datetime64 → convert via pd.Timestamp
                 import pandas as _pd
                 query_date_val = _pd.Timestamp(raw_date).date()
             elif raw_date is None or (isinstance(raw_date, float) and np.isnan(raw_date)):
                 query_date_val = date.today()
             else:
-                query_date_val = raw_date  # already datetime.date or string
+                query_date_val = raw_date
             neighbor_results.append(NeighborResult(
                 query_ticker=str(val_tickers_b[i]),
                 query_date=query_date_val,
@@ -492,8 +506,7 @@ class PatternMatcher:
                 n_neighbors_requested=cfg.top_k,
                 n_neighbors_found=int(n_matches[i]),
             ))
-
-        return prob_up, mean_ret, signals, reasons, n_matches.tolist(), ensemble_list, neighbor_results
+        return neighbor_results
 
     # ──────────────────────────────────────────────────────────────────────────
     # E1: BMA per-neighbour label extraction
@@ -665,58 +678,58 @@ class PatternMatcher:
         self._fitted = True
         self._rebuild_caches()
 
-        # Calibration double-pass (SLE-89 — closes I8 gap from M2-M5 review).
-        # Matches production PatternEngine.fit() step 3:
-        #   1. self._calibrator = None so self.query() returns raw probs
-        #   2. Query train_db against itself (no look-ahead: same regime/distance)
-        #   3. Fit PlattCalibrator on (raw_probs, y_true_binary)
-        # Subsequent query() calls see self._calibrator and apply transform().
-        _cal_method = getattr(cfg, 'calibration_method', 'platt')
-        self._calibrator = None  # sentinel: self.query() returns raw probs below
-        self._bma_calibrator = None  # reset on each fit
-        if _cal_method not in ('none', None):
-            # cal_frac (default 0.76): sample a fraction of training rows for the
-            # calibration double-pass.  Platt scaling (logistic regression) reaches
-            # stable estimates with ~10k–50k samples; querying the full training set
-            # costs proportionally more time with negligible calibration benefit.
-            # cal_max_samples (default 100_000): absolute cap so the calibration
-            # cost stays constant regardless of universe size.  cal_frac was locked
-            # at 0.76 for a 52-ticker universe (~110k training rows → ~83k cal rows);
-            # at 585 tickers the same ratio produces 1.9M cal rows — 23× more than
-            # needed for stable Platt estimates.
-            _cal_frac = getattr(cfg, 'cal_frac', 0.76)
-            _cal_max = getattr(cfg, 'cal_max_samples', 100_000)
-            _n_train = len(train_db)
-            _n_cal = max(1000, min(int(_cal_frac * _n_train), _cal_max))
-            if _n_cal < _n_train:
-                _rng = np.random.RandomState(42)
-                _cal_idx = _rng.choice(_n_train, size=_n_cal, replace=False)
-                _cal_db = train_db.iloc[_cal_idx]
-            else:
-                _cal_db = train_db
-
-            if getattr(cfg, 'use_bma', False):
-                # E1 BMA path: extract (N_cal, K) per-neighbour label matrix
-                from research.bma_calibrator import BMACalibrator
-                _raw_matrix, _bma_y_true = self._extract_neighbour_labels_for_bma(
-                    _cal_db, regime_labeler=regime_labeler
-                )
-                self._bma_calibrator = BMACalibrator()
-                self._bma_calibrator.fit(_raw_matrix, _bma_y_true)
-                # self._calibrator stays None — BMA replaces it in _package_results
-            else:
-                # Existing path (unchanged)
-                _cal_raw_probs, _, _, _, _, _ = self.query(
-                    _cal_db, regime_labeler=regime_labeler, verbose=0
-                )
-                _y_true = (
-                    _cal_db[cfg.projection_horizon].values.astype(np.float64)
-                    if cfg.projection_horizon in _cal_db.columns
-                    else np.zeros(len(_cal_db), dtype=np.float64)
-                )
-                self._calibrator = _PlattCalibrator().fit(_cal_raw_probs, _y_true)
+        # Calibration double-pass (SLE-89)
+        self._fit_calibration_pass(train_db, cfg, regime_labeler)
 
         return self
+
+    def _fit_calibration_pass(self, train_db: pd.DataFrame, cfg, regime_labeler) -> None:
+        """Calibration double-pass (SLE-89 — closes I8 gap from M2-M5 review).
+
+        Protocol:
+          1. self._calibrator = None so self.query() returns raw probs.
+          2. Query train_db against itself (no look-ahead).
+          3. Fit PlattCalibrator on (raw_probs, y_true_binary).
+
+        Subsequent query() calls see self._calibrator and apply transform().
+        When calibration_method is 'none'/None, does nothing.
+        """
+        _cal_method = getattr(cfg, 'calibration_method', 'platt')
+        self._calibrator = None
+        self._bma_calibrator = None
+        if _cal_method in ('none', None):
+            return
+
+        # cal_frac (default 0.76): sample a fraction of training rows.
+        # cal_max_samples (default 100_000): absolute cap independent of universe size.
+        _cal_frac = getattr(cfg, 'cal_frac', 0.76)
+        _cal_max = getattr(cfg, 'cal_max_samples', 100_000)
+        _n_train = len(train_db)
+        _n_cal = max(1000, min(int(_cal_frac * _n_train), _cal_max))
+        if _n_cal < _n_train:
+            _rng = np.random.RandomState(42)
+            _cal_idx = _rng.choice(_n_train, size=_n_cal, replace=False)
+            _cal_db = train_db.iloc[_cal_idx]
+        else:
+            _cal_db = train_db
+
+        if getattr(cfg, 'use_bma', False):
+            from research.bma_calibrator import BMACalibrator
+            _raw_matrix, _bma_y_true = self._extract_neighbour_labels_for_bma(
+                _cal_db, regime_labeler=regime_labeler
+            )
+            self._bma_calibrator = BMACalibrator()
+            self._bma_calibrator.fit(_raw_matrix, _bma_y_true)
+        else:
+            _cal_raw_probs, _, _, _, _, _ = self.query(
+                _cal_db, regime_labeler=regime_labeler, verbose=0
+            )
+            _y_true = (
+                _cal_db[cfg.projection_horizon].values.astype(np.float64)
+                if cfg.projection_horizon in _cal_db.columns
+                else np.zeros(len(_cal_db), dtype=np.float64)
+            )
+            self._calibrator = _PlattCalibrator().fit(_cal_raw_probs, _y_true)
 
     def _rebuild_caches(self) -> None:
         """Pre-cache numpy arrays from _train_db for vectorized batch queries.
@@ -752,6 +765,123 @@ class PatternMatcher:
             if "Date" in train_db.columns
             else np.array([None] * len(train_db))
         )
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # query() helpers — private, each corresponds to one named pipeline stage
+    # ──────────────────────────────────────────────────────────────────────────
+
+    def _query_prepare_inputs(
+        self,
+        val_db: pd.DataFrame,
+        regime_labeler,
+        verbose: int,
+        cfg,
+    ):
+        """Stage 1+regime: scale query features and pre-extract all val arrays.
+
+        Returns (X_val_weighted, regime_labels_arr, val_tickers_arr,
+                 val_sectors_arr, val_dates_arr).
+        """
+        X_val_raw = val_db[self._feature_cols].values
+        X_val_weighted = self._prepare_features(X_val_raw, fit_scaler=False)
+
+        if self._ib_compressor is not None:
+            X_val_weighted = self._ib_compressor.transform(X_val_weighted)
+
+        regime_labels_val = None
+        if regime_labeler is not None and getattr(regime_labeler, "fitted", False) and cfg.regime_filter:
+            regime_labels_val = regime_labeler.label(val_db, reference_db=self._train_db)
+            if verbose:
+                bull_q = (regime_labels_val == 1).sum() if getattr(regime_labeler, "mode", None) == "binary" else "N/A"
+                bear_q = (regime_labels_val == 0).sum() if getattr(regime_labeler, "mode", None) == "binary" else "N/A"
+                _log.debug(
+                    "Regime filter (%s): val=%s bull / %s bear queries",
+                    regime_labeler.mode, bull_q, bear_q,
+                )
+
+        n_val = len(val_db)
+        val_tickers_arr = np.asarray(val_db["Ticker"], dtype=object)
+        val_sectors_arr = np.array([_SECTOR_MAP.get(t, "") for t in val_tickers_arr])
+        val_dates_arr = val_db.get("Date", pd.Series([None] * n_val)).values
+        regime_labels_arr = (
+            np.asarray(regime_labels_val) if regime_labels_val is not None else None
+        )
+        return X_val_weighted, regime_labels_arr, val_tickers_arr, val_sectors_arr, val_dates_arr
+
+    def _query_calibrate_signals(
+        self,
+        raw_probs: np.ndarray,
+        all_n_matches: list,
+        n_val: int,
+        cfg,
+    ):
+        """Apply Platt calibration and regenerate signals from calibrated probs.
+
+        Returns (out_probs, signals, reasons).
+        If no calibrator is set, returns raw_probs unchanged.
+        """
+        if self._calibrator is None:
+            return raw_probs, None, None
+
+        cal_probs = self._calibrator.transform(raw_probs)
+        n_m = np.array(all_n_matches)
+        cal_agree = np.abs(cal_probs - 0.5) * 2
+        _insuf = n_m < cfg.min_matches
+        _low_agree = cal_agree < cfg.agreement_spread
+        _buy = ~_insuf & ~_low_agree & (cal_probs >= cfg.confidence_threshold)
+        _sell = ~_insuf & ~_low_agree & (cal_probs <= 1.0 - cfg.confidence_threshold)
+        cal_signals: list[str] = []
+        cal_reasons: list[str] = []
+        for _i in range(n_val):
+            if _insuf[_i]:
+                cal_signals.append("HOLD"); cal_reasons.append("insufficient_matches")
+            elif _low_agree[_i]:
+                cal_signals.append("HOLD"); cal_reasons.append("low_agreement")
+            elif _buy[_i]:
+                cal_signals.append("BUY")
+                cal_reasons.append(f"prob={cal_probs[_i]:.3f}_agree={cal_agree[_i]:.3f}")
+            elif _sell[_i]:
+                cal_signals.append("SELL")
+                cal_reasons.append(f"prob={cal_probs[_i]:.3f}_agree={cal_agree[_i]:.3f}")
+            else:
+                cal_signals.append("HOLD")
+                cal_reasons.append(f"prob={cal_probs[_i]:.3f}_below_threshold")
+        return cal_probs, cal_signals, cal_reasons
+
+    def _query_build_journal(
+        self,
+        batch_meta: list,
+        all_signals: list,
+        out_probs: np.ndarray,
+        all_n_matches: list,
+        j_top_n: int,
+    ) -> None:
+        """Build self.last_journal from post-calibration signals (second pass)."""
+        self.last_journal = []
+        if j_top_n <= 0 or not batch_meta:
+            return
+        from pattern_engine.journal import build_journal_entries
+        for (_tm, _dist, _idx, _tickers_b, _dates_b, _raw_b, _s, _e) in batch_meta:
+            _final_sigs_b = all_signals[_s:_e]
+            _cal_b = out_probs[_s:_e]
+            _nm_b = all_n_matches[_s:_e]
+            _entries = build_journal_entries(
+                top_masks=_tm,
+                distances=_dist,
+                indices=_idx,
+                val_tickers=_tickers_b,
+                val_dates=_dates_b,
+                raw_probs=_raw_b,
+                cal_probs=_cal_b,
+                signals=_final_sigs_b,
+                n_matches=_nm_b,
+                train_tickers=self._train_tickers_arr,
+                train_dates=self._train_dates_arr,
+                train_targets=self._train_target_arr,
+                train_returns=self._train_ret_arr,
+                top_n=j_top_n,
+            )
+            self.last_journal.extend(_entries)
 
     @icontract.require(
         lambda self: self._fitted,
@@ -800,37 +930,13 @@ class PatternMatcher:
         cfg = self.config
         n_val = len(val_db)
 
-        # Scale + weight the query features (Stage 1, fit_scaler=False)
-        X_val_raw = val_db[self._feature_cols].values
-        X_val_weighted = self._prepare_features(X_val_raw, fit_scaler=False)
-
-        # Research pilot: IB compression of query features (SLE-78).
-        # The index was built on compressed features in fit(); query features
-        # must be projected into the same compressed space.
-        if self._ib_compressor is not None:
-            X_val_weighted = self._ib_compressor.transform(X_val_weighted)
-
-        # Pre-compute regime labels for all query rows
-        regime_labels_val = None
-        if regime_labeler is not None and getattr(regime_labeler, "fitted", False) and cfg.regime_filter:
-            regime_labels_val = regime_labeler.label(val_db, reference_db=self._train_db)
-            if verbose:
-                bull_q = (regime_labels_val == 1).sum() if getattr(regime_labeler, "mode", None) == "binary" else "N/A"
-                bear_q = (regime_labels_val == 0).sum() if getattr(regime_labeler, "mode", None) == "binary" else "N/A"
-                _log.debug(
-                    "Regime filter (%s): val=%s bull / %s bear queries",
-                    regime_labeler.mode, bull_q, bear_q,
-                )
-
-        # Pre-extract val arrays once (avoids iloc per row in batch loop)
-        val_tickers_arr = np.asarray(val_db["Ticker"], dtype=object)
-        val_sectors_arr = np.array([_SECTOR_MAP.get(t, "") for t in val_tickers_arr])
-        val_dates_arr = val_db.get("Date", pd.Series([None] * n_val)).values
-        regime_labels_arr = (
-            np.asarray(regime_labels_val) if regime_labels_val is not None else None
+        # Stage 1 + regime: scale features and prepare all val arrays
+        (X_val_weighted, regime_labels_arr,
+         val_tickers_arr, val_sectors_arr, val_dates_arr) = self._query_prepare_inputs(
+            val_db, regime_labeler, verbose, cfg
         )
 
-        # Accumulators
+        # Accumulators for batch loop
         all_probs: list[float] = []
         all_signals: list[str] = []
         all_reasons: list[str] = []
@@ -839,7 +945,7 @@ class PatternMatcher:
         all_ensembles: list = []
 
         _j_top_n = getattr(cfg, 'journal_top_n', 0)
-        _batch_meta: list = []   # stores (top_mask, dist, idx, tickers_b, dates_b, raw_probs_b, start, end)
+        _batch_meta: list = []
 
         start_time = time.time()
 
@@ -864,20 +970,13 @@ class PatternMatcher:
                 X_batch=q_batch if self._sax_filter is not None else None,
             )
 
-            # Research pilot: WFA DTW reranker (SLE-73).
-            # Reorders top_k survivors by constrained DTW distance so Stage 5
-            # sees the most temporally-aligned analogues first.  Does not
-            # change which candidates are included — only their ordering.
+            # Research pilot: WFA DTW reranker (SLE-73)
             if self._wfa_reranker is not None:
                 top_mask = self._wfa_reranker.rerank_mask(
                     q_batch, indices_b, top_mask, cfg.top_k
                 )
 
-            # E3: DTW reranker — rerank accepted neighbours by DTW distance on
-            # return columns (0:8) only. Replaces top_mask with a new mask
-            # selecting only the top dtw_rerank_k DTW-closest neighbours.
-            # Candlestick columns (8:23) are excluded — bounded proportions
-            # have no meaningful temporal warping.
+            # E3: DTW reranker on return columns (0:8) only
             if getattr(cfg, 'use_dtw_reranker', False) and self._X_train_weighted is not None:
                 from research.wfa_reranker import dtw_rerank
                 _k = getattr(cfg, 'dtw_rerank_k', 20)
@@ -886,13 +985,12 @@ class PatternMatcher:
                     _accepted_idx = indices_b[i][top_mask[i]]
                     if len(_accepted_idx) == 0:
                         continue
-                    _nbrs_feat = self._X_train_weighted[_accepted_idx]  # (n_acc, D)
+                    _nbrs_feat = self._X_train_weighted[_accepted_idx]
                     _reranked, _ = dtw_rerank(
                         q_batch[i], _nbrs_feat, _accepted_idx,
                         k=min(_k, len(_accepted_idx))
                     )
-                    # Rebuild top_mask using O(1) position lookup
-                    _pos_map = {int(v): p for p, v in enumerate(indices_b[i])}
+                    _pos_map = {int(v): pos for pos, v in enumerate(indices_b[i])}
                     for ri in _reranked:
                         _new_mask[i, _pos_map[int(ri)]] = True
                 top_mask = _new_mask
@@ -911,92 +1009,36 @@ class PatternMatcher:
             all_mean_returns.extend(ret_b.tolist())
             all_ensembles.extend(ens_b)
 
-            # Store batch metadata for journal (second pass after calibration)
             if _j_top_n > 0:
                 _batch_meta.append((
-                    top_mask.copy(),
-                    distances_b.copy(),
-                    indices_b.copy(),
+                    top_mask.copy(), distances_b.copy(), indices_b.copy(),
                     val_tickers_arr[batch_start:batch_end].copy(),
                     val_dates_arr[batch_start:batch_end].copy(),
-                    prob_b.copy(),
-                    batch_start,
-                    batch_end,
+                    prob_b.copy(), batch_start, batch_end,
                 ))
 
-            # Progress reporting (matches production Matcher output format)
             if verbose and batch_end % 2000 < cfg.batch_size:
                 elapsed = time.time() - start_time
                 rate = batch_end / elapsed if elapsed > 0 else 0
                 remaining = (n_val - batch_end) / rate if rate > 0 else 0
                 _log.debug(
                     "Query batch %d/%d complete (%d%%) | %d queries/sec | ETA: %.1f min",
-                    batch_end, n_val,
-                    int(batch_end / n_val * 100),
-                    int(rate),
-                    remaining / 60,
+                    batch_end, n_val, int(batch_end / n_val * 100),
+                    int(rate), remaining / 60,
                 )
 
         raw_probs = np.array(all_probs)
 
-        # Apply Platt calibration (SLE-89).  The calibrator is None during the
-        # double-pass self-query inside fit(); it is set after that pass.
-        # When calibration is applied, signals must be regenerated from the
-        # calibrated probabilities (same threshold logic as _package_results).
-        if self._calibrator is not None:
-            cal_probs = self._calibrator.transform(raw_probs)
-            # Regenerate signals from calibrated probabilities
-            n_m = np.array(all_n_matches)
-            cal_agree = np.abs(cal_probs - 0.5) * 2
-            _insuf = n_m < cfg.min_matches
-            _low_agree = cal_agree < cfg.agreement_spread
-            _buy = ~_insuf & ~_low_agree & (cal_probs >= cfg.confidence_threshold)
-            _sell = ~_insuf & ~_low_agree & (cal_probs <= 1.0 - cfg.confidence_threshold)
-            all_signals = []
-            all_reasons = []
-            for _i in range(n_val):
-                if _insuf[_i]:
-                    all_signals.append("HOLD"); all_reasons.append("insufficient_matches")
-                elif _low_agree[_i]:
-                    all_signals.append("HOLD"); all_reasons.append("low_agreement")
-                elif _buy[_i]:
-                    all_signals.append("BUY")
-                    all_reasons.append(f"prob={cal_probs[_i]:.3f}_agree={cal_agree[_i]:.3f}")
-                elif _sell[_i]:
-                    all_signals.append("SELL")
-                    all_reasons.append(f"prob={cal_probs[_i]:.3f}_agree={cal_agree[_i]:.3f}")
-                else:
-                    all_signals.append("HOLD")
-                    all_reasons.append(f"prob={cal_probs[_i]:.3f}_below_threshold")
-            out_probs = cal_probs
-        else:
-            out_probs = raw_probs
+        # Stage 6: apply calibration and regenerate signals
+        out_probs, cal_signals, cal_reasons = self._query_calibrate_signals(
+            raw_probs, all_n_matches, n_val, cfg
+        )
+        if cal_signals is not None:
+            all_signals = cal_signals
+            all_reasons = cal_reasons
 
-        # Build decision journal from post-calibration signals (correct final state)
-        self.last_journal = []
-        if _j_top_n > 0 and _batch_meta:
-            from pattern_engine.journal import build_journal_entries
-            for (_tm, _dist, _idx, _tickers_b, _dates_b, _raw_b, _s, _e) in _batch_meta:
-                _final_sigs_b = all_signals[_s:_e]
-                _cal_b = out_probs[_s:_e]
-                _nm_b = all_n_matches[_s:_e]
-                _entries = build_journal_entries(
-                    top_masks=_tm,
-                    distances=_dist,
-                    indices=_idx,
-                    val_tickers=_tickers_b,
-                    val_dates=_dates_b,
-                    raw_probs=_raw_b,
-                    cal_probs=_cal_b,
-                    signals=_final_sigs_b,
-                    n_matches=_nm_b,
-                    train_tickers=self._train_tickers_arr,
-                    train_dates=self._train_dates_arr,
-                    train_targets=self._train_target_arr,
-                    train_returns=self._train_ret_arr,
-                    top_n=_j_top_n,
-                )
-                self.last_journal.extend(_entries)
+        # Build decision journal (second pass, post-calibration)
+        self._query_build_journal(_batch_meta, all_signals, out_probs, all_n_matches, _j_top_n)
 
         return (
             out_probs,
@@ -1006,7 +1048,6 @@ class PatternMatcher:
             all_mean_returns,
             all_ensembles,
         )
-
     # ──────────────────────────────────────────────────────────────────────────
     # Properties (match production Matcher interface)
     # ──────────────────────────────────────────────────────────────────────────

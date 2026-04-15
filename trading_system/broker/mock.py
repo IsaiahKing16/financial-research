@@ -38,126 +38,28 @@ class MockBroker(BaseBroker):
     def submit_order(self, order: Order) -> OrderResult:
         # Rejection: fail ticker
         if order.ticker in self._config.fail_tickers:
-            result = OrderResult(
-                order_id=order.order_id,
-                ticker=order.ticker,
-                status=OrderStatus.REJECTED,
-                filled_quantity=0.0,
-                fill_price=0.0,
-                latency_ms=self._config.latency_ms,
-                error=f"Ticker {order.ticker} is in fail list",
-            )
+            result = self._make_rejected(order, f"Ticker {order.ticker} is in fail list")
             self._history.append((order, result))
             return result
 
-        # Guard: price must be set
         if order.ticker not in self._prices:
             raise RuntimeError(
                 f"MockBroker: no price set for {order.ticker!r}; call set_prices() first"
             )
 
         price = self._prices[order.ticker]
-
-        # Compute fill price with slippage
         slip = self._config.slippage_bps / 10_000
-        if order.side == OrderSide.BUY:
-            fill_price = price * (1 + slip)
-        else:
-            fill_price = price * (1 - slip)
-
+        fill_price = price * (1 + slip) if order.side == OrderSide.BUY else price * (1 - slip)
         fill_qty = order.quantity * self._config.fill_fraction
 
-        # Update positions and cash
         if order.side == OrderSide.BUY:
-            # Zero fill → nothing happened, reject cleanly (no ghost positions)
-            if fill_qty < 1e-9:
-                result = OrderResult(
-                    order_id=order.order_id,
-                    ticker=order.ticker,
-                    status=OrderStatus.REJECTED,
-                    filled_quantity=0.0,
-                    fill_price=0.0,
-                    latency_ms=self._config.latency_ms,
-                    error="Zero fill quantity",
-                )
-                self._history.append((order, result))
-                return result
-
-            cost = fill_qty * fill_price
-
-            # Rejection: insufficient funds
-            if self._config.reject_when_insufficient and cost > self._cash:
-                result = OrderResult(
-                    order_id=order.order_id,
-                    ticker=order.ticker,
-                    status=OrderStatus.REJECTED,
-                    filled_quantity=0.0,
-                    fill_price=0.0,
-                    latency_ms=self._config.latency_ms,
-                    error="Insufficient funds",
-                )
-                self._history.append((order, result))
-                return result
-
-            status = OrderStatus.PARTIAL if self._config.fill_fraction < 1.0 else OrderStatus.FILLED
-
-            self._cash -= cost
-            pos = self._positions.get(order.ticker)
-            if pos is None:
-                self._positions[order.ticker] = _MockPosition(
-                    quantity=fill_qty, avg_cost=fill_price,
-                )
-            else:
-                total_qty = pos.quantity + fill_qty
-                pos.avg_cost = (
-                    (pos.avg_cost * pos.quantity + fill_price * fill_qty) / total_qty
-                )
-                pos.quantity = total_qty
+            early_result, fill_qty, status = self._process_buy(order, fill_price, fill_qty)
         else:
-            pos = self._positions.get(order.ticker)
-            if pos is None:
-                result = OrderResult(
-                    order_id=order.order_id,
-                    ticker=order.ticker,
-                    status=OrderStatus.REJECTED,
-                    filled_quantity=0.0,
-                    fill_price=0.0,
-                    latency_ms=self._config.latency_ms,
-                    error=f"No position in {order.ticker} to sell",
-                )
-                self._history.append((order, result))
-                return result
+            early_result, fill_qty, status = self._process_sell(order, fill_price, fill_qty)
 
-            # Clamp to available shares — cannot sell more than held
-            fill_qty = min(fill_qty, pos.quantity)
-            if fill_qty < 1e-9:
-                result = OrderResult(
-                    order_id=order.order_id,
-                    ticker=order.ticker,
-                    status=OrderStatus.REJECTED,
-                    filled_quantity=0.0,
-                    fill_price=0.0,
-                    latency_ms=self._config.latency_ms,
-                    error="No shares available after clamping",
-                )
-                self._history.append((order, result))
-                return result
-
-            # Determine if clamped (requested more than held)
-            requested_qty = order.quantity * self._config.fill_fraction
-            was_clamped = fill_qty < requested_qty - 1e-9
-
-            cost = fill_qty * fill_price
-            self._cash += cost
-            pos.quantity -= fill_qty
-
-            # Clean up zero-quantity positions
-            if pos.quantity < 1e-9:
-                del self._positions[order.ticker]
-
-            status = OrderStatus.PARTIAL if was_clamped else (
-                OrderStatus.PARTIAL if self._config.fill_fraction < 1.0 else OrderStatus.FILLED
-            )
+        if early_result is not None:
+            self._history.append((order, early_result))
+            return early_result
 
         result = OrderResult(
             order_id=order.order_id,
@@ -170,6 +72,65 @@ class MockBroker(BaseBroker):
         )
         self._history.append((order, result))
         return result
+
+    def _make_rejected(self, order: Order, error: str) -> OrderResult:
+        """Build a REJECTED OrderResult."""
+        return OrderResult(
+            order_id=order.order_id,
+            ticker=order.ticker,
+            status=OrderStatus.REJECTED,
+            filled_quantity=0.0,
+            fill_price=0.0,
+            latency_ms=self._config.latency_ms,
+            error=error,
+        )
+
+    def _process_buy(
+        self, order: Order, fill_price: float, fill_qty: float
+    ):
+        """Execute BUY side. Returns (early_result_or_None, fill_qty, status)."""
+        if fill_qty < 1e-9:
+            return self._make_rejected(order, "Zero fill quantity"), 0.0, None
+
+        cost = fill_qty * fill_price
+        if self._config.reject_when_insufficient and cost > self._cash:
+            return self._make_rejected(order, "Insufficient funds"), 0.0, None
+
+        status = OrderStatus.PARTIAL if self._config.fill_fraction < 1.0 else OrderStatus.FILLED
+        self._cash -= cost
+        pos = self._positions.get(order.ticker)
+        if pos is None:
+            self._positions[order.ticker] = _MockPosition(quantity=fill_qty, avg_cost=fill_price)
+        else:
+            total_qty = pos.quantity + fill_qty
+            pos.avg_cost = (pos.avg_cost * pos.quantity + fill_price * fill_qty) / total_qty
+            pos.quantity = total_qty
+        return None, fill_qty, status
+
+    def _process_sell(
+        self, order: Order, fill_price: float, fill_qty: float
+    ):
+        """Execute SELL side. Returns (early_result_or_None, fill_qty, status)."""
+        pos = self._positions.get(order.ticker)
+        if pos is None:
+            return self._make_rejected(order, f"No position in {order.ticker} to sell"), 0.0, None
+
+        fill_qty = min(fill_qty, pos.quantity)
+        if fill_qty < 1e-9:
+            return self._make_rejected(order, "No shares available after clamping"), 0.0, None
+
+        requested_qty = order.quantity * self._config.fill_fraction
+        was_clamped = fill_qty < requested_qty - 1e-9
+        cost = fill_qty * fill_price
+        self._cash += cost
+        pos.quantity -= fill_qty
+        if pos.quantity < 1e-9:
+            del self._positions[order.ticker]
+
+        status = OrderStatus.PARTIAL if was_clamped else (
+            OrderStatus.PARTIAL if self._config.fill_fraction < 1.0 else OrderStatus.FILLED
+        )
+        return None, fill_qty, status
 
     def cancel_order(self, order_id: str) -> bool:
         return False  # MockBroker doesn't track pending orders

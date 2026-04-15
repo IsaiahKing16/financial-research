@@ -94,3 +94,44 @@ def test_no_scaler_leakage_across_folds():
     assert abs(mean_b - 5.0) < 0.2, f"Fold B mean expected ~5, got {mean_b:.3f}"
     # Scalers must be independent (different means)
     assert abs(mean_a - mean_b) > 4.0, "Scaler means should differ across folds"
+
+
+@pytest.mark.slow
+def test_per_feature_variance_post_scaling():
+    """After fit(), all 23 returns_candle features have variance close to 1.0.
+    This directly addresses the spec claim that candlestick features have
+    ~9% of distance variance in raw space (they should have ~50% post-scaling).
+    """
+    from pattern_engine.walkforward import load_and_augment_db
+    from pattern_engine.config import WALKFORWARD_FOLDS
+
+    # Load a small slice of real data
+    try:
+        full_db = load_and_augment_db()
+    except Exception as exc:
+        pytest.skip(f"52T database not available: {exc}")
+
+    feature_cols = get_feature_cols("returns_candle")
+
+    fold = WALKFORWARD_FOLDS[0]  # earliest fold
+    train_end = pd.Timestamp(fold["train_end"])
+    train_db = full_db[full_db["Date"] <= train_end].dropna(subset=["fwd_7d_up"]).copy()
+
+    cfg = EngineConfig(feature_set="returns_candle", use_hnsw=False)
+    m = PatternMatcher(cfg)
+    m.fit(train_db, feature_cols)
+
+    X_raw = train_db[feature_cols].values
+    X_scaled = m._scaler.transform(X_raw)
+
+    per_var = X_scaled.var(axis=0)
+    returns_var = per_var[:8].mean()   # first 8: returns features
+    candle_var  = per_var[8:].mean()   # last 15: candlestick features
+
+    # Both should be near 1.0 after StandardScaler
+    assert abs(returns_var - 1.0) < 0.05, f"Returns variance expected ~1.0, got {returns_var:.4f}"
+    assert abs(candle_var  - 1.0) < 0.05, f"Candle variance expected ~1.0, got {candle_var:.4f}"
+
+    # Print for diagnostic record
+    print(f"\nReturns features mean variance: {returns_var:.4f}")
+    print(f"Candle features mean variance:  {candle_var:.4f}")

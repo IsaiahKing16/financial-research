@@ -29,8 +29,9 @@ from datetime import date as Date
 from enum import Enum
 from typing import Dict, List, Optional, Tuple
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from pattern_engine.contracts.finite_types import FiniteFloat
 from trading_system.contracts.decisions import (
     EvaluatorSnapshot,
     EvaluatorStatus,
@@ -59,13 +60,13 @@ class SystemCommand(str, Enum):
 
 class EquityState(BaseModel):
     """Current capital accounting."""
-    model_config = {"frozen": True}
+    model_config = ConfigDict(frozen=True, allow_inf_nan=False)
 
-    total_equity: float = Field(gt=0, description="Total portfolio value (cash + positions)")
-    cash: float = Field(ge=0, description="Uninvested cash balance")
-    invested_capital: float = Field(ge=0, description="Capital in open positions")
-    peak_equity: float = Field(gt=0, description="All-time high equity (for drawdown calc)")
-    inception_equity: float = Field(gt=0, description="Starting equity (for total return calc)")
+    total_equity: FiniteFloat = Field(gt=0, description="Total portfolio value (cash + positions)")
+    cash: FiniteFloat = Field(ge=0, description="Uninvested cash balance")
+    invested_capital: FiniteFloat = Field(ge=0, description="Capital in open positions")
+    peak_equity: FiniteFloat = Field(gt=0, description="All-time high equity (for drawdown calc)")
+    inception_equity: FiniteFloat = Field(gt=0, description="Starting equity (for total return calc)")
 
     @model_validator(mode="after")
     def equity_components_consistent(self) -> "EquityState":
@@ -144,7 +145,7 @@ class PositionsState(BaseModel):
 
 class RiskState(BaseModel):
     """Risk engine parameters and current risk metrics."""
-    model_config = {"frozen": True}
+    model_config = ConfigDict(frozen=True, allow_inf_nan=False)
 
     stop_loss_atr_multiple: float = Field(gt=0.0, default=3.0, description="ATR stop multiplier")
     max_holding_days: int = Field(ge=1, default=14)

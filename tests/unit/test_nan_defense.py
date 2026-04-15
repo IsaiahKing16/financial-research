@@ -137,3 +137,46 @@ def test_trade_event_valid_construction():
         execution_latency_seconds=0.0,
     )
     assert t.fill_price == 150.0
+
+
+def test_calibrated_probability_rejects_nan():
+    """CalibratedProbability rejects NaN — this is the ML/execution boundary."""
+    from pattern_engine.contracts.signals import CalibratedProbability
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        CalibratedProbability(
+            query_ticker="AAPL",
+            query_date=__import__("datetime").date(2024, 1, 2),
+            raw_prob=float("nan"),
+            calibrated_prob=0.70,
+            n_neighbors_found=50,
+            mean_distance=1.2,
+        )
+
+
+def test_engine_state_rejects_nan_scaler_params():
+    """EngineState rejects NaN in scaler_mean (would corrupt distance computation)."""
+    import hashlib
+    import json
+    from pattern_engine.contracts.state import EngineState
+    from pydantic import ValidationError
+
+    # Build a valid config_hash from a dummy config
+    dummy = json.dumps({"dummy": True}, sort_keys=True)
+    valid_hash = hashlib.sha256(dummy.encode()).hexdigest()
+
+    feature_cols = [f"f{i}" for i in range(23)]
+
+    with pytest.raises(ValidationError):
+        EngineState(
+            feature_cols=feature_cols,
+            scaler_mean=[float("nan")] * 23,
+            scaler_scale=[1.0] * 23,
+            n_samples=100,
+            matcher_backend="balltree",
+            matcher_params={"backend": "balltree", "n_samples_fitted": 100},
+            config_hash=valid_hash,
+            fit_timestamp="2024-01-01T00:00:00+00:00",
+            feature_set_name="returns_candle",
+        )

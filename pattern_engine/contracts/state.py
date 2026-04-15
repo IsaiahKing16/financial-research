@@ -26,7 +26,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 import numpy as np
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 # ─── EngineState ──────────────────────────────────────────────────────────────
@@ -66,7 +66,7 @@ class EngineState(BaseModel):
         mean = restored.scaler_mean_array    # np.ndarray
         scale = restored.scaler_scale_array  # np.ndarray
     """
-    model_config = {"frozen": True}
+    model_config = ConfigDict(frozen=True, allow_inf_nan=False)
 
     # Feature column specification
     feature_cols: List[str] = Field(
@@ -126,6 +126,24 @@ class EngineState(BaseModel):
                 f"but feature_cols has {n_features}"
             )
         return self
+
+    @field_validator("scaler_mean", "scaler_scale")
+    @classmethod
+    def _require_finite_scaler(cls, v: List[float]) -> List[float]:
+        """Scaler arrays must contain only finite values.
+
+        A NaN or Inf in scaler_mean or scaler_scale would corrupt every
+        distance computation silently — the KNN search would return garbage
+        neighbors without any error.
+        """
+        import math
+        bad = [i for i, x in enumerate(v) if not math.isfinite(x)]
+        if bad:
+            raise ValueError(
+                f"Scaler values at indices {bad} are NaN or Inf. "
+                "A corrupt scaler would produce invalid distances."
+            )
+        return v
 
     @field_validator("scaler_scale")
     @classmethod

@@ -10,6 +10,7 @@ Tests that:
 Linear: SLE-57
 """
 
+import pandas as pd
 import pytest
 from datetime import date
 from pydantic import ValidationError
@@ -256,3 +257,81 @@ class TestDailySnapshot:
             self._valid_snapshot(drawdown_from_peak=-0.1)
         with pytest.raises(ValidationError):
             self._valid_snapshot(drawdown_from_peak=1.5)
+
+
+# ─── Walkforward temporal integrity ─────────────────────────────
+
+
+def test_run_fold_raises_on_overlapping_dates():
+    """run_fold raises RuntimeError when train_end >= val_start (temporal leakage)."""
+    from pattern_engine.walkforward import run_fold
+
+    bad_fold = {
+        "label": "overlap_test",
+        "train_end": "2020-01-15",
+        "val_start": "2020-01-15",   # same day — overlap
+        "val_end":   "2020-06-30",
+    }
+    dummy_db = pd.DataFrame({
+        "Date": pd.date_range("2015-01-01", periods=10),
+        "Ticker": "TEST",
+        "fwd_7d_up": 0.0,
+    })
+    with pytest.raises(RuntimeError, match="train_end.*val_start"):
+        run_fold(bad_fold, dummy_db)
+
+
+# ─── Murphy BSS identity ─────────────────────────────────────────
+
+
+def test_murphy_bss_identity():
+    """BSS identity: |REL - RES + UNC - BS| < 1e-6 after every decomposition."""
+    import numpy as np
+    from pattern_engine.walkforward import _murphy_decomposition
+
+    rng = np.random.default_rng(42)
+    probs = rng.uniform(0.3, 0.8, 200)
+    y_true = rng.integers(0, 2, 200).astype(float)
+
+    rel, res, unc = _murphy_decomposition(probs, y_true)
+    bs = float(np.mean((probs - y_true) ** 2))
+
+    # BSS identity: BS = REL - RES + UNC  (float64 arithmetic; tolerance 1e-4)
+    identity_residual = abs(rel - res + unc - bs)
+    assert identity_residual < 1e-4, (
+        f"Murphy BSS identity violated: |REL-RES+UNC-BS| = {identity_residual:.2e} "
+        f"(REL={rel:.6f}, RES={res:.6f}, UNC={unc:.6f}, BS={bs:.6f})"
+    )
+
+
+# ─── icontract guards on _prepare_features ──────────────────────
+
+
+def test_prepare_features_rejects_nan_input():
+    """_prepare_features raises icontract.ViolationError on NaN input."""
+    import numpy as np
+    import pandas as pd
+    import icontract
+    from pattern_engine.config import EngineConfig
+    from pattern_engine.matcher import PatternMatcher
+    from pattern_engine.features import get_feature_cols
+
+    feature_cols = get_feature_cols("returns_only")
+    cfg = EngineConfig(feature_set="returns_only", use_hnsw=False)
+    m = PatternMatcher(cfg)
+
+    # Fit on clean data first
+    rng = np.random.default_rng(0)
+    n = 100
+    X = rng.normal(0, 1.0, (n, 8))
+    df = pd.DataFrame(X, columns=feature_cols)
+    df["Ticker"] = "TEST"
+    df["Date"] = pd.date_range("2018-01-01", periods=n)
+    df["fwd_7d_up"] = rng.integers(0, 2, n).astype(float)
+    m.fit(df, feature_cols)
+
+    # Now try to prepare features with NaN
+    X_bad = X.copy()
+    X_bad[0, 0] = float("nan")
+    with pytest.raises(icontract.ViolationError):
+        m._prepare_features(X_bad, fit_scaler=False)

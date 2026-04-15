@@ -36,6 +36,7 @@ from typing import Optional
 
 _log = logging.getLogger(__name__)
 
+import icontract
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
@@ -145,6 +146,15 @@ class PatternMatcher:
     # Stage 1 — Feature preparation
     # ──────────────────────────────────────────────────────────────────────────
 
+    @icontract.require(
+        lambda X_raw: np.all(np.isfinite(X_raw)),
+        "Feature matrix must be finite (no NaN or Inf). "
+        "Check upstream data pipeline for missing values."
+    )
+    @icontract.ensure(
+        lambda result: np.all(np.isfinite(result)),
+        "Scaled feature matrix must be finite after transformation."
+    )
     def _prepare_features(
         self,
         X_raw: np.ndarray,

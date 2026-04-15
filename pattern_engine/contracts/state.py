@@ -265,7 +265,11 @@ class EngineState(BaseModel):
         try:
             config_dict = config.model_dump() if hasattr(config, "model_dump") else vars(config)
             config_json = json.dumps(config_dict, sort_keys=True, default=str)
-        except (TypeError, AttributeError):
+        except (TypeError, AttributeError) as exc:
+            import logging
+            logging.getLogger(__name__).debug(
+                "SharedState validation check failed: %s — returning False", exc
+            )
             return False
 
         current_hash = hashlib.sha256(config_json.encode()).hexdigest()

@@ -28,8 +28,11 @@ Linear: Phase 2, Task T2.1
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from typing import Optional
+
+import icontract
 
 
 # ─── Config ───────────────────────────────────────────────────────────────────
@@ -127,6 +130,22 @@ def compute_kelly_fraction(p: float, b: float) -> float:
     return (p * b - q) / b
 
 
+@icontract.require(
+    lambda confidence: math.isfinite(confidence),
+    "confidence must be finite (not NaN/inf).",
+)
+@icontract.require(
+    lambda b_ratio: math.isfinite(b_ratio),
+    "b_ratio must be finite (not NaN/inf).",
+)
+@icontract.require(
+    lambda atr_pct: atr_pct is None or math.isfinite(atr_pct),
+    "atr_pct must be finite when provided (not NaN/inf).",
+)
+@icontract.ensure(
+    lambda result: not result.approved or math.isfinite(result.position_pct),
+    "approved result must have finite position_pct.",
+)
 def size_position(
     confidence: float,
     b_ratio: float,

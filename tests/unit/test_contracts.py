@@ -10,6 +10,7 @@ Tests that:
 Linear: SLE-57
 """
 
+import icontract
 import pandas as pd
 import pytest
 from datetime import date
@@ -336,3 +337,39 @@ def test_prepare_features_rejects_nan_input():
     X_bad[0, 0] = float("nan")
     with pytest.raises(icontract.ViolationError):
         m._prepare_features(X_bad, fit_scaler=False)
+
+
+# ─── position_sizer icontract guards (P8-PRE-6D) ──────────────────────────────
+
+class TestSizePositionIcontract:
+    """P8-PRE-6D: size_position must reject NaN/inf inputs via icontract."""
+
+    def test_rejects_nan_confidence(self):
+        """size_position raises ViolationError on NaN confidence."""
+        from trading_system.position_sizer import size_position
+        with pytest.raises(icontract.ViolationError):
+            size_position(confidence=float("nan"), b_ratio=1.2)
+
+    def test_rejects_inf_confidence(self):
+        """size_position raises ViolationError on infinite confidence."""
+        from trading_system.position_sizer import size_position
+        with pytest.raises(icontract.ViolationError):
+            size_position(confidence=float("inf"), b_ratio=1.2)
+
+    def test_rejects_nan_b_ratio(self):
+        """size_position raises ViolationError on NaN b_ratio."""
+        from trading_system.position_sizer import size_position
+        with pytest.raises(icontract.ViolationError):
+            size_position(confidence=0.65, b_ratio=float("nan"))
+
+    def test_rejects_nan_atr_pct(self):
+        """size_position raises ViolationError on NaN atr_pct."""
+        from trading_system.position_sizer import size_position
+        with pytest.raises(icontract.ViolationError):
+            size_position(confidence=0.65, b_ratio=1.2, atr_pct=float("nan"))
+
+    def test_valid_inputs_pass_contracts(self):
+        """size_position does not raise on valid inputs."""
+        from trading_system.position_sizer import size_position
+        result = size_position(confidence=0.65, b_ratio=1.2)
+        assert result.approved is True

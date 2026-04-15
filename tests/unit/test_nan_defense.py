@@ -14,6 +14,10 @@ def test_finite_float_rejects_nan():
     with pytest.raises(ValidationError):
         M(price=float("nan"))
 
+    # String "nan" from JSON deserializers should also be rejected
+    with pytest.raises(ValidationError):
+        M(price="nan")
+
 
 def test_finite_float_rejects_inf():
     """FiniteFloat type alias rejects positive and negative infinity."""

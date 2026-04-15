@@ -382,6 +382,16 @@ def run_fold(
     # Murphy decomposition on scored rows only
     if scored_mask.any():
         rel, res, unc = _murphy_decomposition(probs_hold[scored_mask], y_true[scored_mask])
+        # BSS identity guard: BS = REL - RES + UNC  (Murphy decomposition invariant)
+        bs_val = float(np.mean((probs_hold[scored_mask] - y_true[scored_mask]) ** 2))
+        identity_residual = abs(rel - res + unc - bs_val)
+        if identity_residual > 1e-6:
+            raise RuntimeError(
+                f"Murphy BSS identity violated in fold '{fold.get('label', '?')}': "
+                f"|REL-RES+UNC-BS| = {identity_residual:.2e}. "
+                "This indicates a bug in _murphy_decomposition. "
+                f"REL={rel:.8f}, RES={res:.8f}, UNC={unc:.8f}, BS={bs_val:.8f}"
+            )
     else:
         rel, res, unc = float("nan"), float("nan"), base_rate * (1.0 - base_rate)
 

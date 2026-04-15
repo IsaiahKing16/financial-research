@@ -45,7 +45,7 @@ matching on return fingerprints. Generates probabilistic BUY/SELL/HOLD signals.
 
 ## Critical Rules
 
-1. **Run tests first.** `PYTHONUTF8=1 py -3.12 -m pytest tests/ -q -m "not slow"` — 908 tests, all must pass.
+1. **Run tests first.** `PYTHONUTF8=1 py -3.12 -m pytest tests/ -q -m "not slow"` — 945 tests, all must pass.
 2. **Numbers require provenance.** Any claimed metric must trace to walk-forward results
    or experiment logs. If it cannot be traced, it is fabricated. No exceptions.
 3. **Do NOT modify `prepare.py` or this file** unless explicitly asked.
@@ -53,6 +53,25 @@ matching on return fingerprints. Generates probabilistic BUY/SELL/HOLD signals.
 5. **nn_jobs=1** always. Prevents Windows/Py3.12 joblib deadlock.
 6. **3-strike rule:** If three consecutive attempts at the same fix fail, STOP. Log what
    was tried in the session log and escalate.
+
+## Power of 10 Coding Standards (NASA Holzmann — P8-PRE-5/6, ADR-008–012)
+
+All new production code in `pattern_engine/` and `trading_system/` must follow these rules.
+Violations require a documented waiver in the relevant ADR.
+
+- **R4 (function length):** New functions ≤60 lines / ≤50 statements. Splits required for
+  any new function that would exceed this. Sequential-pipeline waivers must be documented.
+- **R5/R10 (contracts):** Add `@icontract.require`/`@icontract.ensure` to every new public
+  API function. Guard NaN/Inf inputs with `math.isfinite()`. Use `FiniteFloat` (not `float`)
+  for execution-layer financial quantities in Pydantic models.
+- **R7 (no silent swallows):** Never `except ...: pass`. Either re-raise, raise a typed
+  exception (`from None` for translation), or log + re-raise. Bare `except Exception: pass`
+  is forbidden.
+- **R9 (zero new warnings):** New code must introduce 0 new ruff/mypy/bandit findings.
+  Existing baseline (601 ruff) is frozen — do not add to it.
+- **No recursion (R1):** Use iterative loops. No recursive calls in production paths.
+- ADR index: `docs/adr/` — ADR-008 (static analysis), ADR-009 (FiniteFloat),
+  ADR-011 (icontract), ADR-012 (P10 audit findings + waivers)
 
 ## Locked Settings (do not change without new experiment evidence)
 
@@ -99,48 +118,40 @@ regime=hold_spy_threshold+0.05, horizon=fwd_7d_up, stop_loss_atr_multiple=3.0
 - `docs/FPPE_TRADING_SYSTEM_DESIGN.md` v0.3 — Trading layer architecture
 - `docs/campaigns/PHASE_3Z_CAMPAIGN.md` — Full Phase 3Z rebuild history (SLE-51–89)
 - `docs/CANDLESTICK_CATEGORIZATION_DESIGN.md` v0.2 — Future Phase 6
-- `docs/PHASE2_SYSTEM_DESIGN.md`, `docs/PHASE2_RISK_ENGINE.md` — Phase 2 spec + campaign (in docs/, NOT docs/campaigns/)
+- `docs/PHASE2_SYSTEM_DESIGN.md`, `docs/PHASE2_RISK_ENGINE.md` — Phase 2 spec + campaign
 - Phase 4 plan: `docs/superpowers/plans/2026-04-06-phase4-portfolio-manager-plan.md`
+- ADRs: `docs/adr/` — ADR-008 (Ruff/mypy/Bandit CI), ADR-009 (FiniteFloat),
+  ADR-010 (structlog), ADR-011 (icontract), ADR-012 (Power of 10 audit)
 
 ## Current Phase
 
-**Phase 4 Portfolio Manager — COMPLETE (2026-04-09)**
-- Plan: `docs/superpowers/plans/2026-04-08-phase4-portfolio-manager-plan.md`
-- Result: Sharpe=2.649, MaxDD=4.4%, max sector=15.0%, mean idle cash=28.0% (2024 fold).
-  8/9 gates PASS; G6 (rejection diversity) sample-size-gated N/A at n=9.
-- Commits on `phase4-portfolio-manager` branch: T4.0b → T4.0 → T4.0c → T4.1a → T4.1b → T4.2 → T4.3 → T4.4.
-- Session log: `docs/session-logs/SESSION_2026-04-09_phase4-t4-1a-through-t4-2.md`
+**NEXT: T8.1 — EOD Pipeline Automation (UNBLOCKED as of 2026-04-15)**
+- Build `scripts/eod_pipeline.py` — 60-day autonomous signal-to-order pipeline
+- Use structlog from day one (ADR-010). All new code must pass Ruff/mypy/Bandit baselines.
+- Zero new ruff findings policy — existing baseline is 601.
 
-**Phase 5 Live Execution Plumbing — COMPLETE (2026-04-09)**
-- Plan: `docs/superpowers/plans/2026-04-09-phase5-live-plumbing-plan.md`
-- Spec: `docs/superpowers/specs/2026-04-09-phase5-live-plumbing-design.md`
-- G1: 100/100 fills ✓, G2: 30-day recon ✓, G3: 0.18s ✓
+**P8-PRE-6 Power of 10 Retroactive Audit — COMPLETE (2026-04-15)**
+- Audited all production files in `pattern_engine/` + `trading_system/` against NASA P10 rules.
+- R7 FIXED: `features.py` silent swallow. R4 improved: CC 35→18, no grade-D/E remain.
+- icontract contracts added to `size_position`, `risk_engine`, `matcher.fit/query`.
+- FiniteFloat added to `portfolio_state` (equity, cash, confidence, position_pct).
+- ADR: `docs/adr/ADR-012-power-of-10-retroactive-audit.md`. 945 tests pass.
 
-**Phase 6 Candlestick Features — COMPLETE (2026-04-09)**
-- 15-column continuous candlestick feature set (5 proportions × 3 timeframes) implemented.
-- Task 6.1: max_distance=2.5 selected (√(23/8) scaling; AvgK≥20 all 6 folds).
-- Task 6.2: returns_candle wins 5/6 folds vs returns_only. GATE PASS.
-- Task 6.3: body_position KEPT (gate DROP at 3/6 but magnitude asymmetry favors 23D in 2023/2024-Val).
-- Locked: feature_set=returns_candle, max_distance=2.5. 846 tests pass.
-
-**Phase 7 Model Enhancements — COMPLETE (2026-04-10)**
-- E1 BMA: FAIL | E2 OWA: FAIL | E3 DTW: FAIL | E4 Conformal: FAIL | E5 LOF: DEFERRED | E6 STUMPY: DEFERRED
-- Root cause: 52T probs cluster [0.50–0.59], below 0.65 threshold — calibration improvements structurally impossible.
-- E5/E6 deferred pending new research direction. All 6 flags remain False. 858 tests pass.
-- Provenance: results/phase7/enhancement_summary.tsv
+**P8-PRE-5 Power of 10 Hardening — COMPLETE (2026-04-15)**
+- FiniteFloat type, MAX_* constants, error hierarchy, static analysis CI, icontract guards.
+- ADRs: ADR-008 (Ruff/mypy/Bandit), ADR-009 (FiniteFloat), ADR-011 (icontract). 927 tests.
 
 **R3 Optuna Infrastructure — COMPLETE (2026-04-11)**
-- Extracted walkforward.py (~490 lines), sweep.py (~480 lines), experiment_log.py (~70 lines) from phase7_baseline.py
-- OptunaSweep (TPE) + GridSweep with gate penalization, resume support
-- Parity verified: fold 2019 BSS matches baseline_23d.tsv within 1e-6
-- 908 tests pass (+50 new). Branch: p3-optuna-infrastructure (merged).
-- Research roadmap: `docs/research/UNIFIED_RESEARCH_ROADMAP.md` (20 papers, 6 tiers)
+- OptunaSweep (TPE) + GridSweep. 908 tests. Research roadmap: `docs/research/UNIFIED_RESEARCH_ROADMAP.md`
 
-Phase 1–4 summary (for context, not active):
-- H7 regime HOLD: mean_BSS=+0.00033, 3/6 positive folds. Thin margin.
-- Phase 2: Half-Kelly, Sharpe=2.527, 5/6 folds positive Kelly. 2022-Bear Kelly=-0.504.
-- Phase 3: Risk engine, Sharpe=2.659, MaxDD=4.3%. Fatigue OFF (SLE-75 saturates).
-- Phase 4: PM filter, Sharpe=2.649 (regression −0.38%), MaxDD=4.4%. 9/278 rejected, all insufficient_capital.
+**Phase 7 Model Enhancements — COMPLETE (2026-04-10)**
+- E1–E4 FAIL. Root cause: 52T probs cluster [0.50–0.59], below 0.65 threshold.
+- E5/E6 deferred. All 6 flags remain False. Provenance: results/phase7/enhancement_summary.tsv
+
+Phase 1–6 summary (for context, not active):
+- Phase 2: Half-Kelly, Sharpe=2.527. Phase 3: Risk engine, Sharpe=2.659, MaxDD=4.3%.
+- Phase 4: PM filter, Sharpe=2.649, MaxDD=4.4%. Phase 5: Live execution plumbing (G1–G3 ✓).
+- Phase 6: returns_candle(23D), max_distance=2.5, wins 5/6 folds. 846 tests.
 
 ## Session Protocol
 

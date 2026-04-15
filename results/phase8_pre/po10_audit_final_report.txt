@@ -1,0 +1,25 @@
+P8-PRE-6 Power of 10 Retroactive Audit — Final Report
+Date: 2026-04-15
+Branch: p8-pre6-po10-audit
+
+=== TEST SUITE ===
+Pre-audit:  927 passed
+Post-audit: 945 passed (+18 new contract/FiniteFloat tests)
+Status: PASS
+
+=== RADON COMPLEXITY ===
+Pre-6E worst:  query() CC=35 (E), _package_results() CC=23 (D)
+Post-6E worst: query() CC=18 (C), _package_results() CC=16 (C)
+Status: No grade-D or grade-E functions remain.
+
+=== R1 Recursion     === PASS (0 violations)
+=== R2 Bounded loops === PASS (0 violations)
+=== R3 Heap alloc    === PASS (production; MockBroker test-only waiver)
+=== R4 Function len  === PARTIAL (waivers documented in ADR-012)
+=== R5/R10 Asserts   === IMPROVED (critical path protected; waivers for remainder)
+=== R6 Module state  === PASS (0 violations)
+=== R7 Silent swallow=== FIXED (features.py; research/ waivers)
+=== R8 Pointer hops  === PASS (0 violations)
+=== R9 Zero warnings === DEFERRED (601 ruff findings; style sprint pending)
+
+ADR: docs/adr/ADR-012-power-of-10-retroactive-audit.md

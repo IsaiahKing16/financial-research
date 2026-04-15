@@ -59,3 +59,38 @@ def test_standardize_features_false_skips_scaler():
     assert not hasattr(m_raw._scaler, "mean_"), (
         "Scaler should not be fitted when standardize_features=False"
     )
+
+
+def test_no_scaler_leakage_across_folds():
+    """Each PatternMatcher.fit() call produces an independent scaler.
+    Scaler mean must match training data mean, not a global mean."""
+    feature_cols = get_feature_cols("returns_only")
+    rng = np.random.default_rng(0)
+    n = 300
+
+    # Fold A: mean ~0, Fold B: mean ~5.0 (drastically different)
+    X_fold_a = rng.normal(0.0, 1.0, (n, 8))
+    X_fold_b = rng.normal(5.0, 1.0, (n, 8))
+
+    def _make_df(X, offset_days=0):
+        df = pd.DataFrame(X, columns=feature_cols)
+        df["Ticker"] = "TEST"
+        df["Date"] = pd.date_range("2018-01-01", periods=n) + pd.Timedelta(days=offset_days)
+        df["fwd_7d_up"] = rng.integers(0, 2, n).astype(float)
+        return df
+
+    cfg = EngineConfig(feature_set="returns_only", use_hnsw=False)
+
+    m_a = PatternMatcher(cfg)
+    m_a.fit(_make_df(X_fold_a, offset_days=0), feature_cols)
+    mean_a = m_a._scaler.mean_[0]
+
+    m_b = PatternMatcher(cfg)
+    m_b.fit(_make_df(X_fold_b, offset_days=400), feature_cols)
+    mean_b = m_b._scaler.mean_[0]
+
+    # Each scaler must reflect its own training data
+    assert abs(mean_a - 0.0) < 0.2, f"Fold A mean expected ~0, got {mean_a:.3f}"
+    assert abs(mean_b - 5.0) < 0.2, f"Fold B mean expected ~5, got {mean_b:.3f}"
+    # Scalers must be independent (different means)
+    assert abs(mean_a - mean_b) > 4.0, "Scaler means should differ across folds"

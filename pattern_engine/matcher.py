@@ -160,17 +160,24 @@ class PatternMatcher:
             X_weighted: (N, D) float64 array — scaled and weighted.
         """
         cfg = self.config
-        if fit_scaler:
-            X_scaled = self._scaler.fit_transform(X_raw)
+        use_scaling = getattr(cfg, "standardize_features", True)
+
+        if use_scaling:
+            if fit_scaler:
+                X_scaled = self._scaler.fit_transform(X_raw)
+            else:
+                # Guard: sklearn raises AttributeError if transform() is called before fit(),
+                # but the message is cryptic.  Provide a clear RuntimeError instead.
+                if not hasattr(self._scaler, "mean_"):
+                    raise RuntimeError(
+                        "_prepare_features(fit_scaler=False) called before the scaler has "
+                        "been fitted.  Call PatternMatcher.fit() first."
+                    )
+                X_scaled = self._scaler.transform(X_raw)
         else:
-            # Guard: sklearn raises AttributeError if transform() is called before fit(),
-            # but the message is cryptic.  Provide a clear RuntimeError instead.
-            if not hasattr(self._scaler, "mean_"):
-                raise RuntimeError(
-                    "_prepare_features(fit_scaler=False) called before the scaler has "
-                    "been fitted.  Call PatternMatcher.fit() first."
-                )
-            X_scaled = self._scaler.transform(X_raw)
+            # standardize_features=False: pass raw features through unchanged.
+            # Only used in controlled experiments (P8-PRE-4).
+            X_scaled = X_raw.astype(np.float64)
 
         return apply_feature_weights(X_scaled, self._feature_cols, cfg.feature_weights)
 

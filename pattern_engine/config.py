@@ -38,6 +38,13 @@ class EngineConfig:
     feature_set: str = "returns_candle"
     """Feature set name resolved via FeatureRegistry. Default is locked per CLAUDE.md."""
     feature_weights: dict = field(default_factory=dict)
+    standardize_features: bool = True
+    """If True (default), StandardScaler normalizes all features to unit variance
+    before L2 distance computation.  Set to False only in controlled experiments.
+
+    NOTE: StandardScaler is ALREADY applied in _prepare_features (default=True
+    preserves current production behavior).  False is the experimental condition.
+    ADR-007 documents this decision with provenance from the experiment results."""
 
     # ── Forward projection ────────────────────────────────────────────────────
     projection_horizon: str = "fwd_7d_up"

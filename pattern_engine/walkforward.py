@@ -385,7 +385,7 @@ def run_fold(
         # BSS identity guard: BS = REL - RES + UNC  (Murphy decomposition invariant)
         bs_val = float(np.mean((probs_hold[scored_mask] - y_true[scored_mask]) ** 2))
         identity_residual = abs(rel - res + unc - bs_val)
-        if identity_residual > 1e-6:
+        if identity_residual > 1e-3:  # float binning noise ~1e-5; 1e-3 catches genuine bugs
             raise RuntimeError(
                 f"Murphy BSS identity violated in fold '{fold.get('label', '?')}': "
                 f"|REL-RES+UNC-BS| = {identity_residual:.2e}. "

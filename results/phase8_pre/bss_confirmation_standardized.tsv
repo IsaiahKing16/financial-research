@@ -1,0 +1,7 @@
+config	fold	fold_label	BSS_new	BSS_baseline	delta	within_gate	AvgK	runtime_s
+returns_candle_p8pre7	0	2019	0.006241	0.006241	-0.000000	True	41.166000	17.170000
+returns_candle_p8pre7	1	2020-COVID	0.000388	0.000388	0.000000	True	42.165000	20.310000
+returns_candle_p8pre7	2	2021	0.000791	0.000791	-0.000000	True	43.151000	22.380000
+returns_candle_p8pre7	3	2022-Bear	-0.002802	-0.002802	0.000000	True	43.696000	24.610000
+returns_candle_p8pre7	4	2023	-0.001102	-0.001102	0.000000	True	43.451000	26.440000
+returns_candle_p8pre7	5	2024-Val	-0.000013	-0.000013	0.000000	True	43.010000	28.690000

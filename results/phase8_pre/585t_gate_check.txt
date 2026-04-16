@@ -1,0 +1,20 @@
+P8-PRE-1 Gate Check — 585T End-to-End Revalidation
+Date: 2026-04-16
+Commit: 6051142
+
+G1 BSS ≥3/6 positive folds:  0/6  → FAIL
+G2 Sharpe ≥ 1.0:             0.04 → FAIL
+G3 MaxDD ≤ 15%:              4.2% → PASS
+G4 Trades ≥ 50:              200  → PASS
+G5 Win rate ≥ 50%:           47.5% → FAIL
+
+OVERALL: FAIL
+
+Per-fold BSS:
+  2019        : -0.001530
+  2020-COVID  : -0.001297
+  2021        : -0.001313
+  2022-Bear   : -0.044168
+  2023        : -0.024191
+  2024-Val    : -0.001822
+

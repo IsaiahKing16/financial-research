@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Literal, Optional
+from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -19,8 +19,8 @@ class Order(BaseModel):
     side: OrderSide
     quantity: float = Field(gt=0, description="Shares (fractional OK)")
     order_type: Literal["MARKET", "LIMIT"] = "MARKET"
-    limit_price: Optional[float] = None
-    notional: Optional[float] = Field(default=None, description="Dollar amount (audit trail)")
+    limit_price: float | None = None
+    notional: float | None = Field(default=None, description="Dollar amount (audit trail)")
     timestamp: datetime
 
     @field_validator("ticker")
@@ -31,7 +31,7 @@ class Order(BaseModel):
         return v
 
     @model_validator(mode="after")
-    def _validate_limit_price(self) -> "Order":
+    def _validate_limit_price(self) -> Order:
         if self.order_type == "LIMIT" and self.limit_price is None:
             raise ValueError("limit_price is required when order_type='LIMIT'")
         if self.order_type == "MARKET" and self.limit_price is not None:
@@ -49,8 +49,8 @@ class OrderResult(BaseModel):
     filled_quantity: float = Field(ge=0)
     fill_price: float = Field(ge=0)
     latency_ms: float = Field(default=0.0, ge=0)
-    executed_at: Optional[datetime] = None
-    error: Optional[str] = None
+    executed_at: datetime | None = None
+    error: str | None = None
 
     @field_validator("ticker")
     @classmethod

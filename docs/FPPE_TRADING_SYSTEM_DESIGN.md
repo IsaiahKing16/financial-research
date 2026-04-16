@@ -1,8 +1,25 @@
 # FPPE Trading System — Architecture & Design Specification
 
-**Version:** 0.5 (Phase 3.5 Research Integration complete; SLE-47 HNSW + SLE-48 vectorized query)
-**Date:** March 21, 2026
-**Status:** ACTIVE — Phase 3 & 3.5 complete. Phase 4 (strategy evaluator) next.
+**Version:** 0.6 (Phases 1–7 + P8-PRE complete. 945 tests.)
+**Date:** April 15, 2026
+**Status:** ACTIVE — Phases 1–7 + P8-PRE-4/5/6 complete. T8.1 (EOD Pipeline) next.
+
+**Revision notes (v0.6):** Phases 4–7 and P8-PRE-4/5/6 complete. Phase 4: PM filter
+(Sharpe=2.649, MaxDD=4.4%). Phase 5: Execution layer — OrderManager, MockBroker,
+LiveRunner, reconciliation (G1–G3 gates passed). Phase 6: returns_candle(23D) features,
+max_distance=2.5, wins 5/6 folds. Phase 7: E1–E4 enhancement experiments ALL FAIL;
+all flags remain False. P8-PRE: Power of 10 hardening — FiniteFloat type, icontract
+contracts, TradingSystemError hierarchy, static analysis baselines (Ruff/mypy/Bandit).
+ADR-007 through ADR-012. 945 tests pass. Production uses 585T ticker universe
+(52T retained for walk-forward validation only).
+
+**New modules (v0.6):**
+- `trading_system/exceptions.py`: TradingSystemError hierarchy (typed exceptions)
+- `trading_system/broker/`: BaseBroker ABC, Order/OrderResult schemas, MockBroker
+- `trading_system/order_manager.py`: AllocationDecision → Order lifecycle
+- `trading_system/reconciliation.py`: Position reconciliation vs broker
+- `pattern_engine/contracts/finite_types.py`: FiniteFloat validated type
+- `pattern_engine/live.py`: LiveRunner — AllocationDecisions + exit_tickers via OrderManager
 
 **Revision notes (v0.5):** Phase 3.5 Research Integration complete. ATR sweep locked 3.0×. HNSW index (SLE-47) integrated. Vectorized Matcher.query() (SLE-48) replaces per-row iloc. 596 tests passing.
 
@@ -11,7 +28,7 @@
 - **New modules:** `trading_system/portfolio_state.py` (frozen dataclasses: `RankedSignal`, `AllocationDecision`, `PortfolioSnapshot`), `trading_system/portfolio_manager.py` (Layer 3 logic: `rank_signals`, `check_allocation`, `allocate_day`)
 - **Integration:** `BacktestEngine` now accepts `use_portfolio_manager=True` (requires `use_risk_engine=True`). PM pre-filters on count constraints (holding, cooldown, sector limit); risk engine gates on dollar constraints (exposure, capital). Rank order preserved end-to-end.
 - **Backtest validation (2024, 52-ticker universe):** Phase 3 matches Phase 2 exactly — Ann. 15.1%, Sharpe 1.93, Max DD 3.9%, Win rate 52.4%, 103 trades. PM generated 37 portfolio-layer rejections (29 already-holding, 7 cooldown, 1 sector limit).
-- **Test suite:** 556 tests, 0 failures. Layer 3 adds 11 integration tests, 30 unit tests (portfolio_manager), 20 unit tests (portfolio_state).
+- **Test suite (at Phase 3 completion):** 556 tests, 0 failures. Layer 3 added 11 integration tests, 30 unit tests (portfolio_manager), 20 unit tests (portfolio_state). (Current total: 945 tests.)
 - **Phase 3 branch:** `phase3-portfolio-manager` — ready for merge to main.
 
 **Revision notes (v0.3):** Phase 1 backtest on 2024 data. Empirical sweeps set confidence_threshold=0.60 (5 values tested) and max_holding_days=14 (7 windows tested). Result: 22.3% annual, Sharpe 1.82, Max DD 6.9%, beats SPY risk-adjusted. All v1 success criteria passed. CAUTION: 2024 was a strong bull year — re-validate max_holding_days in bear-market data.
@@ -22,7 +39,7 @@
 
 ## 1. Purpose
 
-This document defines the architecture for a four-layer trading system built on top of the Financial Pattern Prediction Engine (FPPE v2.1). The system transforms FPPE's probabilistic BUY/HOLD/SELL signals into simulated trades, tracks performance against defined thresholds, manages risk through volatility-based position sizing, and allocates capital across a 52-ticker universe.
+This document defines the architecture for a trading system built on top of the Financial Pattern Prediction Engine (FPPE). The system transforms FPPE's probabilistic BUY/HOLD/SELL signals into simulated trades, tracks performance against defined thresholds, manages risk through volatility-based position sizing, and allocates capital. Production uses a 585-ticker universe; 52T is retained for walk-forward validation only.
 
 **v1 is long-only.** Short selling will be added in v2 after the long-only system demonstrates positive expectancy after friction. This decision reduces complexity and isolates whether FPPE's BUY signals carry a real, tradeable edge before introducing the additional mechanics of margin, borrow fees, and unlimited-risk stop logic.
 
@@ -452,11 +469,15 @@ The trading system does NOT consume these directly. A **signal adapter** normali
 | Phase | Module | Status | Key Result |
 |-------|--------|--------|------------|
 | 1 | backtest_engine.py (equal-weight) | **DONE** | 22.3% annual, Sharpe 1.82, Max DD 6.9% |
-| 2 | risk_engine.py (ATR sizing) | **DONE** | $9.31 NE/trade, stops=28 at 3.0× ATR |
-| 3 | portfolio_manager.py | **DONE** | 37 PM rejections, matches Phase 2 exactly |
-| 3.5 | Research integration | **DONE** | ATR=3.0× locked, HNSW 54.5×, vectorized query |
-| **4** | **strategy_evaluator.py** | **NEXT** | Rolling metrics, RED/YELLOW/GREEN, TWRR |
-| 5 | Excel dashboard | Future | — |
+| 2 | risk_engine.py (ATR sizing) | **DONE** | $9.31 NE/trade, stops=28 at 3.0x ATR |
+| 3 | portfolio_manager.py | **DONE** | 37 PM rejections, Sharpe=2.659, MaxDD=4.3% |
+| 3.5 | Research integration | **DONE** | ATR=3.0x locked, HNSW 54.5x, vectorized query |
+| 4 | PM filter (strategy_evaluator.py) | **DONE** | Sharpe=2.649, MaxDD=4.4% |
+| 5 | Execution layer (OrderManager, MockBroker, LiveRunner) | **DONE** | G1-G3 gates passed |
+| 6 | Candlestick features (returns_candle 23D) | **DONE** | max_distance=2.5, wins 5/6 folds |
+| 7 | Model enhancements (E1-E4) | **DONE** | All FAIL; flags remain False |
+| P8-PRE | Power of 10 hardening | **DONE** | FiniteFloat, icontract, static analysis. 945 tests |
+| **T8.1** | **EOD Pipeline Automation** | **NEXT** | scripts/eod_pipeline.py |
 | v2 | Shorts, composite ranking, partial exits | Future | After v1 proven on OOS data |
 
 ---

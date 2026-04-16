@@ -1,5 +1,5 @@
 # PROJECT_GUIDE.md — Multi-AI Collaboration Reference
-# Last Updated: 2026-03-21
+# Last Updated: 2026-04-15
 # Owner: Sleep (Isaia)
 # Primary AI: Claude (Anthropic) | Supporting: Gemini, ChatGPT
 
@@ -10,19 +10,23 @@
 You are helping build **FPPE (Financial Pattern Prediction Engine)** — an autonomous
 financial prediction system. The core engine uses K-nearest-neighbor historical
 analogue matching on return fingerprints to generate probabilistic BUY/SELL/HOLD
-signals across a 52-ticker universe.
+signals. Production uses a **585-ticker universe** (52T retained for
+walk-forward validation only).
 
 The project has three codebases:
-1. **`pattern_engine/`** — Python package (21 modules)
-2. **`trading_system/`** — Four-layer trading system built on FPPE signals (Phase 1, 2 & 3 complete)
+1. **`pattern_engine/`** — Python package (21+ modules), beta_abm calibration, icontract contracts
+2. **`trading_system/`** — Trading system built on FPPE signals (Phases 1–7 + P8-PRE complete)
 3. **`research/`** — Pluggable ABCs + Phase C modules (HNSW, vectorized matching)
 4. **`pattern-engine-v2.1.jsx`** — Standalone React demo (claude.ai artifact, no HTTP calls)
 
 **Key design documents (always reference before modifying related code):**
-- `docs/FPPE_TRADING_SYSTEM_DESIGN.md` v0.3 — Architecture spec for all four trading layers
+- `docs/FPPE_TRADING_SYSTEM_DESIGN.md` v0.6 — Architecture spec for trading system (Phases 1-7)
 - `docs/PHASE1_FILE_REVIEW.md` — Structural stability review; all Phase 1 bugs documented and fixed
-- `docs/CANDLESTICK_CATEGORIZATION_DESIGN.md` v0.2 — Future K-NN pre-filtering module (Phase 6)
+- `docs/CANDLESTICK_CATEGORIZATION_DESIGN.md` v0.2 — Candlestick feature design (Phase 6 complete)
 - `docs/PHASE2_SYSTEM_DESIGN.md` — Phase 2 system design
+- `docs/adr/` — ADR-007 through ADR-012 (VOL_NORM, static analysis, FiniteFloat, structlog, icontract, P10 audit)
+- `docs/LOCKED_SETTINGS_PROVENANCE.md` — Full provenance trail for all locked hyperparameters
+- `docs/PHASE_COMPLETION_LOG.md` — Phase history with key metrics
 
 **Do NOT modify `prepare.py` or this file unless explicitly asked.**
 
@@ -86,18 +90,26 @@ pattern_engine/                    # 21 modules, version 2.1.0
 └── reliability.py                 # Atomic writes, lock files, progress logging
 ```
 
-### Trading System Package (Phase 1, 2 & 3 complete)
+### Trading System Package (Phases 1–7 + P8-PRE complete)
 
 ```
-trading_system/                    # 9 modules, Phase 1, 2 & 3 complete
+trading_system/                    # 14+ modules, Phases 1-7 + P8-PRE complete
 ├── __init__.py                    # Full package exports (all primary symbols)
 ├── config.py                      # TradingConfig: 7 frozen sub-configs, from_profile()
 ├── signal_adapter.py              # Normalizes FPPE K-NN / DL outputs → UnifiedSignal
 ├── backtest_engine.py             # Layer 1: Trade simulation; Phase 1/2/3 paths + SlipDeficit TTF gate
+├── strategy_evaluator.py          # Phase 4: Signal → position decision with risk overlays
 ├── risk_state.py                  # Phase 2: PositionDecision, StopLossEvent, RiskState dataclasses
-├── risk_engine.py                 # Phase 2: ATR sizing, drawdown scalar, stop-loss check
-├── portfolio_state.py             # Phase 3: RankedSignal, AllocationDecision, PortfolioSnapshot
-├── portfolio_manager.py           # Phase 3: rank_signals, check_allocation, allocate_day
+├── risk_engine.py                 # Phase 3: Stateless orchestrator — ATR, drawdown brake, risk adj
+├── position_sizer.py              # Phase 2: Half-Kelly with SizingConfig
+├── portfolio_state.py             # Phase 4: RankedSignal, AllocationDecision, PortfolioSnapshot (FiniteFloat)
+├── portfolio_manager.py           # Phase 4: rank_signals, check_allocation, allocate_day
+├── broker/                        # Phase 5: BaseBroker ABC, Order/OrderResult schemas, MockBroker
+├── order_manager.py               # Phase 5: AllocationDecision → Order lifecycle
+├── reconciliation.py              # Phase 5: Position reconciliation vs broker
+├── exceptions.py                  # P8-PRE-5: TradingSystemError hierarchy (typed exceptions)
+├── drift_monitor.py               # Feature drift detection
+├── risk_overlays/                 # Fatigue accumulation, liquidity congestion
 ├── run_phase1.py                  # Phase 1 entry point (equal-weight, cached signals)
 └── run_phase2.py                  # Phase 1 vs Phase 2 comparison runner
 ```
@@ -110,7 +122,7 @@ research/                          # Pluggable ABCs + Phase C experimental modul
 ```
 Enable HNSW: `EngineConfig(use_hnsw=True)` — default False (ball_tree unchanged)
 
-**Trading system design reference:** `docs/FPPE_TRADING_SYSTEM_DESIGN.md` v0.3
+**Trading system design reference:** `docs/FPPE_TRADING_SYSTEM_DESIGN.md` v0.6
 **Phase 1 bug audit:** `docs/PHASE1_FILE_REVIEW.md` — 9 findings, all fixed
 
 ### Legacy Files (reference only — do not modify)
@@ -192,10 +204,11 @@ CRM, AMD, NFLX, INTC, CSCO, QCOM, TXN, MU, PYPL
 - **Validation:** 2024-01-01 → 2024-12-31 (~13,104 rows)
 - **Test:** 2025-01-01 → 2026-01-28 (13,936 rows — held out, do not touch)
 
-### Active Feature Set: Return-Only (8 features) — LOCKED
-Full 16-feature configs produced BSS ≈ −0.135, 3.5× worse. Only these 8 used:
+### Active Feature Set: returns_candle (23 features) — LOCKED (Phase 6, 2026-04-09)
+8 VOL_NORM returns + 15 candlestick features. Wins 5/6 folds vs returns_only.
+Previous 8-feature returns_only set superseded. Full 16-feature configs produced BSS ~ -0.135.
 ```
-ret_1d, ret_3d, ret_7d, ret_14d, ret_30d, ret_45d, ret_60d, ret_90d
+ret_1d, ret_3d, ret_7d, ret_14d, ret_30d, ret_45d, ret_60d, ret_90d + 15 candlestick
 ```
 
 ### Feature Weights (v2.1, returns_only(8) set)
@@ -204,8 +217,8 @@ Default uniform (1.0 for all). Non-default weights must be validated via sweep b
 ### Additional Feature Sets (available, pluggable via config)
 | Set | Features | Status |
 |-----|----------|--------|
-| `returns_only` | 8 trailing returns | **Default — proven** |
-| `returns_candle` | 8 returns + 15 candlestick | Available |
+| `returns_only` | 8 trailing returns | Superseded (Phase 6) |
+| `returns_candle` | 8 returns + 15 candlestick | **Default — locked (Phase 6, 2026-04-09)** |
 | `returns_vol` | 8 returns + 4 volatility | Available |
 | `returns_sector` | 8 returns + 3 sector-relative | Available |
 | `returns_overnight` | 8 returns + 4 overnight/session | New — research-driven |
@@ -246,27 +259,28 @@ Three orthogonal dimensions → 2×2×2 = 8 states:
 
 Fallback chain when insufficient matches: octet (8) → multi (4) → binary (2) → unfiltered
 
-### Calibration Double-Pass
+### Calibration Double-Pass (beta_abm — locked since H5, 2026-04-02)
 The calibrator trains on training data querying itself (not val data):
 1. Build K-NN index from training data
 2. Query training data against itself (cal_frac=0.76 holdout)
-3. Fit Platt sigmoid on self-query frequencies + known outcomes
+3. Fit beta_abm calibrator on self-query frequencies + known outcomes
 4. No look-ahead bias — calibrator sees same distribution as inference
 
 ### Locked Hyperparameters
 ```python
 distance_metric = "euclidean"        # Cosine collapsed at 93.3% saturation
-max_distance = 1.1019                # Quantile-calibrated (AvgK ~42)
+feature_set = "returns_candle"       # 23D: 8 VOL_NORM + 15 candlestick (Phase 6, 2026-04-09)
+max_distance = 2.5                   # 23D calibrated (Phase 6 sweep; 8D was 0.90)
 top_k = 50                           # Neighbourhood ceiling
 distance_weighting = "uniform"       # Beats inverse (sweep 1)
 projection_horizon = "fwd_7d_up"     # Best BSS across horizons
 confidence_threshold = 0.65          # Best accuracy trade-off (sweep 1)
-agreement_spread = 0.10              # Minimum directional agreement
-min_matches = 10                     # Minimum analogues required
-calibration_method = "platt"         # Generalises best across folds
+agreement_spread = 0.05              # Minimum directional agreement
+min_matches = 5                      # Minimum analogues required
+calibration_method = "beta_abm"      # Locked since H5 (2026-04-02)
 cal_frac = 0.76                      # Best calibration holdout
-regime_filter = True                 # Binary mode (Bull/Bear)
-regime_mode = "binary"               # Proven default
+regime_filter = True                 # H7 (2026-04-06): hold mode active in production
+regime_mode = "hold"                 # H7: bear rows (SPY ret_90d < +0.05) → base_rate (HOLD)
 nn_jobs = 1                          # Prevents Win/Py3.12 joblib deadlock
 batch_size = 256                     # Memory-efficient batched queries
 ```
@@ -303,14 +317,14 @@ BSS < 0    = worse than base rate
 - 2024 fold = positive BSS — genuine predictive skill on unseen data
 - 2022 bear market = worst fold (regime shift, fewer bear training analogues)
 - Expanding window means later folds have more training data → better performance
-- 596 automated tests all passing (pattern_engine + trading_system + research)
+- **945 automated tests** all passing (pattern_engine + trading_system + research)
 
 ---
 
 ## 7. TRADING SYSTEM RESULTS
 
-**Status:** Phase 1 complete. Phase 2 complete. Phase 3 complete. Phase 3.5 (Research Integration) complete. Phase C Domain 1 complete (HNSW, SLE-47). SLE-48 (vectorized query) complete. Phase 4 (Strategy Evaluator) is next.
-**Full specification:** `docs/FPPE_TRADING_SYSTEM_DESIGN.md` v0.4
+**Status:** Phases 1–7 + P8-PRE-4/5/6 complete. 945 tests. T8.1 (EOD Pipeline) next.
+**Full specification:** `docs/FPPE_TRADING_SYSTEM_DESIGN.md` v0.6
 **Structural audit:** `docs/PHASE1_FILE_REVIEW.md` — 9 findings (3 critical, 5 significant, 1 deferred)
 
 ### 7.1 Phase 1 Configuration
@@ -396,14 +410,14 @@ All findings from `docs/PHASE1_FILE_REVIEW.md`:
 | HNSW approximate NN (SLE-47) | 54.5× speedup, recall@50=0.9996, 0.03ms/query | COMPLETE — `EngineConfig(use_hnsw=True)` |
 | Vectorized Matcher.query() (SLE-48) | 12,508 rows/sec; per-row iloc eliminated | COMPLETE — default path |
 
-### 7.7 Open Items Entering Phase 4
+### 7.7 Current Open Items
 
 | Item | Priority |
 |------|----------|
-| Phase 4: strategy_evaluator.py (rolling metrics, RED/YELLOW/GREEN, TWRR) | **High — next** |
+| T8.1: EOD Pipeline Automation (scripts/eod_pipeline.py) | **High — next** |
 | Phase C Domain 2: vectorized feature extraction | Medium |
 | Conservative profile empirical validation (run threshold_sweep.py at 0.68) | Medium |
-| D3: TWRR decomposition in strategy_evaluator.py | Low — Phase 4 |
+| Ticker expansion beyond 585T (S&P 500 -> Russell 1000 -> 3000) | Medium |
 
 ### 7.7 Phase 2 — Risk engine (complete)
 
@@ -449,7 +463,7 @@ which Python 3.12 picks up automatically — no activation step needed.
 ```cmd
 python -m pytest tests/ -v
 ```
-All **596 tests** must pass (pattern_engine + trading_system + research).
+All **945 tests** must pass (pattern_engine + trading_system + research).
 
 ### Key Entry Points
 
@@ -483,13 +497,13 @@ print(results.sort_values("mean_bss", ascending=False).head(10))
 |---------|-------|----------|
 | Distance metric | Euclidean | Cosine saturated at 93.3% |
 | Distance weighting | "uniform" | Beats inverse (sweep 1) |
-| Feature set | returns_only (8) | Full 16-feature 3.5× worse |
-| Calibration method | Platt | Generalises best across folds |
+| Feature set | returns_candle (23) | Phase 6: 5/6 folds beat returns_only (2026-04-09) |
+| Calibration method | beta_abm | Locked H5 (2026-04-02); +0.001-0.002 BSS vs Platt |
 | cal_frac | 0.76 | Zero-crossing point for positive BSS |
-| max_distance | 1.1019 | Quantile-calibrated, AvgK ~42 |
+| max_distance | 2.5 | 23D calibrated Phase 6 sweep; 8D was 0.90 |
 | top_k | 50 | Neighbourhood ceiling |
 | confidence_threshold | 0.65 | Best accuracy trade-off |
-| regime_filter | True (binary) | Prevents cross-regime contamination |
+| regime_filter | True (mode=hold) | H7: bear rows -> base_rate, SPY threshold=+0.05 |
 | nn_jobs | 1 | Prevents Win/Py3.12 joblib deadlock |
 | Horizon | fwd_7d_up | Best BSS across horizons |
 
@@ -515,24 +529,32 @@ print(results.sort_values("mean_bss", ascending=False).head(10))
 
 | Document | Version | Purpose |
 |----------|---------|---------|
-| `docs/FPPE_TRADING_SYSTEM_DESIGN.md` | v0.5 | Architecture spec for all 4 trading layers |
-| `docs/PHASE1_FILE_REVIEW.md` | — | Phase 1 bug audit (all fixed) |
-| `docs/CANDLESTICK_CATEGORIZATION_DESIGN.md` | v0.2 | Future Phase 6 K-NN pre-filter |
-| `docs/PHASE2_SYSTEM_DESIGN.md` | — | Phase 2 risk engine spec |
+| `docs/FPPE_TRADING_SYSTEM_DESIGN.md` | v0.6 | Architecture spec for trading system (Phases 1-7) |
+| `docs/PHASE1_FILE_REVIEW.md` | -- | Phase 1 bug audit (all fixed) |
+| `docs/CANDLESTICK_CATEGORIZATION_DESIGN.md` | v0.2 | Candlestick feature design (Phase 6 complete) |
+| `docs/PHASE2_SYSTEM_DESIGN.md` | -- | Phase 2 risk engine spec |
+| `docs/adr/` | ADR-007-012 | Architecture Decision Records (P8-PRE) |
+| `docs/LOCKED_SETTINGS_PROVENANCE.md` | -- | Full provenance for locked hyperparameters |
+| `docs/PHASE_COMPLETION_LOG.md` | -- | Phase history with key metrics |
 
 ---
 
 ## 13. ROADMAP
 
 ### Completed
-- [x] v2.1 pattern_engine (21 modules, 596 tests, Bayesian sweep, schema validation, reliability infra)
-- [x] Phase 1: 22.3% annual, Sharpe 1.82, Max DD 6.9% — beats SPY risk-adjusted
-- [x] Phase 2: ATR risk engine — $9.31 NE/trade, stop_loss_atr_multiple=3.0× locked
+- [x] v2.1 pattern_engine (21 modules, Bayesian sweep, schema validation, reliability infra)
+- [x] Phase 1: 22.3% annual, Sharpe 1.82, Max DD 6.9% -- beats SPY risk-adjusted
+- [x] Phase 2: ATR risk engine -- $9.31 NE/trade, stop_loss_atr_multiple=3.0x locked
 - [x] Phase 3: portfolio_manager (confidence ranking, sector allocation, capital queue)
-- [x] Phase 3.5: research integration (EMD, BMA, SlipDeficit) + Phase C Domain 1 (HNSW 54.5×) + SLE-48 (vectorized query 12,508 rows/sec)
+- [x] Phase 3.5: research integration (EMD, BMA, SlipDeficit) + HNSW 54.5x + vectorized query
+- [x] Phase 4: PM filter -- Sharpe=2.649, MaxDD=4.4%
+- [x] Phase 5: Execution layer -- OrderManager, MockBroker, LiveRunner (G1-G3 passed)
+- [x] Phase 6: returns_candle(23D) features, max_distance=2.5, wins 5/6 folds
+- [x] Phase 7: Enhancement experiments E1-E4 ALL FAIL; flags remain False
+- [x] P8-PRE: Power of 10 hardening -- FiniteFloat, icontract, static analysis, 945 tests
 
-### Active (Phase 4)
-- [ ] `trading_system/strategy_evaluator.py` — rolling metrics, RED/YELLOW/GREEN, TWRR decomposition
+### Active (T8.1)
+- [ ] EOD Pipeline Automation (`scripts/eod_pipeline.py`) -- 60-day autonomous pipeline
 
 ### Backlog
 - [ ] Phase C Domain 2: vectorized feature extraction
@@ -547,7 +569,7 @@ print(results.sort_values("mean_bss", ascending=False).head(10))
 
 ### Core (requirements.txt)
 ```
-pandas, numpy, scikit-learn, yfinance, ta, pyarrow, optuna
+pandas, numpy, scikit-learn, yfinance, ta, pyarrow, optuna, icontract
 ```
 
 ### Testing
@@ -566,6 +588,7 @@ python-docx     # Report generation
 torch           # CONV_LSTM feature extraction
 faiss-cpu       # Approximate nearest neighbors at scale
 fastapi         # Real-time prediction API
+structlog       # Structured logging (ADR-010, activated in T8.1)
 ```
 
 ---

@@ -8,9 +8,9 @@ Linear: SLE-57
 """
 
 from trading_system.contracts.trades import (
-    TradeRecord,
-    PositionRecord,
     DailySnapshot,
+    PositionRecord,
+    TradeRecord,
 )
 
-__all__ = ["TradeRecord", "PositionRecord", "DailySnapshot"]
+__all__ = ["DailySnapshot", "PositionRecord", "TradeRecord"]

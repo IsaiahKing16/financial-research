@@ -1,3 +1,7 @@
+> **SUPERSEDED (2026-04-15):** This specification is outdated. Superseded by
+> `fppe-roadmap-v2A.md` (also superseded). For current project state, see
+> `CLAUDE.md` and `docs/PHASE_COMPLETION_LOG.md`. Retained as historical reference.
+
 # FPPE Full Roadmap — Product Requirements & Design Specification
 
 **Version:** 1.0

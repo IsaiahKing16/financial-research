@@ -30,10 +30,8 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Optional
 
 import icontract
-
 
 # ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -103,7 +101,7 @@ class SizingResult:
     kelly_fraction: float
     scaled_kelly: float
     atr_weight: float
-    rejection_reason: Optional[str]
+    rejection_reason: str | None
 
 
 # ─── Core functions ───────────────────────────────────────────────────────────
@@ -149,8 +147,8 @@ def compute_kelly_fraction(p: float, b: float) -> float:
 def size_position(
     confidence: float,
     b_ratio: float,
-    config: Optional[SizingConfig] = None,
-    atr_pct: Optional[float] = None,
+    config: SizingConfig | None = None,
+    atr_pct: float | None = None,
 ) -> SizingResult:
     """Compute Half-Kelly position size for a BUY signal.
 

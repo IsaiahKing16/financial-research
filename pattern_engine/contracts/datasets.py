@@ -21,12 +21,7 @@ Linear: SLE-57
 
 from __future__ import annotations
 
-from typing import List
-
-import pandas as pd
-import pandera as pa
-from pandera import Column, DataFrameSchema, Check
-
+from pandera import Check, Column, DataFrameSchema
 
 # ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -60,7 +55,7 @@ def _binary_check() -> Check:
 
 # ─── TrainDBSchema ─────────────────────────────────────────────────────────────
 
-def make_train_db_schema(feature_cols: List[str]) -> DataFrameSchema:
+def make_train_db_schema(feature_cols: list[str]) -> DataFrameSchema:
     """
     Return a Pandera schema for the training DataFrame.
 
@@ -129,7 +124,7 @@ def make_train_db_schema(feature_cols: List[str]) -> DataFrameSchema:
 
 # ─── QueryDBSchema ─────────────────────────────────────────────────────────────
 
-def make_query_db_schema(feature_cols: List[str]) -> DataFrameSchema:
+def make_query_db_schema(feature_cols: list[str]) -> DataFrameSchema:
     """
     Return a Pandera schema for the query DataFrame (inference-time input).
 
@@ -178,7 +173,7 @@ def make_query_db_schema(feature_cols: List[str]) -> DataFrameSchema:
 
 # ─── FeatureMatrixSchema ───────────────────────────────────────────────────────
 
-def make_feature_matrix_schema(feature_cols: List[str]) -> DataFrameSchema:
+def make_feature_matrix_schema(feature_cols: list[str]) -> DataFrameSchema:
     """
     Return a Pandera schema for the extracted feature matrix (post-StandardScaler input).
 

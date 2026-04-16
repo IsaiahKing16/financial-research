@@ -7,7 +7,7 @@ Designed to survive interruption — each row is appended individually.
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 
@@ -31,7 +31,7 @@ class ExperimentLogger:
         self._columns = list(columns)
         with open(self._path, "w", encoding="utf-8") as f:
             f.write(f"# experiment: {self._name}\n")
-            f.write(f"# started: {datetime.now(timezone.utc).isoformat()}\n")
+            f.write(f"# started: {datetime.now(UTC).isoformat()}\n")
             if search_space:
                 f.write(f"# search_space: {json.dumps(search_space)}\n")
             if locked_settings:

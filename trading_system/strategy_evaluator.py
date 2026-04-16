@@ -39,9 +39,8 @@ Linear: SLE-70
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import date as Date
-from typing import Dict, List, Optional, Tuple
 
 from trading_system.contracts.decisions import (
     EvaluatorSnapshot,
@@ -52,7 +51,6 @@ from trading_system.contracts.state import (
     SharedState,
     SystemCommand,
 )
-
 
 # ─── Evaluator thresholds ──────────────────────────────────────────────────────
 
@@ -111,9 +109,9 @@ class ClosedTrade:
 # ─── Rolling metrics helpers ───────────────────────────────────────────────────
 
 def _annualized_sharpe(
-    daily_returns: List[float],
+    daily_returns: list[float],
     risk_free_daily: float = 0.0,
-) -> Optional[float]:
+) -> float | None:
     """
     Compute annualized Sharpe ratio from a list of daily returns.
 
@@ -147,7 +145,7 @@ def _annualized_sharpe(
     return (mean_e / std_e) * math.sqrt(252)
 
 
-def _drawdown_from_peak(cumulative_returns: List[float]) -> float:
+def _drawdown_from_peak(cumulative_returns: list[float]) -> float:
     """
     Compute current drawdown from the running peak of cumulative returns.
 
@@ -165,13 +163,12 @@ def _drawdown_from_peak(cumulative_returns: List[float]) -> float:
     equity = [1.0 + r for r in cumulative_returns]
     peak = 1.0
     for e in equity:
-        if e > peak:
-            peak = e
+        peak = max(peak, e)
     current = equity[-1]
     return max(0.0, 1.0 - current / peak)
 
 
-def _linear_slope(values: List[float]) -> float:
+def _linear_slope(values: list[float]) -> float:
     """
     Compute slope of a simple linear regression on (index, value) pairs.
 
@@ -238,16 +235,16 @@ class StrategyEvaluator:
         self._risk_free_daily = (1 + risk_free_annual_rate) ** (1 / 252) - 1
 
         # Trade history
-        self._closed_trades: List[ClosedTrade] = []
+        self._closed_trades: list[ClosedTrade] = []
 
         # Daily return series: [(date, portfolio_return, cumulative_return)]
-        self._daily_series: List[Tuple[Date, float, float]] = []
+        self._daily_series: list[tuple[Date, float, float]] = []
 
         # BSS series for calibration drift detection: [(date, bss_value)]
-        self._bss_series: List[Tuple[Date, float]] = []
+        self._bss_series: list[tuple[Date, float]] = []
 
         # Track previous status for command generation
-        self._previous_status: Optional[EvaluatorStatus] = None
+        self._previous_status: EvaluatorStatus | None = None
 
         # Research pilot: DriftMonitor (SLE-76) — None until set_drift_monitor() called
         self._drift_monitor = None   # DriftMonitor | None
@@ -307,12 +304,12 @@ class StrategyEvaluator:
 
     # ── Metric computation ─────────────────────────────────────────────────────
 
-    def _recent_daily_returns(self, window: int) -> List[float]:
+    def _recent_daily_returns(self, window: int) -> list[float]:
         """Return the last `window` daily portfolio returns."""
         returns = [r for _, r, _ in self._daily_series]
         return returns[-window:]
 
-    def _compute_sharpe(self, window: int) -> Optional[float]:
+    def _compute_sharpe(self, window: int) -> float | None:
         """
         Compute rolling Sharpe for the last `window` trading days.
 
@@ -323,7 +320,7 @@ class StrategyEvaluator:
             return None
         return _annualized_sharpe(recent, self._risk_free_daily)
 
-    def _compute_all_time_sharpe(self) -> Optional[float]:
+    def _compute_all_time_sharpe(self) -> float | None:
         """Compute Sharpe ratio over the full trade history."""
         all_returns = [r for _, r, _ in self._daily_series]
         if len(all_returns) < self.config.min_trades_for_sharpe:
@@ -361,12 +358,12 @@ class StrategyEvaluator:
 
     def _determine_status(
         self,
-        sharpe_30d: Optional[float],
-        sharpe_90d: Optional[float],
+        sharpe_30d: float | None,
+        sharpe_90d: float | None,
         drawdown: float,
         total_trades: int,
         bss_drift_slope: float,
-    ) -> Tuple[EvaluatorStatus, str]:
+    ) -> tuple[EvaluatorStatus, str]:
         """
         Apply the RED → YELLOW → GREEN decision tree.
 
@@ -439,7 +436,7 @@ class StrategyEvaluator:
     def _determine_commands(
         self,
         new_status: EvaluatorStatus,
-    ) -> List[SystemCommand]:
+    ) -> list[SystemCommand]:
         """
         Compute SystemCommands based on status transition.
 
@@ -460,7 +457,7 @@ class StrategyEvaluator:
         if self._previous_status == new_status:
             return []  # No change — no command needed
 
-        commands: List[SystemCommand] = []
+        commands: list[SystemCommand] = []
 
         if new_status == EvaluatorStatus.RED:
             commands.append(SystemCommand.HALT)
@@ -481,7 +478,7 @@ class StrategyEvaluator:
     def evaluate(
         self,
         current_date: Date,
-        drawdown: Optional[float] = None,
+        drawdown: float | None = None,
     ) -> EvaluatorSnapshot:
         """
         Evaluate current strategy performance and emit a snapshot.
@@ -540,8 +537,8 @@ class StrategyEvaluator:
         state: SharedState,
         current_date: Date,
         manager,  # SharedStateManager — imported at call site to avoid circular import
-        drawdown: Optional[float] = None,
-    ) -> Tuple[EvaluatorSnapshot, SharedState]:
+        drawdown: float | None = None,
+    ) -> tuple[EvaluatorSnapshot, SharedState]:
         """
         Evaluate and write the result back to SharedState.
 
@@ -556,7 +553,6 @@ class StrategyEvaluator:
         """
         from trading_system.shared_state import (
             LayerTag,
-            SharedStateManager,
         )
 
         # Save previous status BEFORE evaluate() updates _previous_status.
@@ -615,7 +611,7 @@ class StrategyEvaluator:
         """Number of trading days recorded."""
         return len(self._daily_series)
 
-    def metrics_summary(self) -> Dict:
+    def metrics_summary(self) -> dict:
         """
         Return a dict of current metric values for logging/inspection.
 

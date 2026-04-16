@@ -1,6 +1,7 @@
 # HNSW Promotion Gate — SLE-64
 
-**Status:** Draft
+**Status:** OPT-IN (use_hnsw=True). Default remains BallTree. Gate criteria may need
+re-evaluation with 23D feature space (Phase 6 changed from 8D to 23D features).
 **Linear:** SLE-64
 **Decision authority:** Sleep (Isaia)
 **Machine gate script:** `scripts/check_hnsw_promotion_gate.py`

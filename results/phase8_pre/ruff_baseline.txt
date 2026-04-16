@@ -1,50 +1,37 @@
 warning: The following rules have been removed and ignoring them has no effect:
     - PD901
 
-107	UP006  	[*] non-pep585-annotation
- 71	UP045  	[*] non-pep604-annotation-optional
- 44	UP035  	[-] deprecated-import
- 39	N806   	[ ] non-lowercase-variable-in-function
- 34	PLC0415	[ ] import-outside-top-level
- 33	I001   	[*] unsorted-imports
- 28	N803   	[ ] invalid-argument-name
- 27	PD011  	[ ] pandas-use-of-dot-values
- 25	F401   	[*] unused-import
- 25	UP037  	[*] quoted-annotation
- 24	RUF002 	[ ] ambiguous-unicode-character-docstring
- 19	TC001  	[ ] typing-only-first-party-import
- 11	E402   	[ ] module-import-not-at-top-of-file
- 10	RUF059 	[ ] unused-unpacked-variable
- 10	UP017  	[*] datetime-timezone-utc
-  9	UP042  	[ ] replace-str-enum
-  8	TC003  	[ ] typing-only-standard-library-import
-  7	N812   	[ ] lowercase-imported-as-non-lowercase
-  7	TC002  	[ ] typing-only-third-party-import
-  5	B905   	[ ] zip-without-explicit-strict
-  4	E702   	[ ] multiple-statements-on-one-line-semicolon
-  4	F841   	[ ] unused-variable
-  4	RUF022 	[*] unsorted-dunder-all
-  3	B904   	[ ] raise-without-from-inside-except
-  3	C901   	[ ] complex-structure
-  3	PLR0912	[ ] too-many-branches
-  3	PLR0915	[ ] too-many-statements
-  3	RUF003 	[ ] ambiguous-unicode-character-comment
-  3	SIM102 	[ ] collapsible-if
-  2	PLR0913	[ ] too-many-arguments
-  2	RUF001 	[ ] ambiguous-unicode-character-string
-  2	RUF005 	[ ] collection-literal-concatenation
-  2	SIM108 	[ ] if-else-block-instead-of-if-exp
-  1	B008   	[ ] function-call-in-default-argument
-  1	E741   	[ ] ambiguous-variable-name
-  1	F541   	[*] f-string-missing-placeholders
-  1	PD002  	[ ] pandas-use-of-inplace-argument
-  1	PERF401	[ ] manual-list-comprehension
-  1	PLR0911	[ ] too-many-return-statements
-  1	PLR1730	[*] if-stmt-min-max
-  1	RUF023 	[*] unsorted-dunder-slots
-  1	RUF034 	[ ] useless-if-else
-  1	SIM114 	[*] if-with-same-arms
-  1	SIM910 	[*] dict-get-with-none-default
-  1	UP015  	[*] redundant-open-modes
-Found 593 errors.
-[*] 282 fixable with the `--fix` option (69 hidden fixes can be enabled with the `--unsafe-fixes` option).
+41	N806   	non-lowercase-variable-in-function
+33	PLC0415	import-outside-top-level
+29	N803   	invalid-argument-name
+27	PD011  	pandas-use-of-dot-values
+24	RUF002 	ambiguous-unicode-character-docstring
+20	TC001  	typing-only-first-party-import
+11	E402   	module-import-not-at-top-of-file
+10	PLW0108	unnecessary-lambda
+10	RUF059 	unused-unpacked-variable
+ 9	TC003  	typing-only-standard-library-import
+ 9	UP042  	replace-str-enum
+ 7	N812   	lowercase-imported-as-non-lowercase
+ 7	TC002  	typing-only-third-party-import
+ 5	B905   	zip-without-explicit-strict
+ 4	E702   	multiple-statements-on-one-line-semicolon
+ 4	F841   	unused-variable
+ 3	B904   	raise-without-from-inside-except
+ 3	SIM102 	collapsible-if
+ 2	C901   	complex-structure
+ 2	PLR0913	too-many-arguments
+ 2	PLR0915	too-many-statements
+ 2	RUF001 	ambiguous-unicode-character-string
+ 2	RUF005 	collection-literal-concatenation
+ 1	B008   	function-call-in-default-argument
+ 1	E741   	ambiguous-variable-name
+ 1	PD002  	pandas-use-of-inplace-argument
+ 1	PERF401	manual-list-comprehension
+ 1	PLR0911	too-many-return-statements
+ 1	PLR0912	too-many-branches
+ 1	RUF003 	ambiguous-unicode-character-comment
+ 1	RUF034 	useless-if-else
+ 1	SIM108 	if-else-block-instead-of-if-exp
+Found 275 errors.
+No fixes available (80 hidden fixes can be enabled with the `--unsafe-fixes` option).

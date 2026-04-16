@@ -26,10 +26,8 @@ Linear: SLE-73
 from __future__ import annotations
 
 import math
-from typing import Optional
 
 import numpy as np
-
 
 # ─── Constrained DTW ──────────────────────────────────────────────────────────
 
@@ -111,9 +109,9 @@ class WFAReranker:
         if window < 0:
             raise ValueError(f"window must be >= 0, got {window}")
         self.window = window
-        self._train_features: Optional[np.ndarray] = None
+        self._train_features: np.ndarray | None = None
 
-    def fit(self, X_train_scaled: np.ndarray) -> "WFAReranker":
+    def fit(self, X_train_scaled: np.ndarray) -> WFAReranker:
         """Cache the scaled training feature matrix for reranking.
 
         Args:

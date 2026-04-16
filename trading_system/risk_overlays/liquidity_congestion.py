@@ -28,7 +28,7 @@ from __future__ import annotations
 
 from collections import deque
 from datetime import date
-from typing import Any, Deque, Optional
+from typing import Any
 
 from trading_system.risk_overlays.base import BaseRiskOverlay
 
@@ -70,9 +70,9 @@ class LiquidityCongestionGate(BaseRiskOverlay):
         self.block_threshold = block_threshold
         self.cooldown_periods = cooldown_periods
 
-        self._atr_price_ratios: Deque[float] = deque(maxlen=window)
+        self._atr_price_ratios: deque[float] = deque(maxlen=window)
         self._cooldown_remaining: int = 0
-        self._last_date: Optional[date] = None
+        self._last_date: date | None = None
         self._congestion_level: float = 0.0   # rolling mean of ATR/price
 
     @property

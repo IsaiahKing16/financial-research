@@ -23,12 +23,11 @@ from __future__ import annotations
 import hashlib
 import json
 import math
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 import numpy as np
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
-
 
 # ─── EngineState ──────────────────────────────────────────────────────────────
 
@@ -70,16 +69,16 @@ class EngineState(BaseModel):
     model_config = ConfigDict(frozen=True, allow_inf_nan=False)
 
     # Feature column specification
-    feature_cols: List[str] = Field(
+    feature_cols: list[str] = Field(
         min_length=1,
         description="Ordered feature column names (must match Matcher training order)",
     )
 
     # StandardScaler parameters (stored as lists for JSON serializability)
-    scaler_mean: List[float] = Field(
+    scaler_mean: list[float] = Field(
         description="StandardScaler.mean_ — one value per feature",
     )
-    scaler_scale: List[float] = Field(
+    scaler_scale: list[float] = Field(
         description="StandardScaler.scale_ — one value per feature",
     )
 
@@ -91,7 +90,7 @@ class EngineState(BaseModel):
     matcher_backend: str = Field(
         description="Matcher backend name: 'balltree' or 'hnsw'",
     )
-    matcher_params: Dict[str, Any] = Field(
+    matcher_params: dict[str, Any] = Field(
         description="Full params dict from matcher.get_params()",
     )
 
@@ -113,7 +112,7 @@ class EngineState(BaseModel):
     # ── Validators ────────────────────────────────────────────────────────────
 
     @model_validator(mode="after")
-    def validate_scaler_dimensions(self) -> "EngineState":
+    def validate_scaler_dimensions(self) -> EngineState:
         """scaler_mean and scaler_scale must have one entry per feature col."""
         n_features = len(self.feature_cols)
         if len(self.scaler_mean) != n_features:
@@ -130,7 +129,7 @@ class EngineState(BaseModel):
 
     @field_validator("scaler_mean", "scaler_scale")
     @classmethod
-    def _require_finite_scaler(cls, v: List[float]) -> List[float]:
+    def _require_finite_scaler(cls, v: list[float]) -> list[float]:
         """Scaler arrays must contain only finite values.
 
         A NaN or Inf in scaler_mean or scaler_scale would corrupt every
@@ -147,7 +146,7 @@ class EngineState(BaseModel):
 
     @field_validator("scaler_scale")
     @classmethod
-    def scale_non_zero(cls, v: List[float]) -> List[float]:
+    def scale_non_zero(cls, v: list[float]) -> list[float]:
         """StandardScaler.scale_ must be > 0 (zero scale → division by zero)."""
         if any(s <= 0.0 for s in v):
             raise ValueError(
@@ -199,10 +198,10 @@ class EngineState(BaseModel):
         cls,
         scaler: Any,           # sklearn StandardScaler
         matcher: Any,          # BaseMatcher subclass (already fitted)
-        feature_cols: List[str],
+        feature_cols: list[str],
         config: Any,           # EngineConfig or any JSON-serializable object
         feature_set_name: str,
-    ) -> "EngineState":
+    ) -> EngineState:
         """
         Create an EngineState from a fitted scaler and matcher.
 
@@ -238,7 +237,7 @@ class EngineState(BaseModel):
             ) from exc
 
         config_hash = hashlib.sha256(config_json.encode()).hexdigest()
-        fit_timestamp = datetime.now(timezone.utc).isoformat()
+        fit_timestamp = datetime.now(UTC).isoformat()
 
         return cls(
             feature_cols=list(feature_cols),

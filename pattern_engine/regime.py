@@ -28,8 +28,6 @@ Linear: M9 (Signal Intelligence Layer)
 
 from __future__ import annotations
 
-from typing import Optional
-
 import numpy as np
 import pandas as pd
 
@@ -81,8 +79,8 @@ class RegimeLabeler:
         self,
         spy_ticker: str = "SPY",
         lookback_days: int = 90,
-        vix_series: Optional[pd.Series] = None,
-        yield_spread_series: Optional[pd.Series] = None,
+        vix_series: pd.Series | None = None,
+        yield_spread_series: pd.Series | None = None,
         vix_spike_zscore: float = 1.0,
         vix_spike_window: int = 20,
     ) -> None:
@@ -97,14 +95,14 @@ class RegimeLabeler:
         self.mode: str = "binary"
 
         # Populated by fit()
-        self._spy_ret90: Optional[pd.Series] = None
-        self._vix_zscore: Optional[pd.Series] = None
+        self._spy_ret90: pd.Series | None = None
+        self._vix_zscore: pd.Series | None = None
 
     # ──────────────────────────────────────────────────────────────────────────
     # fit
     # ──────────────────────────────────────────────────────────────────────────
 
-    def fit(self, reference_db: pd.DataFrame) -> "RegimeLabeler":
+    def fit(self, reference_db: pd.DataFrame) -> RegimeLabeler:
         """Fit the labeler on a reference (training) database.
 
         Extracts the SPY 90-day return series from ``reference_db`` and,
@@ -161,7 +159,7 @@ class RegimeLabeler:
     def label(
         self,
         db: pd.DataFrame,
-        reference_db: Optional[pd.DataFrame] = None,
+        reference_db: pd.DataFrame | None = None,
     ) -> np.ndarray:
         """Label each row of ``db`` as Bull (1) or Bear (0).
 

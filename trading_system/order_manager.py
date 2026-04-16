@@ -2,14 +2,13 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
-from trading_system.contracts.trades import OrderSide, OrderStatus
-from trading_system.contracts.decisions import AllocationDecision
 from trading_system.broker.base import BaseBroker, Order, OrderResult
+from trading_system.contracts.decisions import AllocationDecision
+from trading_system.contracts.trades import OrderSide, OrderStatus
 
 
 class ManagedOrder(BaseModel):
@@ -18,10 +17,10 @@ class ManagedOrder(BaseModel):
 
     order: Order
     status: OrderStatus
-    result: Optional[OrderResult] = None
+    result: OrderResult | None = None
     created_at: datetime
-    submitted_at: Optional[datetime] = None
-    resolved_at: Optional[datetime] = None
+    submitted_at: datetime | None = None
+    resolved_at: datetime | None = None
 
 
 class OrderManager:
@@ -62,7 +61,7 @@ class OrderManager:
             side=OrderSide.BUY,
             quantity=quantity,
             notional=decision.capital_allocated,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
         )
 
     def create_exit_order(
@@ -78,12 +77,12 @@ class OrderManager:
             side=OrderSide.SELL,
             quantity=quantity,
             notional=quantity * price,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
         )
 
     def submit(self, order: Order) -> ManagedOrder:
         """Submit to broker. PENDING -> terminal state."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         result = self._broker.submit_order(order)
         managed = ManagedOrder(
             order=order,
@@ -91,7 +90,7 @@ class OrderManager:
             result=result,
             created_at=order.timestamp,
             submitted_at=now,
-            resolved_at=datetime.now(timezone.utc),
+            resolved_at=datetime.now(UTC),
         )
         self._orders[order.order_id] = managed
         return managed

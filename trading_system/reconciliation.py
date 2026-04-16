@@ -1,12 +1,12 @@
 """Position reconciliation — compare portfolio snapshot vs broker state."""
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from pydantic import BaseModel
 
-from trading_system.portfolio_state import PortfolioSnapshot
 from trading_system.broker.base import BaseBroker
+from trading_system.portfolio_state import PortfolioSnapshot
 
 
 class PositionMismatch(BaseModel):
@@ -81,7 +81,7 @@ def reconcile(
     passed = len(mismatches) == 0 and len(missing) == 0 and len(unexpected) == 0
 
     return ReconciliationResult(
-        as_of=datetime.now(timezone.utc),
+        as_of=datetime.now(UTC),
         n_expected=len(expected),
         n_actual=len(actual),
         mismatches=tuple(mismatches),

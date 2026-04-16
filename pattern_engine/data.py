@@ -30,11 +30,9 @@ from __future__ import annotations
 
 import hashlib
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import List, Optional
 
-import numpy as np
 import pandas as pd
 
 from pattern_engine.contracts.datasets import (
@@ -42,7 +40,6 @@ from pattern_engine.contracts.datasets import (
     make_train_db_schema,
 )
 from pattern_engine.features import RETURNS_ONLY_COLS
-
 
 # ─── Exceptions ──────────────────────────────────────────────────────────────
 
@@ -56,7 +53,7 @@ class DataPipelineError(ValueError):
 
 # ─── Feature column defaults ─────────────────────────────────────────────────
 
-DEFAULT_FEATURE_COLS: List[str] = RETURNS_ONLY_COLS
+DEFAULT_FEATURE_COLS: list[str] = RETURNS_ONLY_COLS
 """Default 8-feature return fingerprint. Locked setting — matches production."""
 
 TARGET_COL: str = "fwd_7d_up"
@@ -90,7 +87,7 @@ def _build_lineage(
     df: pd.DataFrame,
     source: str,
     checkpoint: str,
-    feature_cols: Optional[List[str]] = None,
+    feature_cols: list[str] | None = None,
 ) -> dict:
     """Build a lineage metadata dict for a DataFrame.
 
@@ -112,7 +109,7 @@ def _build_lineage(
     return {
         "source": source,
         "checkpoint": checkpoint,
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": datetime.now(UTC).isoformat(),
         "row_count": row_count,
         "n_tickers": n_tickers,
         "row_count_hash": fingerprint,
@@ -165,7 +162,7 @@ def _validate_ohlcv(df: pd.DataFrame, ticker: str) -> pd.DataFrame:
 
 def _validate_feature_db(
     df: pd.DataFrame,
-    feature_cols: List[str],
+    feature_cols: list[str],
     checkpoint: str,
 ) -> pd.DataFrame:
     """Checkpoint 2/3: validate the feature + target database.
@@ -217,10 +214,10 @@ class DataLoaderHardened:
 
     def __init__(
         self,
-        tickers: Optional[List[str]] = None,
+        tickers: list[str] | None = None,
         start_date: str = "2000-01-01",
         data_dir: str = "data",
-        feature_cols: Optional[List[str]] = None,
+        feature_cols: list[str] | None = None,
         validate_ohlcv: bool = True,
         validate_features: bool = True,
     ) -> None:
@@ -230,10 +227,10 @@ class DataLoaderHardened:
         except ImportError:
             _default_tickers = []
 
-        self.tickers: List[str] = tickers if tickers is not None else _default_tickers
+        self.tickers: list[str] = tickers if tickers is not None else _default_tickers
         self.start_date: str = start_date
         self.data_dir: Path = Path(data_dir)
-        self.feature_cols: List[str] = feature_cols or DEFAULT_FEATURE_COLS
+        self.feature_cols: list[str] = feature_cols or DEFAULT_FEATURE_COLS
         self.validate_ohlcv: bool = validate_ohlcv
         self.validate_features: bool = validate_features
 

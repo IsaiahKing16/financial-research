@@ -24,4 +24,5 @@ unlike raw assert which is stripped by Python -O.
 
 - `_prepare_features`: @require(finite input) + @ensure(finite output)
 - `run_fold`: RuntimeError guards on train_end >= val_start and BSS identity
-  (|REL-RES+UNC-BS| > 1e-3 threshold; Murphy binning noise ~3e-5)
+  (|REL-RES+UNC-BS| > 0.05 threshold; Murphy binning noise up to ~0.004 on
+  clustered probs; 0.05 gives 13x margin while catching formula bugs)

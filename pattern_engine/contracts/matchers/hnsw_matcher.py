@@ -18,7 +18,6 @@ Key design decisions:
 Linear: SLE-62
 """
 
-from typing import Dict, Tuple
 
 import numpy as np
 
@@ -107,7 +106,7 @@ class HNSWMatcher(BaseMatcher):
 
     def kneighbors(
         self, X: np.ndarray, n_neighbors: int = 0
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    ) -> tuple[np.ndarray, np.ndarray]:
         """Query HNSW index for approximate nearest neighbors.
 
         Returns (distances, indices) matching sklearn convention:
@@ -200,6 +199,7 @@ class HNSWMatcher(BaseMatcher):
         """
         import json
         import os
+
         import hnswlib
 
         path_str = str(path)
@@ -211,7 +211,7 @@ class HNSWMatcher(BaseMatcher):
                 "Index may be corrupt or was not saved with save_index()."
             )
 
-        with open(meta_path, "r", encoding="utf-8") as f:
+        with open(meta_path, encoding="utf-8") as f:
             meta = json.load(f)
 
         if not os.path.exists(path_str):
@@ -231,7 +231,7 @@ class HNSWMatcher(BaseMatcher):
         self._M = meta["M"]
         self._num_threads = meta["num_threads"]
 
-    def get_params(self) -> Dict[str, object]:
+    def get_params(self) -> dict[str, object]:
         return {
             "backend": "hnsw",
             "n_neighbors": self._n_neighbors,

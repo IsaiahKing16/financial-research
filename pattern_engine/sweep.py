@@ -28,8 +28,9 @@ import itertools
 import logging
 import time
 import warnings
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
 import pandas as pd
 
@@ -76,13 +77,13 @@ class SweepResult:
     best_wilcoxon_p: float | None
     results_df: pd.DataFrame
     elapsed_minutes: float
-    study: "_optuna_type.Study | None" = field(default=None, repr=False)
+    study: _optuna_type.Study | None = field(default=None, repr=False)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _suggest_params(
-    trial: "_optuna_type.Trial",
+    trial: _optuna_type.Trial,
     search_space: dict[str, tuple | list],
 ) -> dict:
     """Map search_space spec to Optuna trial suggestions."""
@@ -160,7 +161,7 @@ class OptunaSweep:
         self._seed = seed
 
         # State populated after run()
-        self._study: "_optuna_type.Study | None" = None
+        self._study: _optuna_type.Study | None = None
         self._result: SweepResult | None = None
 
     def _storage_url(self) -> str | None:
@@ -168,7 +169,7 @@ class OptunaSweep:
             return None
         return f"sqlite:///{self._storage_path}"
 
-    def _make_study(self, load_if_exists: bool = True) -> "_optuna_type.Study":
+    def _make_study(self, load_if_exists: bool = True) -> _optuna_type.Study:
         import optuna
 
         sampler = optuna.samplers.TPESampler(seed=self._seed)
@@ -338,7 +339,7 @@ class OptunaSweep:
 
     @staticmethod
     def _make_sweep_result(
-        study: "_optuna_type.Study",
+        study: _optuna_type.Study,
         results_df: pd.DataFrame,
         elapsed: float,
     ) -> SweepResult:

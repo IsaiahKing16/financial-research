@@ -10,7 +10,6 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-
 # ─── Returns-only feature set (locked setting) ────────────────────────────────
 
 RETURNS_ONLY_COLS: list[str] = [f"ret_{w}d" for w in [1, 3, 7, 14, 30, 45, 60, 90]]

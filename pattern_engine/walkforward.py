@@ -24,10 +24,10 @@ import numpy as np
 import pandas as pd
 
 import pattern_engine.matcher as _matcher_module
-from pattern_engine.config import EngineConfig, WALKFORWARD_FOLDS
-from pattern_engine.matcher import PatternMatcher
+from pattern_engine.candlestick import CANDLE_COLS, compute_candlestick_features
+from pattern_engine.config import WALKFORWARD_FOLDS, EngineConfig
 from pattern_engine.features import FeatureRegistry
-from pattern_engine.candlestick import compute_candlestick_features, CANDLE_COLS
+from pattern_engine.matcher import PatternMatcher
 
 try:
     from betacal import BetaCalibration
@@ -67,7 +67,7 @@ class _BetaCalibrator:
     def __init__(self) -> None:
         self._cal = None
 
-    def fit(self, raw: np.ndarray, y: np.ndarray) -> "_BetaCalibrator":
+    def fit(self, raw: np.ndarray, y: np.ndarray) -> _BetaCalibrator:
         self._cal = BetaCalibration(parameters="abm")
         self._cal.fit(raw.reshape(-1, 1), y)
         return self

@@ -24,11 +24,10 @@ from __future__ import annotations
 
 import logging
 from datetime import date as Date
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 _log = logging.getLogger(__name__)
 
-import numpy as np
 import pandas as pd
 from pydantic import BaseModel, Field, field_validator
 
@@ -39,7 +38,6 @@ from pattern_engine.contracts.signals import (
     SignalDirection,
     SignalSource,
 )
-
 
 # ─── UnifiedSignal ─────────────────────────────────────────────────────────────
 
@@ -73,7 +71,7 @@ class UnifiedSignal(BaseModel):
     confidence: float = Field(ge=0.0, le=1.0)
     signal_source: SignalSource
     sector: str = Field(min_length=1)
-    raw_metadata: Dict[str, Any] = Field(default_factory=dict)
+    raw_metadata: dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("ticker")
     @classmethod
@@ -87,9 +85,9 @@ class UnifiedSignal(BaseModel):
 # ─── KNN adapter ───────────────────────────────────────────────────────────────
 
 def adapt_knn_signals(
-    signals_list: List[Dict],
-    sector_map: Dict[str, str],
-) -> List[UnifiedSignal]:
+    signals_list: list[dict],
+    sector_map: dict[str, str],
+) -> list[UnifiedSignal]:
     """
     Convert raw FPPE K-NN signal output to unified format.
 
@@ -102,7 +100,7 @@ def adapt_knn_signals(
     Returns:
         List of UnifiedSignal objects, one per ticker.
     """
-    unified: List[UnifiedSignal] = []
+    unified: list[UnifiedSignal] = []
     for s in signals_list:
         raw_date = s.get("date", Date.today())
         if isinstance(raw_date, pd.Timestamp):
@@ -132,9 +130,9 @@ def adapt_knn_signals(
 
 
 def adapt_dl_signals(
-    predictions: Dict,
-    sector_map: Dict[str, str],
-) -> List[UnifiedSignal]:
+    predictions: dict,
+    sector_map: dict[str, str],
+) -> list[UnifiedSignal]:
     """
     Convert deep learning model output to unified format.
 
@@ -146,7 +144,7 @@ def adapt_dl_signals(
     Returns:
         List of UnifiedSignal objects.
     """
-    unified: List[UnifiedSignal] = []
+    unified: list[UnifiedSignal] = []
     raw_date = predictions["date"]
     if isinstance(raw_date, pd.Timestamp):
         signal_date = raw_date.date()
@@ -185,7 +183,7 @@ def adapt_dl_signals(
 def simulate_signals_from_val_db(
     val_db: pd.DataFrame,
     train_db: pd.DataFrame,
-    sector_map: Dict[str, str],
+    sector_map: dict[str, str],
     confidence_threshold: float = 0.65,
     agreement_spread: float = 0.10,
     min_matches: int = 10,
@@ -230,8 +228,8 @@ def simulate_signals_from_val_db(
         ImportError: If neither production EngineConfig nor the rebuild can be
                      imported (should not happen in a correctly installed venv).
     """
-    from pattern_engine.matcher import PatternMatcher
     from pattern_engine.features import RETURNS_ONLY_COLS
+    from pattern_engine.matcher import PatternMatcher
 
     # ── Resolve EngineConfig ───────────────────────────────────────────────────
     if engine_config is None:

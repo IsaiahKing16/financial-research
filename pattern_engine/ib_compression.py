@@ -42,10 +42,7 @@ Linear: SLE-78
 
 from __future__ import annotations
 
-from typing import List, Optional
-
 import numpy as np
-
 
 # ─── IBCompressor ─────────────────────────────────────────────────────────────
 
@@ -75,10 +72,10 @@ class IBCompressor:
             raise ValueError(f"Unsupported method: {method!r}")
         self.d_out = d_out
         self.method = method
-        self._projection: Optional[np.ndarray] = None   # (D, d_out)
-        self._feature_importance: Optional[np.ndarray] = None  # (D,) scores
+        self._projection: np.ndarray | None = None   # (D, d_out)
+        self._feature_importance: np.ndarray | None = None  # (D,) scores
 
-    def fit(self, X: np.ndarray, y: np.ndarray) -> "IBCompressor":
+    def fit(self, X: np.ndarray, y: np.ndarray) -> IBCompressor:
         """Fit the compression projection on training data.
 
         Args:
@@ -146,11 +143,11 @@ class IBCompressor:
         return self.fit(X, y).transform(X)
 
     @property
-    def feature_importance(self) -> Optional[np.ndarray]:
+    def feature_importance(self) -> np.ndarray | None:
         """Per-feature predictive importance scores (correlations with y)."""
         return self._feature_importance
 
-    def top_features(self, feature_names: List[str]) -> List[str]:
+    def top_features(self, feature_names: list[str]) -> list[str]:
         """Return feature names ranked by predictive importance (descending).
 
         Args:

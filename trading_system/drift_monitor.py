@@ -27,13 +27,10 @@ Linear: SLE-76
 
 from __future__ import annotations
 
-import math
-from collections import defaultdict, deque
+from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
 
 import numpy as np
-
 
 # ─── Data classes ─────────────────────────────────────────────────────────────
 
@@ -153,7 +150,7 @@ class CalibrationBucket:
         self.n_correct += int(actual_outcome)
 
     @property
-    def empirical_rate(self) -> Optional[float]:
+    def empirical_rate(self) -> float | None:
         """Empirical hit rate, or None if no observations yet."""
         if self.n_forecast == 0:
             return None
@@ -164,7 +161,7 @@ class CalibrationBucket:
         return (self.prob_lo + self.prob_hi) / 2.0
 
     @property
-    def drift(self) -> Optional[float]:
+    def drift(self) -> float | None:
         """Signed drift from the expected midpoint probability.
 
         Positive = overconfident (predicting high but hitting less).
@@ -205,7 +202,7 @@ class DriftMonitor:
 
     def __init__(
         self,
-        feature_names: List[str],
+        feature_names: list[str],
         n_buckets: int = 5,
         cusum_k: float = 0.5,
         cusum_h: float = 4.0,
@@ -225,26 +222,26 @@ class DriftMonitor:
         self.bss_alert_threshold = bss_alert_threshold
 
         # Baseline statistics (set by set_baseline)
-        self._baseline_means: Optional[np.ndarray] = None
-        self._baseline_stds: Optional[np.ndarray] = None
+        self._baseline_means: np.ndarray | None = None
+        self._baseline_stds: np.ndarray | None = None
         self._baseline_bss: float = 0.0
 
         # Per-feature CUSUM charts (mean shift detection)
-        self._mean_cusum: Dict[str, CUSUMState] = {}
-        self._var_cusum: Dict[str, CUSUMState] = {}
+        self._mean_cusum: dict[str, CUSUMState] = {}
+        self._var_cusum: dict[str, CUSUMState] = {}
 
         # BSS EWMA
-        self._bss_ewma: Optional[EWMAState] = None
+        self._bss_ewma: EWMAState | None = None
 
         # Calibration buckets
         edges = np.linspace(0.0, 1.0, n_buckets + 1)
-        self._cal_buckets: List[CalibrationBucket] = [
+        self._cal_buckets: list[CalibrationBucket] = [
             CalibrationBucket(prob_lo=edges[i], prob_hi=edges[i + 1])
             for i in range(n_buckets)
         ]
 
         # Alert history
-        self._feature_alerts: Dict[str, int] = defaultdict(int)
+        self._feature_alerts: dict[str, int] = defaultdict(int)
         self._bss_alerts: int = 0
         self._n_updates: int = 0
 
@@ -302,7 +299,7 @@ class DriftMonitor:
 
     # ── Update methods ─────────────────────────────────────────────────────────
 
-    def update_features(self, X_batch: np.ndarray) -> Dict[str, bool]:
+    def update_features(self, X_batch: np.ndarray) -> dict[str, bool]:
         """Update feature distribution monitors with a new batch.
 
         Computes batch mean and variance per feature; feeds into CUSUM charts.
@@ -316,7 +313,7 @@ class DriftMonitor:
         if self._baseline_means is None:
             raise RuntimeError("Call set_baseline() before update_features()")
 
-        alerts: Dict[str, bool] = {}
+        alerts: dict[str, bool] = {}
         batch_means = X_batch.mean(axis=0)
         # Use Bessel correction (ddof=1) for multi-row batches; fall back to
         # population variance (ddof=0) for single-row batches where ddof=1
@@ -378,7 +375,7 @@ class DriftMonitor:
 
     # ── Reporting ─────────────────────────────────────────────────────────────
 
-    def get_report(self) -> Dict:
+    def get_report(self) -> dict:
         """Return a summary of current drift state.
 
         Returns:
@@ -438,7 +435,7 @@ class DriftMonitor:
             "n_updates": self._n_updates,
         }
 
-    def reset_cusum(self, feature_name: Optional[str] = None) -> None:
+    def reset_cusum(self, feature_name: str | None = None) -> None:
         """Reset CUSUM charts after an alert has been actioned.
 
         Args:

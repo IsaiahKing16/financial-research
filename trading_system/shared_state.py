@@ -45,18 +45,11 @@ from __future__ import annotations
 
 import json
 from enum import Enum
-from typing import Dict, FrozenSet, List, Tuple
 
 from trading_system.contracts.state import (
     SharedState,
     SystemCommand,
-    EquityState,
-    PositionsState,
-    RiskState,
-    PortfolioState,
-    EvaluatorState,
 )
-
 
 # ─── LayerTag ──────────────────────────────────────────────────────────────────
 
@@ -80,7 +73,7 @@ class LayerTag(str, Enum):
 
 # Maps layer → frozenset of SharedState field names it may write.
 # These are the only fields each layer is allowed to pass in an update() call.
-_LAYER_WRITE_PERMITS: Dict[LayerTag, FrozenSet[str]] = {
+_LAYER_WRITE_PERMITS: dict[LayerTag, frozenset[str]] = {
     LayerTag.PATTERN_ENGINE: frozenset(),                          # read-only
     LayerTag.RISK_ENGINE: frozenset({"risk", "positions"}),
     LayerTag.PORTFOLIO_MANAGER: frozenset({"equity", "positions", "portfolio"}),
@@ -208,7 +201,7 @@ class SharedStateManager:
         self,
         state: SharedState,
         layer: LayerTag,
-    ) -> Tuple[List[SystemCommand], SharedState]:
+    ) -> tuple[list[SystemCommand], SharedState]:
         """
         Remove all pending commands from the queue and return them.
 

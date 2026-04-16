@@ -4,15 +4,14 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-from typing import Optional
 
-from pattern_engine.matcher import PatternMatcher
 from pattern_engine.contracts.state import EngineState
-from trading_system.contracts.state import SharedState
-from trading_system.contracts.decisions import AllocationDecision
-from trading_system.portfolio_state import PortfolioSnapshot
+from pattern_engine.matcher import PatternMatcher
 from trading_system.broker.base import BaseBroker
-from trading_system.order_manager import OrderManager, ManagedOrder
+from trading_system.contracts.decisions import AllocationDecision
+from trading_system.contracts.state import SharedState
+from trading_system.order_manager import ManagedOrder, OrderManager
+from trading_system.portfolio_state import PortfolioSnapshot
 from trading_system.reconciliation import reconcile
 
 log = logging.getLogger(__name__)
@@ -32,7 +31,7 @@ class LiveRunner:
         shared_state: SharedState,
         broker: BaseBroker,
         order_manager: OrderManager,
-        engine_state: Optional[EngineState] = None,
+        engine_state: EngineState | None = None,
         reconcile_on_start: bool = True,
     ) -> None:
         if not isinstance(matcher, PatternMatcher):

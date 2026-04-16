@@ -1,3 +1,7 @@
+> **SUPERSEDED (2026-04-15):** This document describes the v2.1 architecture as of the
+> initial Phase 3Z rebuild. For current architecture, see
+> `docs/FPPE_TRADING_SYSTEM_DESIGN.md` v0.6 and `CLAUDE.md`.
+
 # Financial Prediction Pattern Engine v2.1 — Development Briefing
 
 ## What Was Built

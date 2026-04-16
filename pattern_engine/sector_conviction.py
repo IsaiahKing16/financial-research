@@ -18,8 +18,6 @@ Linear: M9 (Signal Intelligence Layer)
 """
 from __future__ import annotations
 
-from typing import Dict, Tuple
-
 import numpy as np
 import pandas as pd
 
@@ -39,12 +37,12 @@ class SectorConvictionLayer(SignalFilterBase):
                           to retain signals. Default 0.005 (0.5pp — calibrated for 585T universe).
     """
 
-    def __init__(self, sector_map: Dict[str, str], min_sector_lift: float = 0.005):
+    def __init__(self, sector_map: dict[str, str], min_sector_lift: float = 0.005):
         self.sector_map = sector_map
         self.min_sector_lift = min_sector_lift
-        self.sector_base_rates_: Dict[str, float] = {}
+        self.sector_base_rates_: dict[str, float] = {}
 
-    def fit(self, train_db: pd.DataFrame, target_col: str = "fwd_7d_up") -> "SectorConvictionLayer":
+    def fit(self, train_db: pd.DataFrame, target_col: str = "fwd_7d_up") -> SectorConvictionLayer:
         """Compute per-sector historical base rates from training data.
 
         Args:
@@ -66,7 +64,7 @@ class SectorConvictionLayer(SignalFilterBase):
         self,
         probs: np.ndarray,
         tickers: np.ndarray,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """Compute mean predicted probability per sector.
 
         Args:
@@ -85,7 +83,7 @@ class SectorConvictionLayer(SignalFilterBase):
         signals: list[str],
         val_db: pd.DataFrame,
         **kwargs,
-    ) -> Tuple[list[str], np.ndarray]:
+    ) -> tuple[list[str], np.ndarray]:
         """Veto BUY/SELL signals where sector conviction is insufficient.
 
         For each BUY/SELL signal, check whether the sector-level mean

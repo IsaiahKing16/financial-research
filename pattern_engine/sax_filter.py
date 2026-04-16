@@ -37,11 +37,7 @@ Linear: SLE-72
 
 from __future__ import annotations
 
-import math
-from typing import Optional
-
 import numpy as np
-
 
 # ─── SAX breakpoints (pre-computed from N(0,1) quantiles) ─────────────────────
 # breakpoints[k] gives the boundaries for an alphabet of size k.
@@ -147,7 +143,7 @@ class SAXFilter:
         self,
         word_size: int = 4,
         alphabet_size: int = 4,
-        max_symbolic_distance: Optional[float] = 1.0,
+        max_symbolic_distance: float | None = 1.0,
     ) -> None:
         if word_size < 1 or word_size > 8:
             raise ValueError(f"word_size must be 1–8, got {word_size}")
@@ -160,9 +156,9 @@ class SAXFilter:
         self.max_symbolic_distance = max_symbolic_distance
         self._breakpoints: list[float] = _BREAKPOINTS[alphabet_size]
         self._dist_table: np.ndarray = _build_dist_table(alphabet_size)
-        self._train_words: Optional[np.ndarray] = None  # (N_train, word_size) int32
+        self._train_words: np.ndarray | None = None  # (N_train, word_size) int32
 
-    def fit(self, X_scaled: np.ndarray) -> "SAXFilter":
+    def fit(self, X_scaled: np.ndarray) -> SAXFilter:
         """Pre-compute SAX words for the entire training set.
 
         Must be called after the StandardScaler is fitted (X_scaled is the

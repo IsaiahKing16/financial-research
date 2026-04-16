@@ -21,9 +21,9 @@ Design decisions:
 Linear: SLE-58
 """
 
-from datetime import date as Date, datetime, timezone
+from datetime import UTC, datetime
+from datetime import date as Date
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -217,7 +217,7 @@ class TradeEvent(BaseModel):
     fill_price: FiniteFloat = Field(ge=0, description="Actual fill price (0 if not yet filled)")
     fill_ratio: FiniteFloat = Field(ge=0.0, le=1.0, default=1.0, description="fill_quantity / ordered_quantity")
     status: OrderStatus = Field(default=OrderStatus.PENDING)
-    execution_timestamp: Optional[str] = Field(
+    execution_timestamp: str | None = Field(
         default=None,
         description="ISO 8601 UTC timestamp of fill (None = not filled yet)",
     )
@@ -226,7 +226,7 @@ class TradeEvent(BaseModel):
         default=0.0,
         description="Seconds from order submission to fill (0 in backtest)",
     )
-    broker_order_id: Optional[str] = Field(
+    broker_order_id: str | None = Field(
         default=None,
         description="External broker order ID (None in backtest mode)",
     )
@@ -300,7 +300,7 @@ class TradeEvent(BaseModel):
             fill_price=fill_price,
             fill_ratio=1.0,
             status=OrderStatus.FILLED,
-            execution_timestamp=datetime.now(timezone.utc).isoformat(),
+            execution_timestamp=datetime.now(UTC).isoformat(),
             execution_latency_seconds=0.0,
             broker_order_id=None,
         )

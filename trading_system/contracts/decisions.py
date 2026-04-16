@@ -24,12 +24,10 @@ from __future__ import annotations
 
 from datetime import date as Date
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from pattern_engine.contracts.finite_types import FiniteFloat
-
 
 # ─── EvaluatorStatus ──────────────────────────────────────────────────────────
 
@@ -82,8 +80,8 @@ class EvaluatorSnapshot(BaseModel):
 
     evaluation_date: Date
     status: EvaluatorStatus
-    sharpe_30d: Optional[float] = Field(default=None, description="30d Sharpe (None = insufficient history)")
-    sharpe_90d: Optional[float] = Field(default=None, description="90d Sharpe (None = insufficient history)")
+    sharpe_30d: float | None = Field(default=None, description="30d Sharpe (None = insufficient history)")
+    sharpe_90d: float | None = Field(default=None, description="90d Sharpe (None = insufficient history)")
     drawdown_from_peak: float = Field(ge=0.0, le=1.0, description="Current drawdown [0, 1]")
     days_in_market: int = Field(ge=0, description="Trading days since system start")
     reason: str = Field(min_length=1, description="Explanation of status decision")
@@ -139,7 +137,7 @@ class PositionDecision(BaseModel):
     ticker: str = Field(min_length=1, max_length=10)
     signal_date: Date
     approved: bool = Field(description="True = enter; False = skip")
-    rejection_reason: Optional[RejectionReason] = Field(
+    rejection_reason: RejectionReason | None = Field(
         default=None,
         description="Set only when approved=False",
     )
@@ -153,7 +151,7 @@ class PositionDecision(BaseModel):
     sector: str = Field(min_length=1)
 
     @model_validator(mode="after")
-    def rejection_requires_reason(self) -> "PositionDecision":
+    def rejection_requires_reason(self) -> PositionDecision:
         """A rejected decision must have a rejection_reason."""
         if not self.approved and self.rejection_reason is None:
             raise ValueError(
@@ -166,7 +164,7 @@ class PositionDecision(BaseModel):
         return self
 
     @model_validator(mode="after")
-    def approved_requires_sizing(self) -> "PositionDecision":
+    def approved_requires_sizing(self) -> PositionDecision:
         """An approved decision must have non-zero sizing."""
         if self.approved and self.position_pct == 0.0:
             raise ValueError(

@@ -5,6 +5,7 @@ Computes global OWA weights from mutual information rankings.
 Applied in PatternMatcher.fit() when use_owa=True.
 """
 from __future__ import annotations
+
 import numpy as np
 from sklearn.feature_selection import mutual_info_classif
 

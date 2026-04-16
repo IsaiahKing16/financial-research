@@ -1,12 +1,13 @@
 """MockBroker — in-memory broker for testing."""
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from pydantic import BaseModel, Field
 
 from trading_system.contracts.trades import OrderSide, OrderStatus
-from .base import BaseBroker, Order, OrderResult, BrokerPosition, AccountSnapshot
+
+from .base import AccountSnapshot, BaseBroker, BrokerPosition, Order, OrderResult
 
 
 class MockBrokerConfig(BaseModel):
@@ -68,7 +69,7 @@ class MockBroker(BaseBroker):
             filled_quantity=fill_qty,
             fill_price=fill_price,
             latency_ms=self._config.latency_ms,
-            executed_at=datetime.now(timezone.utc),
+            executed_at=datetime.now(UTC),
         )
         self._history.append((order, result))
         return result
@@ -169,7 +170,7 @@ class MockBroker(BaseBroker):
 
 class _MockPosition:
     """Mutable internal position tracker."""
-    __slots__ = ("quantity", "avg_cost")
+    __slots__ = ("avg_cost", "quantity")
 
     def __init__(self, quantity: float, avg_cost: float) -> None:
         self.quantity = quantity

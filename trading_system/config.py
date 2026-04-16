@@ -15,10 +15,7 @@ Key addition (SLE-71):
 Linear: SLE-68, SLE-71
 """
 
-import dataclasses
 from dataclasses import dataclass, field
-from typing import Dict, List
-
 
 # ─── Sub-Configs (same as production) ──────────────────────────────────────────
 
@@ -95,7 +92,7 @@ class RiskConfig:
 @dataclass(frozen=True)
 class EvaluationConfig:
     """Performance evaluation windows and thresholds."""
-    rolling_windows: List[int] = field(
+    rolling_windows: list[int] = field(
         default_factory=lambda: [30, 90, 252]
     )
     min_trades_for_metrics: int = 30
@@ -188,7 +185,7 @@ class TradingConfig:
     research_flags: ResearchFlagsConfig = field(default_factory=ResearchFlagsConfig)
     use_portfolio_manager: bool = False  # Phase 4: enable PM filter (default off)
 
-    def validate(self) -> List[str]:
+    def validate(self) -> list[str]:
         """Check internal consistency. Returns list of error messages (empty = valid)."""
         errors = []
 
@@ -216,7 +213,7 @@ class TradingConfig:
 
         if self.capital.max_gross_exposure > 1.0:
             errors.append(
-                f"v1 is long-only: max_gross_exposure must be ≤ 1.0"
+                "v1 is long-only: max_gross_exposure must be ≤ 1.0"
             )
 
         if not 0.50 <= self.signals.confidence_threshold <= 1.0:

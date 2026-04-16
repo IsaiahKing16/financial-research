@@ -17,8 +17,6 @@ Linear: M9 (Signal Intelligence Layer)
 """
 from __future__ import annotations
 
-from typing import Dict, Tuple
-
 import numpy as np
 import pandas as pd
 
@@ -41,16 +39,16 @@ class MomentumSignalFilter(SignalFilterBase):
 
     def __init__(
         self,
-        sector_map: Dict[str, str],
+        sector_map: dict[str, str],
         lookback_col: str = "ret_7d",
         min_outperformance: float = 0.015,
     ):
         self.sector_map = sector_map
         self.lookback_col = lookback_col
         self.min_outperformance = min_outperformance
-        self.sector_mean_returns_: Dict[str, float] = {}
+        self.sector_mean_returns_: dict[str, float] = {}
 
-    def fit(self, train_db: pd.DataFrame) -> "MomentumSignalFilter":
+    def fit(self, train_db: pd.DataFrame) -> MomentumSignalFilter:
         """Compute sector mean returns from training data.
 
         Args:
@@ -73,7 +71,7 @@ class MomentumSignalFilter(SignalFilterBase):
         signals: list[str],
         val_db: pd.DataFrame,
         **kwargs,
-    ) -> Tuple[list[str], np.ndarray]:
+    ) -> tuple[list[str], np.ndarray]:
         """Downgrade signals where ticker momentum disagrees with K-NN direction.
 
         Args:

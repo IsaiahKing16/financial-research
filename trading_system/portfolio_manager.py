@@ -25,8 +25,6 @@ Plan: docs/superpowers/plans/2026-04-08-phase4-portfolio-manager-plan.md
 """
 from __future__ import annotations
 
-from typing import Dict, List
-
 from pattern_engine.contracts.signals import SignalDirection
 from trading_system.config import PositionLimitsConfig
 from trading_system.portfolio_state import (
@@ -37,10 +35,9 @@ from trading_system.portfolio_state import (
 )
 from trading_system.signal_adapter import UnifiedSignal
 
-
 # ── rank_signals ──────────────────────────────────────────────────────────────
 
-def rank_signals(buy_signals: List[UnifiedSignal]) -> List[RankedSignal]:
+def rank_signals(buy_signals: list[UnifiedSignal]) -> list[RankedSignal]:
     """Rank BUY candidates by confidence descending, ticker ascending.
 
     Args:
@@ -114,11 +111,11 @@ def _approve(rs: RankedSignal) -> AllocationResult:
 
 
 def allocate_day(
-    ranked_signals: List[RankedSignal],
+    ranked_signals: list[RankedSignal],
     snapshot: PortfolioSnapshot,
     limits: PositionLimitsConfig,
     min_position_pct: float = 0.02,
-) -> List[AllocationResult]:
+) -> list[AllocationResult]:
     """Apply portfolio-level constraints to each ranked signal in rank order.
 
     Uses a RUNNING snapshot: approvals earlier in the day are added to
@@ -150,11 +147,11 @@ def allocate_day(
     # Build running state from the snapshot. Tuples in snapshot are immutable;
     # we maintain parallel mutable mirrors for the loop.
     running_tickers: set[str] = {p.ticker for p in snapshot.open_positions}
-    running_sector_counts: Dict[str, int] = dict(snapshot.sector_counts)
-    running_sector_exposure: Dict[str, float] = dict(snapshot.sector_exposure_pct)
+    running_sector_counts: dict[str, int] = dict(snapshot.sector_counts)
+    running_sector_exposure: dict[str, float] = dict(snapshot.sector_exposure_pct)
     running_cash_pct: float = snapshot.cash_pct
 
-    results: List[AllocationResult] = []
+    results: list[AllocationResult] = []
 
     for rs in ranked_signals:
         sector = rs.sector

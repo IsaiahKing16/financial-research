@@ -26,10 +26,9 @@ import pandas as pd
 import pandera as pa
 
 from pattern_engine.contracts.datasets import (
-    make_train_db_schema,
     make_query_db_schema,
+    make_train_db_schema,
 )
-
 
 # ─── Public Exception ──────────────────────────────────────────────────────────
 
@@ -220,7 +219,6 @@ def _validate_target_col(db: pd.DataFrame, col: str, errors: list[str]) -> None:
         errors.append(f"Missing projection horizon column: {col}")
         return
 
-    import numpy as np
     if not pd.api.types.is_numeric_dtype(db[col]):
         errors.append(
             f"Projection horizon '{col}' has dtype {db[col].dtype}, expected numeric (0/1)"

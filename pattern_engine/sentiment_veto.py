@@ -29,7 +29,6 @@ from __future__ import annotations
 
 import logging
 from datetime import date, timedelta
-from typing import Dict, Optional
 
 import numpy as np
 import pandas as pd
@@ -80,8 +79,8 @@ class SentimentVetoFilter(SignalFilterBase):
     def fetch_sentiment(
         self,
         tickers: list[str],
-        query_date: Optional[date] = None,
-    ) -> Dict[str, float]:
+        query_date: date | None = None,
+    ) -> dict[str, float]:
         """Fetch news sentiment scores for a list of tickers.
 
         Calls _fetch_ticker() for each ticker and aggregates results.
@@ -104,7 +103,7 @@ class SentimentVetoFilter(SignalFilterBase):
             query_date = date.today()
 
         since_date = query_date - timedelta(days=self.lookback_days)
-        scores: Dict[str, float] = {}
+        scores: dict[str, float] = {}
         error_count = 0
 
         for ticker in tickers:
@@ -129,7 +128,7 @@ class SentimentVetoFilter(SignalFilterBase):
         probs: np.ndarray,
         signals: list[str],
         tickers: list[str],
-        sentiment: Dict[str, float],
+        sentiment: dict[str, float],
     ) -> list[str]:
         """Apply sentiment veto to signals using pre-fetched sentiment scores.
 
@@ -182,7 +181,7 @@ class SentimentVetoFilter(SignalFilterBase):
             (filtered_signals, veto_mask).
         """
         tickers = list(val_db["Ticker"].values)
-        sentiment: Dict[str, float] = kwargs.get("sentiment", {})
+        sentiment: dict[str, float] = kwargs.get("sentiment", {})
         filtered = self.apply_with_sentiment(probs, signals, tickers, sentiment)
         veto_mask = np.array(
             [filtered[i] != signals[i] for i in range(len(signals))], dtype=bool

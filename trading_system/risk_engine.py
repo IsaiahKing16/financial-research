@@ -25,7 +25,6 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import List, Optional
 
 import icontract
 
@@ -177,7 +176,7 @@ class AdjustedSizing:
     dd_scalar: float
     overlay_multiplier: float
     blocked: bool
-    block_reason: Optional[str]
+    block_reason: str | None
 
 
 # ─── Orchestrator ─────────────────────────────────────────────────────────────
@@ -201,7 +200,7 @@ class AdjustedSizing:
 def apply_risk_adjustments(
     sizing: SizingResult,
     drawdown: float,
-    overlays: Optional[List[BaseRiskOverlay]] = None,
+    overlays: list[BaseRiskOverlay] | None = None,
     dd_warn: float = 0.15,
     dd_halt: float = 0.20,
 ) -> AdjustedSizing:
@@ -270,7 +269,7 @@ def apply_risk_adjustments(
     dd_scalar = drawdown_brake_scalar(drawdown, warn=dd_warn, halt=dd_halt)
 
     overlay_multiplier = 1.0
-    blocking_overlay: Optional[BaseRiskOverlay] = None
+    blocking_overlay: BaseRiskOverlay | None = None
     if overlays:
         for overlay in overlays:
             m = overlay.get_signal_multiplier()

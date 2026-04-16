@@ -17,9 +17,7 @@ Linear: SLE-57
 
 from datetime import date as Date
 from enum import Enum
-from typing import List, Optional, Tuple
 
-import numpy as np
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from pattern_engine.contracts.finite_types import FiniteFloat
@@ -113,9 +111,9 @@ class NeighborResult(BaseModel):
 
     query_ticker: str = Field(description="Ticker symbol being queried")
     query_date: Date = Field(description="Date of the query fingerprint")
-    neighbor_indices: List[int] = Field(description="Training DB row indices of KNN results")
-    neighbor_distances: List[float] = Field(description="Euclidean distances to each neighbor")
-    neighbor_labels: List[int] = Field(description="Binary target labels of each neighbor (0 or 1)")
+    neighbor_indices: list[int] = Field(description="Training DB row indices of KNN results")
+    neighbor_distances: list[float] = Field(description="Euclidean distances to each neighbor")
+    neighbor_labels: list[int] = Field(description="Binary target labels of each neighbor (0 or 1)")
     n_neighbors_requested: int = Field(ge=1, description="k requested at query time")
     n_neighbors_found: int = Field(ge=0, description="Actual neighbors returned")
 
@@ -149,7 +147,7 @@ class NeighborResult(BaseModel):
 
     @field_validator("neighbor_distances")
     @classmethod
-    def distances_non_negative(cls, v: List[float]) -> List[float]:
+    def distances_non_negative(cls, v: list[float]) -> list[float]:
         """All Euclidean distances must be >= 0."""
         if any(d < 0.0 for d in v):
             raise ValueError("neighbor_distances contains negative values; sqrt() may be missing")
@@ -157,7 +155,7 @@ class NeighborResult(BaseModel):
 
     @field_validator("neighbor_labels")
     @classmethod
-    def labels_binary(cls, v: List[int]) -> List[int]:
+    def labels_binary(cls, v: list[int]) -> list[int]:
         """Neighbor labels must be 0 or 1 (binary classification only)."""
         if any(label not in (0, 1) for label in v):
             raise ValueError("neighbor_labels must contain only 0 and 1")

@@ -46,10 +46,8 @@ Linear: SLE-77
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import List, Optional, Tuple
 
 import numpy as np
-
 
 # ─── Interface stubs ──────────────────────────────────────────────────────────
 
@@ -83,7 +81,7 @@ class BaseConformalCalibrator(ABC):
         self,
         point_prob: float,
         alpha: float = 0.1,
-    ) -> Tuple[float, float]:
+    ) -> tuple[float, float]:
         """Return a (1-alpha)-coverage prediction interval.
 
         Args:
@@ -123,7 +121,7 @@ class NaiveConformalCalibrator(BaseConformalCalibrator):
     """
 
     def __init__(self) -> None:
-        self._cal_scores: Optional[np.ndarray] = None
+        self._cal_scores: np.ndarray | None = None
         self._n_cal: int = 0
 
     def calibrate(
@@ -147,7 +145,7 @@ class NaiveConformalCalibrator(BaseConformalCalibrator):
         self,
         point_prob: float,
         alpha: float = 0.1,
-    ) -> Tuple[float, float]:
+    ) -> tuple[float, float]:
         """Return conformal prediction interval centred on point_prob.
 
         STUB — NO FORMAL COVERAGE GUARANTEE.
@@ -174,9 +172,7 @@ class NaiveConformalCalibrator(BaseConformalCalibrator):
             p_lo, p_hi = self.predict_set(prob)
             # Label 1 is covered if the prediction set includes values above 0.5
             # Label 0 is covered if the prediction set includes values below 0.5
-            if label == 1 and p_hi > 0.5:
-                covered += 1
-            elif label == 0 and p_lo < 0.5:
+            if (label == 1 and p_hi > 0.5) or (label == 0 and p_lo < 0.5):
                 covered += 1
         return covered / len(test_labels) if test_labels.size > 0 else 0.0
 
@@ -188,7 +184,7 @@ def augment_signals_with_conformal(
     calibrator: BaseConformalCalibrator,
     confidence_threshold: float = 0.65,
     alpha: float = 0.1,
-) -> Tuple[np.ndarray, List[str]]:
+) -> tuple[np.ndarray, list[str]]:
     """Wrap point probabilities with conformal intervals to sharpen signals.
 
     A BUY signal requires: p_lo > confidence_threshold (high confidence
@@ -241,7 +237,7 @@ class AdaptiveConformalPredictor:
         self.nominal_alpha = nominal_alpha
         self.gamma = gamma
         self.alpha_t = nominal_alpha
-        self._scores: Optional[np.ndarray] = None
+        self._scores: np.ndarray | None = None
 
     def calibrate(self, cal_probs: np.ndarray, cal_labels: np.ndarray) -> None:
         """Compute non-conformity scores on calibration set.
@@ -250,7 +246,7 @@ class AdaptiveConformalPredictor:
         """
         self._scores = np.sort(np.abs(cal_probs - cal_labels))
 
-    def predict_interval(self, prob: float) -> Tuple[float, float]:
+    def predict_interval(self, prob: float) -> tuple[float, float]:
         """Return (lower, upper) prediction interval for a single probability.
 
         Uses the (1 - alpha_t) quantile of calibration non-conformity scores

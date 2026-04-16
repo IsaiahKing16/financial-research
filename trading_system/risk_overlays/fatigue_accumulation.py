@@ -31,7 +31,7 @@ Linear: SLE-75
 from __future__ import annotations
 
 from datetime import date
-from typing import Any, Optional
+from typing import Any
 
 from trading_system.risk_overlays.base import BaseRiskOverlay
 
@@ -69,9 +69,9 @@ class FatigueAccumulationOverlay(BaseRiskOverlay):
         self.reset_on_neutral = reset_on_neutral
 
         self._fatigue_score: float = 0.0
-        self._current_regime: Optional[str] = None
+        self._current_regime: str | None = None
         self._regime_duration: int = 0
-        self._last_date: Optional[date] = None
+        self._last_date: date | None = None
 
     @property
     def fatigue_score(self) -> float:
@@ -84,7 +84,7 @@ class FatigueAccumulationOverlay(BaseRiskOverlay):
         return self._regime_duration
 
     @property
-    def current_regime(self) -> Optional[str]:
+    def current_regime(self) -> str | None:
         """Active regime label, or None if not yet set."""
         return self._current_regime
 
@@ -99,7 +99,7 @@ class FatigueAccumulationOverlay(BaseRiskOverlay):
             current_date: Trading date.
             **market_data: Market data kwargs; unrecognised keys are ignored.
         """
-        regime = market_data.get("regime_label", None)
+        regime = market_data.get("regime_label")
         self._last_date = current_date
 
         # Determine if this is a regime transition

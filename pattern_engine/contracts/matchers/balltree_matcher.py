@@ -11,7 +11,6 @@ current 52-ticker universe (~260k training points per fold).
 Linear: SLE-61
 """
 
-from typing import Dict, Tuple
 
 import numpy as np
 from sklearn.neighbors import NearestNeighbors
@@ -69,7 +68,7 @@ class BallTreeMatcher(BaseMatcher):
 
     def kneighbors(
         self, X: np.ndarray, n_neighbors: int = 0
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    ) -> tuple[np.ndarray, np.ndarray]:
         """Query BallTree for exact nearest neighbors.
 
         Returns (distances, indices) matching sklearn convention:
@@ -92,7 +91,7 @@ class BallTreeMatcher(BaseMatcher):
         distances, indices = self._nn.kneighbors(X, n_neighbors=k)
         return distances, indices
 
-    def get_params(self) -> Dict[str, object]:
+    def get_params(self) -> dict[str, object]:
         return {
             "backend": "balltree",
             "n_neighbors": self._n_neighbors,

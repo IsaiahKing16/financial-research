@@ -25,12 +25,11 @@ Plan: docs/superpowers/plans/2026-04-08-phase4-portfolio-manager-plan.md
 from __future__ import annotations
 
 from datetime import date as Date
-from typing import Dict, Literal, Optional, Tuple
+from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from pattern_engine.contracts.finite_types import FiniteFloat
-
 
 # ── OpenPosition ──────────────────────────────────────────────────────────────
 
@@ -75,10 +74,10 @@ class PortfolioSnapshot(BaseModel):
     as_of_date: Date
     equity: FiniteFloat = Field(gt=0.0, description="Total portfolio equity (cash + positions)")
     cash: FiniteFloat = Field(ge=0.0, description="Available cash")
-    open_positions: Tuple[OpenPosition, ...] = Field(default_factory=tuple)
+    open_positions: tuple[OpenPosition, ...] = Field(default_factory=tuple)
 
     @model_validator(mode="after")
-    def cash_must_not_exceed_equity(self) -> "PortfolioSnapshot":
+    def cash_must_not_exceed_equity(self) -> PortfolioSnapshot:
         if self.cash > self.equity:
             raise ValueError(
                 f"cash ({self.cash}) must not exceed equity ({self.equity})"
@@ -90,15 +89,15 @@ class PortfolioSnapshot(BaseModel):
         return len(self.open_positions)
 
     @property
-    def sector_counts(self) -> Dict[str, int]:
-        counts: Dict[str, int] = {}
+    def sector_counts(self) -> dict[str, int]:
+        counts: dict[str, int] = {}
         for p in self.open_positions:
             counts[p.sector] = counts.get(p.sector, 0) + 1
         return counts
 
     @property
-    def sector_exposure_pct(self) -> Dict[str, float]:
-        exposure: Dict[str, float] = {}
+    def sector_exposure_pct(self) -> dict[str, float]:
+        exposure: dict[str, float] = {}
         for p in self.open_positions:
             exposure[p.sector] = exposure.get(p.sector, 0.0) + p.position_pct
         return exposure
@@ -191,10 +190,10 @@ class AllocationResult(BaseModel):
     confidence: float = Field(ge=0.0, le=1.0)
     rank: int = Field(ge=1)
     approved: bool
-    rejection: Optional[PMRejection] = None
+    rejection: PMRejection | None = None
 
     @model_validator(mode="after")
-    def approval_state_consistency(self) -> "AllocationResult":
+    def approval_state_consistency(self) -> AllocationResult:
         if self.approved and self.rejection is not None:
             raise ValueError(
                 "approved=True must not have a rejection attached"

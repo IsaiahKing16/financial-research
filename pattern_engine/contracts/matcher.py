@@ -26,7 +26,6 @@ Design doc: docs/rebuild/PHASE_3Z_EXECUTION_PLAN.md §4
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, Tuple
 
 import numpy as np
 
@@ -76,7 +75,7 @@ class BaseMatcher(ABC):
     @abstractmethod
     def kneighbors(
         self, X: np.ndarray, n_neighbors: int
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    ) -> tuple[np.ndarray, np.ndarray]:
         """Find the k nearest neighbors for each query point.
 
         Args:
@@ -96,7 +95,7 @@ class BaseMatcher(ABC):
         ...
 
     @abstractmethod
-    def get_params(self) -> Dict[str, object]:
+    def get_params(self) -> dict[str, object]:
         """Return configuration parameters for logging/provenance.
 
         Returns:

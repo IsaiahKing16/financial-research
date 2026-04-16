@@ -32,7 +32,6 @@ from __future__ import annotations
 import logging
 import time
 from datetime import date
-from typing import Optional
 
 _log = logging.getLogger(__name__)
 
@@ -45,7 +44,6 @@ from pattern_engine.contracts.matcher import BaseMatcher
 from pattern_engine.contracts.matchers.balltree_matcher import BallTreeMatcher
 from pattern_engine.contracts.signals import NeighborResult
 from pattern_engine.features import apply_feature_weights
-
 
 # ─── SECTOR_MAP import (production source of truth) ───────────────────────────
 
@@ -72,7 +70,7 @@ class _PlattCalibrator:
     def __init__(self) -> None:
         self._lr = None
 
-    def fit(self, raw: np.ndarray, y: np.ndarray) -> "_PlattCalibrator":
+    def fit(self, raw: np.ndarray, y: np.ndarray) -> _PlattCalibrator:
         from sklearn.linear_model import LogisticRegression
         self._lr = LogisticRegression(C=1.0, solver="lbfgs", max_iter=1000)
         self._lr.fit(raw.reshape(-1, 1), y)
@@ -113,30 +111,30 @@ class PatternMatcher:
                     regime_fallback, projection_horizon.
         """
         self.config = config
-        self._scaler: Optional[StandardScaler] = None
-        self._backend: Optional[BaseMatcher] = None
-        self._train_db: Optional[pd.DataFrame] = None
-        self._feature_cols: Optional[list[str]] = None
+        self._scaler: StandardScaler | None = None
+        self._backend: BaseMatcher | None = None
+        self._train_db: pd.DataFrame | None = None
+        self._feature_cols: list[str] | None = None
         self._regime_labels_train = None
         self._fitted: bool = False
 
         # Pre-cached numpy arrays (set by _rebuild_caches after fit)
-        self._train_tickers_arr: Optional[np.ndarray] = None
-        self._train_sector_arr: Optional[np.ndarray] = None
-        self._train_target_arr: Optional[np.ndarray] = None
-        self._train_ret_arr: Optional[np.ndarray] = None
-        self._train_dates_arr: Optional[np.ndarray] = None
+        self._train_tickers_arr: np.ndarray | None = None
+        self._train_sector_arr: np.ndarray | None = None
+        self._train_target_arr: np.ndarray | None = None
+        self._train_ret_arr: np.ndarray | None = None
+        self._train_dates_arr: np.ndarray | None = None
 
         # Platt calibrator (SLE-89): None until fit() runs the double-pass.
         # query() returns raw probs if None; applies transform() otherwise.
-        self._calibrator: Optional[_PlattCalibrator] = None
-        self._bma_calibrator: Optional[object] = None  # BMACalibrator when use_bma=True
+        self._calibrator: _PlattCalibrator | None = None
+        self._bma_calibrator: object | None = None  # BMACalibrator when use_bma=True
 
         # Research pilot modules (SLE-72–78, all None until flag activates in fit())
         self._sax_filter = None         # SAXFilter | None (use_sax_filter flag)
         self._wfa_reranker = None       # WFAReranker | None (use_wfa_rerank flag)
         self._ib_compressor = None      # IBCompressor | None (use_ib_compression flag)
-        self._X_train_weighted: Optional[np.ndarray] = None   # stored for SAX
+        self._X_train_weighted: np.ndarray | None = None   # stored for SAX
         self._active_overlays: list = []  # list[BaseRiskOverlay] — caller-managed
 
         # Decision journal (populated after query() when journal_top_n > 0)
@@ -261,7 +259,7 @@ class PatternMatcher:
         val_tickers_b: np.ndarray, # (B,) object array of ticker strings
         val_sectors_b: np.ndarray, # (B,) object array of sector strings
         val_regime_b,              # (B,) regime labels or None
-        X_batch: Optional[np.ndarray] = None,  # (B, D) — for SAX filter
+        X_batch: np.ndarray | None = None,  # (B, D) — for SAX filter
     ) -> np.ndarray:
         """Build the combined boolean mask selecting which candidates survive.
 
@@ -590,7 +588,7 @@ class PatternMatcher:
         train_db: pd.DataFrame,
         feature_cols: list[str],
         regime_labeler=None,
-    ) -> "PatternMatcher":
+    ) -> PatternMatcher:
         """Fit scaler and build the NN index on training data.
 
         Calls Stage 1 (prepare_features with fit_scaler=True) then
@@ -1053,7 +1051,7 @@ class PatternMatcher:
     # ──────────────────────────────────────────────────────────────────────────
 
     @property
-    def scaler(self) -> Optional[StandardScaler]:
+    def scaler(self) -> StandardScaler | None:
         """The fitted StandardScaler (None if not yet fitted)."""
         return self._scaler
 
@@ -1063,7 +1061,7 @@ class PatternMatcher:
         return self._fitted
 
     @property
-    def backend(self) -> Optional[BaseMatcher]:
+    def backend(self) -> BaseMatcher | None:
         """The active matcher backend (BallTreeMatcher or HNSWMatcher)."""
         return self._backend
 

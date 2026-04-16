@@ -27,7 +27,6 @@ from __future__ import annotations
 
 from datetime import date as Date
 from enum import Enum
-from typing import Dict, List, Optional, Tuple
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -36,7 +35,6 @@ from trading_system.contracts.decisions import (
     EvaluatorSnapshot,
     EvaluatorStatus,
 )
-
 
 # ─── SystemCommand ─────────────────────────────────────────────────────────────
 
@@ -69,7 +67,7 @@ class EquityState(BaseModel):
     inception_equity: FiniteFloat = Field(gt=0, description="Starting equity (for total return calc)")
 
     @model_validator(mode="after")
-    def equity_components_consistent(self) -> "EquityState":
+    def equity_components_consistent(self) -> EquityState:
         """total_equity should approximately equal cash + invested_capital."""
         diff = abs(self.total_equity - (self.cash + self.invested_capital))
         if diff > 1.0:  # Allow $1 rounding tolerance
@@ -80,7 +78,7 @@ class EquityState(BaseModel):
         return self
 
     @model_validator(mode="after")
-    def peak_ge_equity(self) -> "EquityState":
+    def peak_ge_equity(self) -> EquityState:
         """Peak equity must be >= current equity (peaks only move up)."""
         if self.peak_equity < self.total_equity - 0.01:  # $0.01 tolerance for float arithmetic
             raise ValueError(
@@ -111,7 +109,7 @@ class PositionsState(BaseModel):
 
     # Maps ticker → (trade_id, entry_date, entry_price, position_pct, days_held)
     # Using a tuple list instead of nested model for JSON serializability
-    open_tickers: List[str] = Field(
+    open_tickers: list[str] = Field(
         default_factory=list,
         description="Tickers currently held",
     )
@@ -119,13 +117,13 @@ class PositionsState(BaseModel):
     max_positions: int = Field(ge=1, default=10, description="Hard cap on concurrent positions")
 
     # Sector exposure: ticker -> sector (for concentration checks)
-    ticker_sectors: Dict[str, str] = Field(
+    ticker_sectors: dict[str, str] = Field(
         default_factory=dict,
         description="Ticker → sector mapping for open positions",
     )
 
     @model_validator(mode="after")
-    def n_open_consistent(self) -> "PositionsState":
+    def n_open_consistent(self) -> PositionsState:
         """n_open must match len(open_tickers)."""
         if self.n_open != len(self.open_tickers):
             raise ValueError(
@@ -151,7 +149,7 @@ class RiskState(BaseModel):
     max_holding_days: int = Field(ge=1, default=14)
     confidence_threshold: float = Field(ge=0.0, le=1.0, default=0.65)
     max_sector_concentration: int = Field(ge=1, default=3, description="Max positions per sector")
-    current_atr_estimates: Dict[str, float] = Field(
+    current_atr_estimates: dict[str, float] = Field(
         default_factory=dict,
         description="Ticker → ATR estimate (% of price) at last update",
     )
@@ -172,7 +170,7 @@ class EvaluatorState(BaseModel):
     """Strategy evaluator health metrics."""
     model_config = {"frozen": True}
 
-    latest_snapshot: Optional[EvaluatorSnapshot] = Field(
+    latest_snapshot: EvaluatorSnapshot | None = Field(
         default=None,
         description="Most recent evaluator assessment",
     )
@@ -229,7 +227,7 @@ class SharedState(BaseModel):
     risk: RiskState
     portfolio: PortfolioState
     evaluator: EvaluatorState
-    command_queue: List[SystemCommand] = Field(
+    command_queue: list[SystemCommand] = Field(
         default_factory=list,
         description="Pending commands from evaluator to portfolio manager",
     )
@@ -280,7 +278,7 @@ class SharedState(BaseModel):
         max_holding_days: int = 14,
         confidence_threshold: float = 0.65,
         max_sector_concentration: int = 3,
-    ) -> "SharedState":
+    ) -> SharedState:
         """
         Create the initial SharedState at system start.
 

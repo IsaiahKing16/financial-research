@@ -69,3 +69,27 @@ from CLAUDE.md to keep the root config file concise.
 - Script: scripts/run_585t_full_stack.py
 - Provenance: results/phase8_pre/585t_gate_check.txt, results/phase8_pre/585t_walkforward.tsv
 - T8.1 BLOCKED. Recovery campaign launched: docs/campaigns/P8_RECOVERY_CAMPAIGN.md
+
+## Recovery Campaign Track A — Dynamic Universe Sizing (2026-04-16)
+- Result: REJECTED (null result) — all N ∈ {52, 100, 150, 200, 300, 400, 585} fail G1+G6
+- Key finding: Resolution U-curve (peaks N=52 and N=585, trough at N=300) refutes monotone
+  dilution hypothesis. Dynamic selection criteria (5 equal-weight: liquidity, data completeness,
+  volatility coverage, sector representation, signal contribution) produce no BSS improvement.
+- Deviation: survival_adj criterion dropped (no delisted data). 5 criteria re-normalized to 0.20.
+- Weight sweep (§2.3b) not triggered — conditional on passing baseline.
+- Tests: 27 new unit tests in unmerged worktree (`feature/p8-track-a-universe-sweep`).
+- Provenance: results/campaign_p8_recovery/track_a/, docs/adr/ADR-014-dynamic-universe-selection.md
+- Track B (per-sector pools + connectors) and Track C (LightGBM) deferred to Phase 8 R1 window.
+
+## Phase 7.5 — Research Integration Gate (target: 2026-04-21 start, 2026-05-12 gates)
+- Status: UPCOMING — 8 hard-block gate criteria before Phase 8 restarts
+- G7.5-1: Z-score normalization on all 23 features + full 6-fold re-validation (BSS must hold)
+- G7.5-2: Braess gate (`braess_gate()`) — every future feature addition gates here
+- G7.5-3: Identifiability gate — confirms parameters determinable from training data volume
+- G7.5-4: HMM look-ahead audit — hmmlearn.predict_proba() check; migrate if found
+- G7.5-5: Control-variate BSS estimator — 95% CI per fold; CI must exclude 0 on ≥3/6 folds
+- G7.5-6: Murphy B3 decomposition — REL/RES/UNC diagnosis (reliability vs resolution failure)
+- G7.5-7: MI ceiling diagnostic — joint 23D MI; if < 0.001, feature space is insufficient
+- G7.5-8: Multi-horizon BSS curve — 1d/3d/5d/7d/10d/14d (informational, does not block)
+- Decision logic: if G7.5-5 CI includes 0 → halt Phase 8, activate R2-H9 (LightGBM)
+- Reference: FPPE_MASTER_PLAN_v4.md §Phase 7.5

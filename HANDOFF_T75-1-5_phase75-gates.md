@@ -1,5 +1,5 @@
 # HANDOFF: Phase 7.5 Gates T7.5-1 through T7.5-5
-**Created:** 2026-04-18
+**Created:** 2026-04-18 | **Updated:** 2026-04-19
 **Task type:** SR (multi-task — statistical methods + diagnostics infrastructure)
 
 ---
@@ -31,6 +31,25 @@ T7.5-2 through T7.5-5, all of which build new infrastructure in files that do no
 - See [ADR-015](docs/adr/ADR-015-g75-zscore-revalidation.md) for full reasoning
 
 **Test count:** 948 (945 baseline + 3 new T7.5-1 unit tests). All pass.
+
+### Additional Work Completed 2026-04-19 (Documentation Closure)
+
+Master plan review against T7.5-1 results identified two gaps. Both fixed in commit `6bde221`:
+
+**ADR-015 updated** — added "Key Findings" section with:
+- `z_score_off` has `resolution = 0.0` on **all 6 folds** without StandardScaler. Normalization
+  is not incrementally better — it is the *only* source of discriminative power in the system.
+- 2022-Bear fold: `n_scored = 416 / 13,052 (3.2%)`. The catastrophic -0.122 BSS and the
+  Condition B failure both trace to coverage collapse in bear regimes at 52T, not normalization.
+  This is the mechanistic justification for the CONDITIONAL PASS verdict.
+
+**FPPE_MASTER_PLAN_v4.md line 25 corrected** — the claim *"~91% of L2 distance variance from
+returns / +0.005–0.02 lift expected"* was a false premise: StandardScaler was already in place
+per ADR-007. The paragraph now correctly states that T7.5-1 was a verification task, that the
+lift was already baked in to all prior metrics, and that the real finding is zero resolution
+without normalization.
+
+T7.5-1 is now fully and properly closed. No code changes in this session.
 
 ---
 

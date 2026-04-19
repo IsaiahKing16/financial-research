@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+import icontract
 import numpy as np
 
 # ─── Returns-only feature set (locked setting) ────────────────────────────────
@@ -106,6 +107,7 @@ FeatureRegistry = _FeatureRegistry()
 """Singleton feature set registry. Use FeatureRegistry.get("returns_only")."""
 
 
+@icontract.require(lambda feature_set: len(feature_set) > 0, "feature_set must not be empty.")
 def get_feature_cols(feature_set: str) -> list[str]:
     """Resolve feature column names for a given feature set.
 
@@ -129,6 +131,11 @@ def get_feature_cols(feature_set: str) -> list[str]:
 
 # ─── Feature weighting ────────────────────────────────────────────────────────
 
+@icontract.require(lambda feature_cols: len(feature_cols) > 0, "feature_cols must not be empty.")
+@icontract.require(
+    lambda X, feature_cols: X.shape[1] == len(feature_cols),
+    "feature_cols length must match X column count.",
+)
 def apply_feature_weights(
     X: np.ndarray,
     feature_cols: list[str],

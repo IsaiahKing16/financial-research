@@ -67,6 +67,13 @@ class EngineConfig:
     regime_filter: bool = False           # Off until validated (CLAUDE.md)
     regime_fallback: bool = False
     calibration_method: str = "beta_abm"
+    """52T research default.  Production 585T path must override to 'platt'.
+    CLAUDE.md locked setting: Calibration=Platt (585T production).
+    walkforward.py monkey-patches _PlattCalibrator → _BetaCalibrator for 52T runs."""
+    cal_frac: float = 0.76
+    """Fraction of training rows used for the calibration double-pass.
+    Locked setting per CLAUDE.md (cal_frac=0.76).  matcher.py reads this via
+    getattr(cfg, 'cal_frac', 0.76) — this field makes the locked value authoritative."""
     cal_max_samples: int = 100_000
 
     # ── Research pilots (all off in production) ───────────────────────────────

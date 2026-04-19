@@ -43,3 +43,8 @@ omit = ["tests/*", "scripts/*", "archive/*", "venv/*"]
 [tool.bandit]
 exclude_dirs = ["tests", "scripts", "archive", "venv"]
 skips = ["B101"]
+
+[tool.pytest.ini_options]
+markers = [
+    "slow: marks tests as slow-running (deselect with '-m not slow')",
+]

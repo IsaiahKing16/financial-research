@@ -414,12 +414,18 @@ All findings from `docs/PHASE1_FILE_REVIEW.md`:
 
 | Item | Priority |
 |------|----------|
-| T8.1: EOD Pipeline Automation (scripts/eod_pipeline.py) | **High — next** |
-| Phase C Domain 2: vectorized feature extraction | Medium |
-| Conservative profile empirical validation (run threshold_sweep.py at 0.68) | Medium |
-| Ticker expansion beyond 585T (S&P 500 -> Russell 1000 -> 3000) | Medium |
+| **T7.5-1: Z-score normalization + full 6-fold re-validation** | **Critical — NEXT (Phase 7.5)** |
+| T7.5-5: Control-variate BSS estimator (95% CI per fold) | Critical — Phase 7.5 |
+| T7.5-6: Murphy B3 decomposition (REL/RES/UNC per fold) | Critical — Phase 7.5 |
+| T7.5-4: HMM look-ahead audit (hmmlearn.predict_proba check) | Critical — Phase 7.5, parallel |
+| T7.5-3: Identifiability gate | High — Phase 7.5, parallel |
+| T7.5-2: Braess gate implementation | High — Phase 7.5, after T7.5-1 |
+| T7.5-7: MI ceiling diagnostic (mutual_info_classif) | High — Phase 7.5, after T7.5-1 |
+| T7.5-8: Multi-horizon BSS curve (1d/3d/5d/7d/10d/14d) | Informational — Phase 7.5 |
+| T8.1: EOD Pipeline Automation | Blocked on Phase 7.5 gate pass |
+| Phase C Domain 2: vectorized feature extraction | Deferred |
 
-### 7.7 Phase 2 — Risk engine (complete)
+### 7.8 Phase 2 — Risk engine (complete)
 
 **Delivered:** `risk_engine.py`, `risk_state.py`, `use_risk_engine` integration, `run_phase2.py`, unit + integration tests. **Spec:** `docs/PHASE2_SYSTEM_DESIGN.md`. **Validation:** `docs/PHASE2_RESULTS.md`.
 
@@ -536,6 +542,8 @@ print(results.sort_values("mean_bss", ascending=False).head(10))
 | `docs/adr/` | ADR-007-012 | Architecture Decision Records (P8-PRE) |
 | `docs/LOCKED_SETTINGS_PROVENANCE.md` | -- | Full provenance for locked hyperparameters |
 | `docs/PHASE_COMPLETION_LOG.md` | -- | Phase history with key metrics |
+| `FPPE_MASTER_PLAN_v4.md` | v4.0 | Strategic roadmap: Phase 7.5 → Phase 8 → Phase 9 (see Downloads or project root copy) |
+| `docs/campaigns/P8_RECOVERY_CAMPAIGN.md` | -- | Recovery campaign: Track A REJECTED, Track B/C deferred to Phase 8 R1 |
 
 ---
 
@@ -553,15 +561,34 @@ print(results.sort_values("mean_bss", ascending=False).head(10))
 - [x] Phase 7: Enhancement experiments E1-E4 ALL FAIL; flags remain False
 - [x] P8-PRE: Power of 10 hardening -- FiniteFloat, icontract, static analysis, 945 tests
 
-### Active (T8.1)
-- [ ] EOD Pipeline Automation (`scripts/eod_pipeline.py`) -- 60-day autonomous pipeline
+### Active (Phase 7.5 — Research Integration Gate)
+- [ ] T7.5-1: Z-score normalization on all 23 features + full 6-fold re-validation
+- [ ] T7.5-2: Braess gate (`braess_gate()`) implementation
+- [ ] T7.5-3: Identifiability gate (3h) installation
+- [ ] T7.5-4: HMM look-ahead audit (hmmlearn.predict_proba check → statsmodels migration if needed)
+- [ ] T7.5-5: Control-variate BSS estimator (95% CI on all 6 folds)
+- [ ] T7.5-6: Murphy B3 decomposition (REL/RES/UNC per fold, pre and post z-score)
+- [ ] T7.5-7: MI ceiling diagnostic (mutual_info_classif, joint 23D vector)
+- [ ] T7.5-8: Multi-horizon BSS curve (1d/3d/5d/7d/10d/14d)
+
+### Blocked (awaiting Phase 7.5 gate pass)
+- [ ] P8-PRE-1 retest with winning architecture
+- [ ] Phase 8: Paper trading + autonomous EOD pipeline
+- [ ] T8.1: EOD Pipeline Automation (`scripts/eod_pipeline.py`)
+
+### Deferred (Phase 8 R1 integration window)
+- [ ] R1-INT-1: Multi-retriever ensemble (5 HNSW indices + reciprocal rank fusion)
+- [ ] R1-INT-2: Value-stream map the EOD pipeline
+- [ ] R1-INT-3: Defense-in-depth audit (single price feed bus risk)
+- [ ] Track B: Per-sector pools + cross-sector connectors (R1 rank 2 equivalent)
+- [ ] Track C: LightGBM vs KNN head-to-head (R2-H9)
 
 ### Backlog
-- [ ] Phase C Domain 2: vectorized feature extraction
+- [ ] Phase 9: Live deployment ($10k IBKR, Sortino-adjusted Kelly sizing)
+- [ ] Phase 10: NautilusTrader evaluation
+- [ ] Phase 11: Hyper-scale (5,200+ tickers, FAISS IVF)
 - [ ] Conservative profile validation (threshold_sweep.py at 0.68)
 - [ ] 10-year data expansion (2015-2024)
-- [ ] v3.0: Conv1D+LSTM hybrid, 500+ tickers, BSS > 0.05 target
-- [ ] v4.0: FastAPI, Interactive Brokers live trading, Kelly sizing
 
 ---
 
@@ -577,9 +604,13 @@ pandas, numpy, scikit-learn, yfinance, ta, pyarrow, optuna, icontract
 pytest
 ```
 
+### Mandatory (P8-PRE-2, double-confirmed must-have)
+```
+scoringrules    # CRPS + proper scoring rule infrastructure (mandatory for Phase 8 monitoring)
+```
+
 ### Optional
 ```
-scoringrules    # CRPS computation
 python-docx     # Report generation
 ```
 

@@ -69,6 +69,40 @@ still negative but 10× less severe.
 **Overall: CONDITIONAL PASS** — normalization is confirmed working correctly.
 The absolute BSS gate reflects an unrealistic threshold given current 52T data quality.
 
+### Key Findings (post-hoc TSV analysis, 2026-04-19)
+
+**Finding 1 — Raw features produce zero resolution on all 6 folds.**
+`z_score_off` resolution values from the TSV:
+
+| Fold       | z_score_on resolution | z_score_off resolution |
+|------------|-----------------------|------------------------|
+| 2019       | 0.0001345             | 0.0                    |
+| 2020-COVID | 0.0                   | 0.0                    |
+| 2021       | 4.234e-05             | 0.0                    |
+| 2022-Bear  | 0.00054428            | 0.0                    |
+| 2023       | 2.693e-05             | 0.0                    |
+| 2024-Val   | 1.1e-05               | 0.0                    |
+
+Without StandardScaler, every prediction collapses to the base rate — the model has zero
+discriminative power across all six folds. StandardScaler is the sole source of any
+resolution the system produces. This is a stronger argument for normalization than the
+fold-win count alone: the normalization is not merely incrementally better, it is the
+only condition under which the model discriminates at all.
+
+**Finding 2 — 2022-Bear n_scored = 416 / 13,052 (3.2%).**
+Only 3.2% of 2022-Bear validation queries returned a scored result. With so few predictions,
+the reliability term (0.0299) dwarfs the resolution term (0.00054) and produces the
+catastrophic -0.122284 BSS that dominates the mean. This is not a normalization failure —
+it is a coverage failure: max_distance=2.5 in 23D feature space is extremely sparse during
+a bear regime, where the nearest historical analogues are outside the distance threshold.
+The 52T pool has too few bear-market analogues for the 23D returns_candle fingerprint to
+find matches reliably. This is the mechanistic cause of the Condition B failure and the
+mean BSS regression vs the master plan's +0.00033 baseline.
+
+Both findings are recorded here; neither requires code changes. Finding 2 is tracked as
+part of the P8-PRE-1 recovery campaign (Track B/C: pool expansion to address coverage in
+bear regimes).
+
 ## Consequences
 
 - Production `standardize_features=True` **remains unchanged** (confirmed superior).

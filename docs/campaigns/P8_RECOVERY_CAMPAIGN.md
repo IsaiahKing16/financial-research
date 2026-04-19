@@ -610,20 +610,28 @@ Each track has its own 3-strike budget. Track failure does not exhaust the campa
 
 | Track | Status | Started | Completed | Gate Result | Commit |
 |-------|--------|---------|-----------|-------------|--------|
-| Track A | PENDING | — | — | — | — |
-| Track B | PENDING | — | — | — | — |
-| Track C | PENDING | — | — | — | — |
+| Track A | REJECTED | 2026-04-16 | 2026-04-16 | NULL — all N {52..585} fail G1+G6 | feature/p8-track-a-universe-sweep (unmerged) |
+| Track B | DEFERRED | — | — | Pending Phase 7.5 gate results | — |
+| Track C | DEFERRED | — | — | Pending Phase 7.5 gate results | — |
 
 ---
 
 ## §8 EXECUTION ORDER (Final)
 
+> **Strategic Reframe (2026-04-18):** FPPE_MASTER_PLAN_v4.0 inserts Phase 7.5 (Research
+> Integration Gate) before Phase 8 restarts. Track B and Track C are now mapped to Phase 8's
+> R1 integration window (R1-INT-1 multi-retriever ensemble ≈ Track B; R2-H9 ≈ Track C). The
+> Phase 7.5 diagnostic gates (G7.5-1 through G7.5-8) determine whether the fixes are even
+> needed: if G7.5-5 (CV BSS CI) excludes zero on ≥3/6 folds, the edge is real and Track B/C
+> architecture work proceeds. If G7.5-7 (MI ceiling) < 0.001, even Track B cannot fix the system.
+
 1. ~~Close out P8-PRE-1 per HANDOFF_P8-PRE-1_EXECUTE-AND-CLOSE.md~~ ✓ DONE (2026-04-16)
 2. ~~Create this campaign document~~ ✓ DONE (2026-04-16)
-3. **Track A** — universe sweep with equal weights; deferred weight sweep on success
-4. **Track B** — sector pools B.1-B.4; connector sweep S1-S6 if B.2 > B.1
-5. **Track C** — LightGBM vs KNN (KNN baseline = best of A/B; or 52T H7 config if both failed)
-6. Post-campaign: re-run P8-PRE-1 script with winning config, verify all 5 gates pass
+3. ~~**Track A**~~ ✓ REJECTED (2026-04-16) — null result, all N fail. ADR-014 written.
+4. **Phase 7.5** — Research Integration Gate (8 hard-block gates). See FPPE_MASTER_PLAN_v4.md.
+5. **Track B / R1-INT-1** — per-sector pools + connectors = multi-retriever ensemble. Runs during Phase 8 window.
+6. **Track C / R2-H9** — LightGBM vs KNN head-to-head. Runs during Phase 8 window.
+7. Post-Phase-7.5: re-run P8-PRE-1 equivalent with winning normalization + architecture config.
 
 ---
 

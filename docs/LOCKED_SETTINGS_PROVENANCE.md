@@ -97,3 +97,53 @@ regime=hold_spy_threshold+0.05, horizon=fwd_7d_up, stop_loss_atr_multiple=3.0
   intervals (width ~1.0). 2020-COVID fold coverage 0% (no gamma achieves 88% --
   ACI over-tightens on COVID volatility).
 - Provenance: results/phase7/e4_conformal_coverage.tsv (2026-04-09)
+
+---
+
+## Research Corpus Corrections (Master Plan v4.0, 2026-04-18)
+
+These are corrections to locked settings or architectural choices identified by 57-paper research
+synthesis in three documents. Source: FPPE_MASTER_PLAN_v4.0, §Corrections Applied from Research Corpus.
+
+### Kelly Formula — Sortino-Adjusted (P8-PRE-4 correction)
+- **Old:** `f* = mu/sigma²` (standard Kelly)
+- **New:** `f* = mu/sigma_downside²` (Sortino-adjusted Kelly)
+- **Applied in:** P8-PRE-4 position sizer. Downside standard deviation uses only negative returns.
+- **Rationale:** Standard Kelly penalizes upside volatility equally to downside. Sortino-adjusted
+  Kelly correctly ignores upside volatility, producing larger position sizes in trending markets.
+- **Status:** Adopted. Verify `trading_system/position_sizer.py` uses downside deviation.
+
+### scoringrules — Mandatory (P8-PRE-2 correction)
+- **Old:** "should-have" / optional dependency
+- **New:** "must-have" / mandatory for Phase 8 monitoring and CRPS evaluation
+- **Applied in:** P8-PRE-2. `pip install scoringrules` required before Phase 8.
+- **Rationale:** Double-confirmed by research corpus. CRPS is the primary scoring metric for
+  probabilistic forecast evaluation alongside BSS.
+
+### HMM Look-Ahead Risk (G7.5-4 diagnostic)
+- **Old:** `hmmlearn.predict_proba()` (uses Kim smoother — future observations)
+- **New (if hmmlearn used):** `statsmodels.MarkovRegression` with `filtered_marginal_probabilities`
+- **Applied in:** G7.5-4 audit gate. Audit `pattern_engine/regime_labeler.py` first.
+- **Rationale:** Kim smoother uses future observations to smooth state posteriors — a look-ahead
+  trap in walk-forward validation. Filtered (forward-only) probabilities are correct.
+- **Status:** AUDIT REQUIRED (T7.5-4). If hmmlearn not found, correction is vacuous.
+
+### sklearn Deprecation — multi_class Parameter (R2-H9)
+- **Old:** `LogisticRegression(multi_class='multinomial')`
+- **New:** `LogisticRegression(multi_class='auto')` or omit the parameter
+- **Applied in:** R2-H9 LightGBM head-to-head. Removed in sklearn 1.7.
+- **Status:** Not yet implemented. Apply when building R2-H9 LightGBM matcher.
+
+### EOQ Rebalancing Exponent (Phase 11)
+- **Old:** `√λ` (square-root law for rebalancing frequency)
+- **New:** `λ^(1/3)` (cube-root law, corrected formula)
+- **Applied in:** Phase 11 hyper-scale rebalancing. Not relevant until 5,200T universe.
+- **Status:** Not yet implemented. Apply when building Phase 11 rebalancing logic.
+
+### KNN+LightGBM Architecture — Delta Model Pattern (R2-H9)
+- **Old:** Simple probability averaging of KNN and LightGBM outputs
+- **New:** Delta Model (residual learning): KNN predicts first; LightGBM predicts KNN's residual
+  using out-of-fold KNN predictions. Final: `p_ensemble = p_knn + lgbm.predict([features, p_knn])`
+- **Applied in:** R2-H9 spec. Out-of-fold constraint is critical — prevents LightGBM from
+  learning KNN's training-set overfitting.
+- **Status:** Not yet implemented. Apply when building R2-H9.

@@ -57,21 +57,26 @@ regime=hold_spy_threshold+0.05(mode=hold), horizon=fwd_7d_up, stop_loss_atr_mult
 - `docs/superpowers/plans/2026-04-06-phase4-portfolio-manager-plan.md` — Phase 4 plan
 - `docs/campaigns/P8_RECOVERY_CAMPAIGN.md` — Active recovery campaign (Track A/B/C)
 - `docs/adr/` — ADR-007 (VOL_NORM), ADR-008 (Ruff/mypy/Bandit), ADR-009 (FiniteFloat),
-  ADR-010 (structlog), ADR-011 (icontract), ADR-012 (P10 audit), ADR-013 (calibration split)
+  ADR-010 (structlog), ADR-011 (icontract), ADR-012 (P10 audit), ADR-013 (calibration split),
+  ADR-014 (dynamic universe selection — Track A null result, unmerged worktree)
 - `pyproject.toml` — Static analysis toolchain config (ruff, mypy, bandit)
 - `docs/PHASE_COMPLETION_LOG.md` — Full phase history with metrics
 
 ## Current Phase
 **P8-PRE-1 FAIL** (2026-04-16) — 585T full-stack walk-forward DID NOT PASS
   Failed gates: G1 (0/6 BSS positive), G2 (Sharpe=0.04), G5 (Win rate=47.5%)
+  Root cause: Resolution ≈ 0 at 585T from pool dilution (585T=0.000709 vs 52T=0.007621)
   Provenance: results/phase8_pre/585t_gate_check.txt
-**T8.1 BLOCKED on P8-PRE-1 failure.** Recovery campaign ACTIVE.
-**NEXT: P8-RECOVERY-CAMPAIGN** — Three-track research: Track A (universe sizing),
-  Track B (per-sector pools + connectors), Track C (LightGBM). See docs/campaigns/P8_RECOVERY_CAMPAIGN.md
-**Phases 1-7 + P8-PRE-4/5/6 COMPLETE.** 945 tests. See docs/PHASE_COMPLETION_LOG.md.
+**Recovery Campaign Track A REJECTED** (2026-04-16) — all N ∈ {52..585} fail G1+G6.
+  Resolution U-curve refutes monotone dilution hypothesis. See docs/adr/ADR-014-dynamic-universe-selection.md.
+  Track A tests (27) in unmerged worktree `feature/p8-track-a-universe-sweep`. Main: 945 tests.
+**NEXT: Phase 7.5** (Research Integration Gate) — 8 diagnostic + structural gates that
+  must pass before Phase 8 restarts. Track B/C deferred to Phase 8 R1 integration window.
+  See FPPE_MASTER_PLAN_v4.md (Phase 7.5) and docs/campaigns/P8_RECOVERY_CAMPAIGN.md.
+**Phases 1-7, P8-PRE-4/5/6, R3 COMPLETE.** 945 tests. See docs/PHASE_COMPLETION_LOG.md.
 
 ## Session Protocol
-1. Read this file (automatic). 2. Check `docs/campaigns/`. 3. End: `/session-handoff`.
+1. Read this file (automatic). 2. Check `docs/campaigns/` and `FPPE_MASTER_PLAN_v4.md`. 3. End: `/session-handoff`.
 
 ## Environment
 Windows 11, Ryzen 9 5900X, 32GB RAM, Python 3.12. venv: `venv\Scripts\activate`

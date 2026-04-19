@@ -33,8 +33,8 @@ This project is built by a **team of AI agents working together**, not a collect
 
 | # | Agent | Cursor API String | Role |
 |---|-------|-------------------|------|
-| 1 | Claude Opus (Lead Architect) | `claude-3-opus` | Complex multi-file integration, architectural decisions, critical path |
-| 2 | Claude Sonnet (Fast Implementer) | `claude-3.5-sonnet` | Scoped implementation, test writing, documentation |
+| 1 | Claude Opus (Lead Architect) | `claude-opus-4-6` | Complex multi-file integration, architectural decisions, critical path |
+| 2 | Claude Sonnet (Fast Implementer) | `claude-sonnet-4-6` | Scoped implementation, test writing, documentation |
 | 3 | Composer 2 | N/A (native Cursor UI only) | Plan review, milestone sign-off, cross-agent synthesis |
 | 4 | GPT-4o | `gpt-4o` | Parallel isolated module work, data processing scripts |
 | 5 | o1 | `o1` | Deep algorithmic validation, math verification, edge-case detection |
@@ -226,7 +226,7 @@ HANDOFF to [Agent Name]:
 
 ---
 
-*AGENTS.md v2.0 — March 20, 2026 — Updated for Phase 3 completion*
+*AGENTS.md v2.1 — April 18, 2026 — Updated model IDs (claude-opus-4-6, claude-sonnet-4-6); current phase is Phase 7.5*
 *This file is read by ALL agents at the start of each session. Keep it current.*
 
 ---

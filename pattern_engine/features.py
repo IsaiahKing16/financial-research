@@ -167,3 +167,36 @@ def apply_feature_weights(
         if w != 1.0:
             X_weighted[:, i] *= w
     return X_weighted
+
+
+@icontract.require(lambda returns_cols: len(returns_cols) > 0, "returns_cols must not be empty.")
+@icontract.require(lambda candle_cols: len(candle_cols) > 0, "candle_cols must not be empty.")
+@icontract.ensure(lambda result: len(result) > 0, "Result must not be empty.")
+def group_balanced_weights(
+    returns_cols: list[str],
+    candle_cols: list[str],
+) -> dict[str, float]:
+    """Compute per-feature weights that equalize group contributions to L2 distance.
+
+    After StandardScaler (unit variance per feature), the returns group and
+    candle group contribute n_returns and n_candle units respectively to L2².
+    These weights scale each group so both contribute n_total/2 units.
+
+    Formula: weight_group = sqrt(n_total / (2 * n_group))
+
+    Args:
+        returns_cols: Column names for the returns feature group (non-empty).
+        candle_cols:  Column names for the candlestick feature group (non-empty).
+
+    Returns:
+        Dict mapping each column name to its scalar weight.
+        Pass directly to apply_feature_weights() or EngineConfig.feature_weights.
+    """
+    n_r = len(returns_cols)
+    n_c = len(candle_cols)
+    n_total = n_r + n_c
+    r_weight = (n_total / (2.0 * n_r)) ** 0.5
+    c_weight = (n_total / (2.0 * n_c)) ** 0.5
+    weights = {col: r_weight for col in returns_cols}
+    weights.update({col: c_weight for col in candle_cols})
+    return weights
